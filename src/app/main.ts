@@ -51,13 +51,14 @@ window.addEventListener('keydown', (e) => {
   }
 });
 
-// Animation loop. Game time will enter the core as tick events stamped from
-// the injected clock (arriving with the Round timer ticket); rendering time
-// stays wall-clock so animations play even under the manual test clock.
+// Animation loop. Game time enters the core only as TICK events stamped from
+// the injected clock; rendering time stays wall-clock so animations play even
+// under the manual test clock.
 let lastFrame = performance.now();
 function loop(now: number) {
   const dt = now - lastFrame;
   lastFrame = now;
+  store.dispatch({ type: 'TICK', now: clock.now() });
   renderer.frame(dt);
   requestAnimationFrame(loop);
 }
@@ -65,8 +66,12 @@ requestAnimationFrame(loop);
 
 // Flow tests drive game time through this hook (?testClock) instead of waiting.
 if (testMode) {
+  const manual = clock as ManualClock;
   window.__mathhero = {
-    advance: (ms) => (clock as ManualClock).advance(ms),
+    advance(ms) {
+      manual.advance(ms);
+      store.dispatch({ type: 'TICK', now: manual.now() });
+    },
     dispatch: store.dispatch,
     getState: store.getState,
   };

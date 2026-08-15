@@ -7,6 +7,8 @@ export interface Question {
   b: number;
 }
 
+export type Phase = 'pre-round' | 'in-round' | 'results';
+
 export interface GameConfig {
   /** Seed for the injected PRNG — the core never calls Math.random. */
   seed: number;
@@ -15,6 +17,13 @@ export interface GameConfig {
 export interface GameState {
   /** Injected PRNG state; advanced immutably by every random draw. */
   prng: number;
+  phase: Phase;
+  /** Round length setting in seconds; clamped to 30–600, default 120. */
+  timerSeconds: number;
+  /** Latest tick timestamp (ms) — the core's only notion of "now". */
+  now: number;
+  /** Tick timestamp when the current Round began. */
+  roundStartedAt: number;
   score: number;
   question: Question;
   /** Digits typed so far, most recent last. Submit is an explicit event. */
@@ -22,6 +31,10 @@ export interface GameState {
 }
 
 export type GameEvent =
+  | { type: 'TICK'; now: number }
+  | { type: 'TIMER_CHANGED'; seconds: number }
+  | { type: 'ROUND_STARTED' }
+  | { type: 'PLAY_AGAIN' }
   | { type: 'DIGIT_PRESSED'; digit: number }
   | { type: 'BACKSPACE_PRESSED' }
   | { type: 'ANSWER_SUBMITTED' };
@@ -29,7 +42,8 @@ export type GameEvent =
 export type GameEffect =
   | { type: 'ANSWER_CORRECT'; question: Question; points: number }
   | { type: 'ANSWER_WRONG'; question: Question; correctAnswer: number }
-  | { type: 'QUESTION_ASKED'; question: Question };
+  | { type: 'QUESTION_ASKED'; question: Question }
+  | { type: 'ROUND_ENDED'; finalScore: number };
 
 export interface UpdateResult {
   state: GameState;

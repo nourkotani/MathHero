@@ -57,6 +57,98 @@ body {
   color: #ffe14d;
 }
 
+.screen-center {
+  justify-content: center;
+  gap: 1.5rem;
+}
+
+.screen-title {
+  font-size: 3rem;
+  font-weight: 800;
+  color: #fff;
+  text-shadow: 0 3px 10px rgba(0, 0, 0, 0.6);
+}
+
+.timer-setting {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  pointer-events: auto;
+}
+
+.timer-button {
+  width: 4rem;
+}
+
+.timer-display {
+  font-size: 2.5rem;
+  font-weight: 800;
+  color: #fff;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  min-width: 7ch;
+  text-align: center;
+}
+
+.big-button {
+  pointer-events: auto;
+  font-size: 2.2rem;
+  font-weight: 800;
+  padding: 1rem 3.5rem;
+  border: none;
+  border-radius: 1.5rem;
+  background: #ff9f1c;
+  color: #fff;
+  cursor: pointer;
+  box-shadow: 0 6px 0 rgba(0, 0, 0, 0.25);
+  transition: transform 0.05s;
+}
+
+.big-button:active {
+  transform: translateY(4px);
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.25);
+}
+
+.round-top {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.countdown {
+  font-size: 2.5rem;
+  font-weight: 800;
+  color: #fff;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+
+.countdown-urgent {
+  color: #ff5252;
+  animation: countdown-pulse 0.5s ease-in-out infinite alternate;
+}
+
+@keyframes countdown-pulse {
+  from {
+    transform: scale(1);
+  }
+  to {
+    transform: scale(1.18);
+  }
+}
+
+.final-score {
+  font-size: 3.5rem;
+  font-weight: 800;
+  color: #ffe14d;
+  text-shadow: 0 3px 10px rgba(0, 0, 0, 0.6);
+}
+
+.encourage {
+  font-size: 1.5rem;
+  color: #fff;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+
 .number-pad {
   margin-top: auto;
   display: grid;

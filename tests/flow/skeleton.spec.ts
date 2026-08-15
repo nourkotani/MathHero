@@ -1,8 +1,9 @@
 import { expect, test } from '@playwright/test';
-import { answerOnPad, openGame, readCorrectAnswer } from './helpers';
+import { answerOnPad, openGame, readCorrectAnswer, startRound } from './helpers';
 
 test('correct answer via the on-screen pad increases the score', async ({ page }) => {
   await openGame(page);
+  await startRound(page);
 
   await expect(page.getByTestId('score')).toContainText('0');
   const answer = await readCorrectAnswer(page);
@@ -15,6 +16,7 @@ test('correct answer via the on-screen pad increases the score', async ({ page }
 
 test('keyboard entry with backspace works and submits on Enter', async ({ page }) => {
   await openGame(page);
+  await startRound(page);
 
   // Type a stray digit, erase it, then type the real answer.
   await page.keyboard.press('5');
@@ -33,6 +35,7 @@ test('keyboard entry with backspace works and submits on Enter', async ({ page }
 
 test('a wrong answer scores nothing and advances to a new question', async ({ page }) => {
   await openGame(page, '?seed=12345');
+  await startRound(page);
 
   const before = await page.getByTestId('question').innerText();
   const answer = await readCorrectAnswer(page);
@@ -61,6 +64,7 @@ test('the game makes no network requests', async ({ page }) => {
     if (!request.url().startsWith('file://')) remote.push(request.url());
   });
   await openGame(page);
+  await startRound(page);
   const answer = await readCorrectAnswer(page);
   await answerOnPad(page, answer);
   expect(remote).toEqual([]);

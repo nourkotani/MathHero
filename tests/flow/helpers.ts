@@ -4,9 +4,25 @@ import type { Page } from '@playwright/test';
 
 const BUILT_FILE = resolve(import.meta.dirname, '../../dist/MathHero.html');
 
+declare global {
+  interface Window {
+    __mathhero?: { advance(ms: number): void };
+  }
+}
+
 /** Open the built single-file game the way the family does: over file://. */
 export async function openGame(page: Page, query = ''): Promise<void> {
   await page.goto(pathToFileURL(BUILT_FILE).href + query);
+}
+
+/** Press GO! on the pre-round screen. */
+export async function startRound(page: Page): Promise<void> {
+  await page.getByTestId('start-round').click();
+}
+
+/** Drive the injected clock forward (requires opening with ?testClock=1). */
+export async function advanceClock(page: Page, ms: number): Promise<void> {
+  await page.evaluate((m) => window.__mathhero?.advance(m), ms);
 }
 
 /** Read the current question off the HUD and return its correct answer. */
