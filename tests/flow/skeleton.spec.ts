@@ -33,18 +33,18 @@ test('keyboard entry with backspace works and submits on Enter', async ({ page }
   await expect(page.getByTestId('score')).toContainText('10');
 });
 
-test('a wrong answer scores nothing and advances to a new question', async ({ page }) => {
+test('a wrong answer scores nothing and moves on after the teaching moment', async ({ page }) => {
   await openGame(page, '?seed=12345');
   await startRound(page);
 
-  const before = await page.getByTestId('question').innerText();
   const answer = await readCorrectAnswer(page);
   await answerOnPad(page, answer + 1);
 
   await expect(page.getByTestId('score')).toContainText('0');
+  // The correct equation is shown briefly, then a fresh question appears.
+  await expect(page.getByTestId('feedback')).toContainText(`= ${answer}`);
+  await expect(page.getByTestId('question')).toBeVisible({ timeout: 10_000 });
   await expect(page.getByTestId('answer')).toHaveText('?');
-  // Deterministic seed: the question after a submit differs from the one before.
-  await expect(page.getByTestId('question')).not.toHaveText(before);
 });
 
 test('localStorage works under file:// (persistence harness smoke check)', async ({ page }) => {

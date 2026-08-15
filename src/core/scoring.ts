@@ -1,9 +1,10 @@
-// The single place "points for this correct answer" is computed.
-// The Power Streak ticket multiplies the base here.
+// The single place "points for this correct answer" is computed:
+// difficulty base points × Power Streak multiplier.
 
 import { tierFor } from './difficulty';
-import type { GameState } from './types';
+import type { Difficulty } from './difficulty';
+import { tierForStreak } from './streak';
 
-export function pointsForCorrect(state: GameState): number {
-  return tierFor(state.difficulty).basePoints;
+export function pointsForCorrect(difficulty: Difficulty, streak: number): number {
+  return tierFor(difficulty).basePoints * tierForStreak(streak).multiplier;
 }

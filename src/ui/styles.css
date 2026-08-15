@@ -152,6 +152,48 @@ body {
   }
 }
 
+.multiplier {
+  font-size: 2.2rem;
+  font-weight: 800;
+  padding: 0.1rem 1rem;
+  border-radius: 1rem;
+  color: #fff;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+.multiplier-aura {
+  background: #3ac0ff;
+}
+
+.multiplier-surge {
+  background: #8f5aff;
+}
+
+.multiplier-super {
+  background: #ffb300;
+  animation: countdown-pulse 0.4s ease-in-out infinite alternate;
+}
+
+.feedback {
+  margin-top: 3rem;
+  text-align: center;
+  background: rgba(0, 0, 0, 0.55);
+  border-radius: 2rem;
+  padding: 2rem 3rem;
+}
+
+.feedback-title {
+  font-size: 1.6rem;
+  color: #ffe14d;
+  font-weight: 700;
+}
+
+.feedback-equation {
+  font-size: 3.5rem;
+  font-weight: 800;
+  color: #fff;
+}
+
 .final-score {
   font-size: 3.5rem;
   font-weight: 800;

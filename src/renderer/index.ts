@@ -2,12 +2,24 @@
 // plus frame(dt) from the shell's animation loop. Scene internals are private.
 
 import * as THREE from 'three';
-import type { GameEffect, GameState } from '../core';
+import type { GameEffect, GameState, StreakForm } from '../core';
 
 export interface Renderer {
   onStoreUpdate(state: GameState, effects: GameEffect[]): void;
   frame(dtMs: number): void;
 }
+
+// First-pass visual treatment per streak form; the polish ticket re-skins
+// these mappings without the core knowing.
+const FORM_LOOKS: Record<
+  StreakForm,
+  { hair: number; auraColor: number; auraOpacity: number; emissive: number }
+> = {
+  base: { hair: 0x2b2b2b, auraColor: 0x000000, auraOpacity: 0, emissive: 0 },
+  aura: { hair: 0x2b2b2b, auraColor: 0x3ac0ff, auraOpacity: 0.45, emissive: 0.15 },
+  surge: { hair: 0xffe14d, auraColor: 0x8f5aff, auraOpacity: 0.6, emissive: 0.35 },
+  super: { hair: 0xffd700, auraColor: 0xffb300, auraOpacity: 0.8, emissive: 0.6 },
+};
 
 export function createRenderer(canvas: HTMLCanvasElement): Renderer {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -42,16 +54,30 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
   scene.add(arena);
 
   const hero = buildPlaceholderHero();
-  hero.position.set(-2.4, 0.3, 0);
-  hero.rotation.y = Math.PI / 2;
-  scene.add(hero);
+  hero.group.position.set(-2.4, 0.3, 0);
+  hero.group.rotation.y = Math.PI / 2;
+  scene.add(hero.group);
 
   const dummy = buildTrainingDummy();
   dummy.position.set(2.4, 0.3, 0);
   scene.add(dummy);
 
+  const blasts: THREE.Mesh[] = [];
   let elapsed = 0;
   let punchTimer = 0; // seconds remaining in the hero's strike animation
+  let dummyKick = 0; // seconds remaining in the dummy's recoil
+
+  function applyForm(form: StreakForm) {
+    const look = FORM_LOOKS[form];
+    hero.hairMaterial.color.setHex(look.hair);
+    hero.hairMaterial.emissive.setHex(look.hair);
+    hero.hairMaterial.emissiveIntensity = look.emissive;
+    hero.bodyMaterial.emissive.setHex(look.auraColor);
+    hero.bodyMaterial.emissiveIntensity = look.emissive;
+    hero.auraMaterial.color.setHex(look.auraColor);
+    hero.auraMaterial.opacity = look.auraOpacity;
+  }
+  applyForm('base');
 
   window.addEventListener('resize', () => {
     camera.aspect = window.innerWidth / window.innerHeight;
@@ -62,8 +88,30 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
   return {
     onStoreUpdate(_state, effects) {
       for (const effect of effects) {
-        if (effect.type === 'ANSWER_CORRECT') {
-          punchTimer = 0.35;
+        switch (effect.type) {
+          case 'ANSWER_CORRECT':
+            punchTimer = 0.35;
+            dummyKick = 0.35;
+            break;
+          case 'TRANSFORMED':
+            applyForm(effect.form);
+            break;
+          case 'STREAK_BROKEN':
+          case 'ROUND_ENDED':
+            applyForm('base');
+            break;
+          case 'BLAST_FIRED': {
+            const blast = new THREE.Mesh(
+              new THREE.SphereGeometry(0.28, 12, 10),
+              new THREE.MeshBasicMaterial({ color: 0xffe14d }),
+            );
+            blast.position.set(-1.6, 1.6, 0);
+            scene.add(blast);
+            blasts.push(blast);
+            break;
+          }
+          default:
+            break;
         }
       }
     },
@@ -71,20 +119,36 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       const dt = Math.min(dtMs, 100) / 1000;
       elapsed += dt;
 
-      // Idle bob for both figures.
-      hero.position.y = 0.3 + Math.sin(elapsed * 2.2) * 0.05;
+      // Idle bob for both figures; the aura slowly spins.
+      hero.group.position.y = 0.3 + Math.sin(elapsed * 2.2) * 0.05;
+      hero.aura.rotation.y = elapsed * 1.5;
       dummy.rotation.z = Math.sin(elapsed * 1.1) * 0.03;
 
       // Strike lunge toward the dummy on a correct answer.
       if (punchTimer > 0) {
         punchTimer = Math.max(0, punchTimer - dt);
-        const t = punchTimer / 0.35;
-        const lunge = Math.sin((1 - t) * Math.PI);
-        hero.position.x = -2.4 + lunge * 1.5;
-        dummy.rotation.x = lunge * 0.35;
+        const lunge = Math.sin((1 - punchTimer / 0.35) * Math.PI);
+        hero.group.position.x = -2.4 + lunge * 1.5;
       } else {
-        hero.position.x = -2.4;
+        hero.group.position.x = -2.4;
+      }
+      if (dummyKick > 0) {
+        dummyKick = Math.max(0, dummyKick - dt);
+        dummy.rotation.x = Math.sin((1 - dummyKick / 0.35) * Math.PI) * 0.35;
+      } else {
         dummy.rotation.x = 0;
+      }
+
+      // Energy blasts fly toward the dummy and burst.
+      for (let i = blasts.length - 1; i >= 0; i--) {
+        const blast = blasts[i];
+        if (!blast) continue;
+        blast.position.x += dt * 14;
+        if (blast.position.x >= dummy.position.x) {
+          scene.remove(blast);
+          blasts.splice(i, 1);
+          dummyKick = 0.5;
+        }
       }
 
       renderer.render(scene, camera);
@@ -92,12 +156,18 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
   };
 }
 
-function buildPlaceholderHero(): THREE.Group {
+interface HeroRig {
+  group: THREE.Group;
+  hairMaterial: THREE.MeshStandardMaterial;
+  bodyMaterial: THREE.MeshStandardMaterial;
+  aura: THREE.Mesh;
+  auraMaterial: THREE.MeshBasicMaterial;
+}
+
+function buildPlaceholderHero(): HeroRig {
   const group = new THREE.Group();
-  const body = new THREE.Mesh(
-    new THREE.CapsuleGeometry(0.45, 1.0, 6, 12),
-    new THREE.MeshStandardMaterial({ color: 0x3a6fd8 }),
-  );
+  const bodyMaterial = new THREE.MeshStandardMaterial({ color: 0x3a6fd8 });
+  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.45, 1.0, 6, 12), bodyMaterial);
   body.position.y = 1.0;
   group.add(body);
 
@@ -108,13 +178,22 @@ function buildPlaceholderHero(): THREE.Group {
   head.position.y = 2.05;
   group.add(head);
 
-  const hair = new THREE.Mesh(
-    new THREE.ConeGeometry(0.32, 0.55, 8),
-    new THREE.MeshStandardMaterial({ color: 0x2b2b2b }),
-  );
+  const hairMaterial = new THREE.MeshStandardMaterial({ color: 0x2b2b2b });
+  const hair = new THREE.Mesh(new THREE.ConeGeometry(0.32, 0.55, 8), hairMaterial);
   hair.position.y = 2.45;
   group.add(hair);
-  return group;
+
+  const auraMaterial = new THREE.MeshBasicMaterial({
+    color: 0x3ac0ff,
+    transparent: true,
+    opacity: 0,
+    side: THREE.DoubleSide,
+  });
+  const aura = new THREE.Mesh(new THREE.ConeGeometry(0.95, 2.8, 16, 1, true), auraMaterial);
+  aura.position.y = 1.4;
+  group.add(aura);
+
+  return { group, hairMaterial, bodyMaterial, aura, auraMaterial };
 }
 
 function buildTrainingDummy(): THREE.Group {

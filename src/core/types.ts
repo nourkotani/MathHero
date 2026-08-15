@@ -2,6 +2,7 @@
 // they never add a second entry point (ADR 0003, docs/ARCHITECTURE.md).
 
 import type { Difficulty } from './difficulty';
+import type { StreakForm } from './streak';
 
 /** A multiplication question in the operand order it is displayed. */
 export interface Question {
@@ -31,6 +32,10 @@ export interface GameState {
   question: Question;
   /** Digits typed so far, most recent last. Submit is an explicit event. */
   answerBuffer: string;
+  /** Consecutive correct answers this Round; resets at Round start. Never persisted. */
+  streak: number;
+  /** Wrong-answer teaching moment: the correct equation, shown until `until`. */
+  feedback: { question: Question; correctAnswer: number; until: number } | null;
 }
 
 export type GameEvent =
@@ -47,6 +52,9 @@ export type GameEffect =
   | { type: 'ANSWER_CORRECT'; question: Question; points: number }
   | { type: 'ANSWER_WRONG'; question: Question; correctAnswer: number }
   | { type: 'QUESTION_ASKED'; question: Question }
+  | { type: 'TRANSFORMED'; form: StreakForm; multiplier: number; streak: number }
+  | { type: 'STREAK_BROKEN' }
+  | { type: 'BLAST_FIRED' }
   | { type: 'ROUND_ENDED'; finalScore: number };
 
 export interface UpdateResult {

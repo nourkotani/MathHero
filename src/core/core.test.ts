@@ -123,14 +123,15 @@ describe('answer judging and scoring', () => {
       question,
       correctAnswer: question.a * question.b,
     });
-    expect(result.effects[1]).toMatchObject({ type: 'QUESTION_ASKED' });
+    expect(result.effects[1]).toEqual({ type: 'STREAK_BROKEN' });
   });
 
-  it('consecutive correct answers keep scoring', () => {
+  it('consecutive correct answers keep scoring (with streak multipliers)', () => {
     let state = freshRound(3);
-    for (let i = 1; i <= 5; i++) {
+    // Easy base 10; the ×2 aura ignites at streak 3.
+    for (const total of [10, 20, 40, 60, 80]) {
       state = answerCorrectly(state).state;
-      expect(state.score).toBe(i * 10); // Easy base points
+      expect(state.score).toBe(total);
     }
   });
 
