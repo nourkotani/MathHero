@@ -6,6 +6,7 @@
 
 import * as THREE from 'three';
 import {
+  DEFAULT_APPEARANCE,
   glowIntensityForLevel,
   HAIR_PRESETS,
   isFinalTenSeconds,
@@ -14,7 +15,7 @@ import {
   presetHex,
   unlockedCosmetics,
 } from '../core';
-import type { GameEffect, GameState, StreakForm } from '../core';
+import type { GameEffect, GameState, HairStyle, HeroAppearance, StreakForm } from '../core';
 
 export interface Renderer {
   onStoreUpdate(state: GameState, effects: GameEffect[]): void;
@@ -127,10 +128,26 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     clouds.push(cloud);
   }
 
-  const hero = buildHero();
-  hero.group.position.set(HERO_X, 0.3, 0);
-  hero.group.rotation.y = Math.PI / 2;
+  let hero = buildHero(DEFAULT_APPEARANCE);
+  let appearanceKey = JSON.stringify(DEFAULT_APPEARANCE);
+  placeHero();
   scene.add(hero.group);
+
+  function placeHero() {
+    hero.group.position.set(HERO_X, 0.3, 0);
+    hero.group.rotation.y = Math.PI / 2;
+  }
+
+  /** Swap the character model when the appearance changes (or is previewed). */
+  function rebuildHero(appearance: HeroAppearance) {
+    scene.remove(hero.group);
+    hero.group.traverse((obj) => {
+      if (obj instanceof THREE.Mesh) freeMesh(obj);
+    });
+    hero = buildHero(appearance);
+    placeHero();
+    scene.add(hero.group);
+  }
 
   const dummy = buildTrainingDummy();
   dummy.position.set(DUMMY_X, 0.3, 0);
@@ -169,14 +186,24 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
   }
   applyForm('base');
 
-  function applyPlayerColors(state: GameState) {
+  function applyLook(state: GameState) {
+    // During hero creation the draft is previewed live on the 3D character.
     const player = state.players.find((p) => p.id === state.activePlayerId);
-    if (!player) return;
-    const level = levelForXp(player.xp);
-    playerHair = presetHex(HAIR_PRESETS, player.colors.hair);
+    const draft = state.phase === 'hero-creation' ? state.draft : null;
+    const colors = draft?.colors ?? player?.colors;
+    const appearance = draft?.appearance ?? player?.appearance;
+    if (!colors || !appearance) return;
+    const level = draft ? 0 : levelForXp(player?.xp ?? 0);
+
+    const key = JSON.stringify(appearance);
+    if (key !== appearanceKey) {
+      appearanceKey = key;
+      rebuildHero(appearance);
+    }
+    playerHair = presetHex(HAIR_PRESETS, colors.hair);
     playerGlow = glowIntensityForLevel(level);
-    hero.bodyMaterial.color.setHex(presetHex(OUTFIT_PRESETS, player.colors.outfitPrimary));
-    hero.trimMaterial.color.setHex(presetHex(OUTFIT_PRESETS, player.colors.outfitSecondary));
+    hero.bodyMaterial.color.setHex(presetHex(OUTFIT_PRESETS, colors.outfitPrimary));
+    hero.trimMaterial.color.setHex(presetHex(OUTFIT_PRESETS, colors.outfitSecondary));
     const unlockedIds = new Set(unlockedCosmetics(level).map((c) => c.id));
     for (const [id, mesh] of hero.cosmetics) {
       mesh.visible = unlockedIds.has(id);
@@ -217,7 +244,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
 
   return {
     onStoreUpdate(state, effects) {
-      applyPlayerColors(state);
+      applyLook(state);
       urgent = isFinalTenSeconds(state);
       for (const effect of effects) {
         switch (effect.type) {
@@ -242,6 +269,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
             break;
           case 'STREAK_BROKEN':
           case 'ROUND_ENDED':
+          case 'ROUND_ABANDONED':
             applyForm('base');
             break;
           case 'BLAST_FIRED':
@@ -413,9 +441,13 @@ interface HeroRig {
   cosmetics: Map<string, THREE.Object3D>;
 }
 
-/** An original, DBZ-inspired (never copied) anime-style hero. */
-function buildHero(): HeroRig {
+/**
+ * An original, DBZ-inspired (never copied) anime-style hero, assembled from
+ * the chosen appearance: body style, hair style and length, and garment.
+ */
+function buildHero(appearance: HeroAppearance): HeroRig {
   const group = new THREE.Group();
+  const girl = appearance.body === 'girl';
 
   const bodyMaterial = new THREE.MeshStandardMaterial({ color: 0x3a6fd8, roughness: 0.6 });
   const trimMaterial = new THREE.MeshStandardMaterial({ color: 0xff9f1c, roughness: 0.5 });
@@ -423,13 +455,17 @@ function buildHero(): HeroRig {
 
   const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.45, 0.8, 6, 12), bodyMaterial);
   torso.position.y = 1.15;
-  torso.scale.set(1, 1, 0.8);
+  torso.scale.set(girl ? 0.86 : 1, 1, girl ? 0.7 : 0.8);
   group.add(torso);
 
-  const belt = new THREE.Mesh(new THREE.CylinderGeometry(0.47, 0.47, 0.16, 16), trimMaterial);
+  const belt = new THREE.Mesh(
+    new THREE.CylinderGeometry(girl ? 0.42 : 0.47, girl ? 0.42 : 0.47, 0.16, 16),
+    trimMaterial,
+  );
   belt.position.y = 0.82;
   group.add(belt);
 
+  const shoulder = girl ? 0.52 : 0.58;
   for (const side of [-1, 1]) {
     const leg = new THREE.Mesh(new THREE.CapsuleGeometry(0.16, 0.5, 4, 8), bodyMaterial);
     leg.position.set(side * 0.22, 0.4, 0);
@@ -440,18 +476,18 @@ function buildHero(): HeroRig {
     group.add(boot);
 
     const arm = new THREE.Mesh(new THREE.CapsuleGeometry(0.13, 0.5, 4, 8), bodyMaterial);
-    arm.position.set(side * 0.58, 1.25, 0);
+    arm.position.set(side * shoulder, 1.25, 0);
     arm.rotation.z = side * 0.35;
     group.add(arm);
 
     // Martial-artist wristbands in the outfit's trim color.
     const wristband = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.14, 10), trimMaterial);
-    wristband.position.set(side * 0.68, 1.02, 0);
+    wristband.position.set(side * (shoulder + 0.1), 1.02, 0);
     wristband.rotation.z = side * 0.35;
     group.add(wristband);
 
     const fist = new THREE.Mesh(new THREE.SphereGeometry(0.15, 10, 8), skinMaterial);
-    fist.position.set(side * 0.72, 0.92, 0);
+    fist.position.set(side * (shoulder + 0.14), 0.92, 0);
     group.add(fist);
   }
 
@@ -468,26 +504,33 @@ function buildHero(): HeroRig {
     group.add(eye);
   }
 
-  // Spiky anime hair: a crown of tilted cones, all sharing swappable materials.
+  // Anime hair from the chosen style; every strand shares the swappable
+  // hair materials so streak forms and player colors recolor them all.
   const hairMaterials: THREE.MeshStandardMaterial[] = [];
-  const spikes: Array<[number, number, number, number, number]> = [
-    // [x, y, z, tiltX, tiltZ]
-    [0, 2.62, 0, 0, 0],
-    [0.18, 2.55, 0.05, 0, -0.5],
-    [-0.18, 2.55, 0.05, 0, 0.5],
-    [0.1, 2.5, -0.18, 0.5, -0.25],
-    [-0.1, 2.5, -0.18, 0.5, 0.25],
-    [0.05, 2.52, 0.2, -0.45, -0.15],
-    [-0.05, 2.52, 0.2, -0.45, 0.15],
-  ];
-  for (const [x, y, z, tiltX, tiltZ] of spikes) {
+  const hairMat = () => {
     const material = new THREE.MeshStandardMaterial({ color: 0x2b2b2b, roughness: 0.4 });
     hairMaterials.push(material);
-    const spike = new THREE.Mesh(new THREE.ConeGeometry(0.14, 0.55, 6), material);
-    spike.position.set(x, y, z);
-    spike.rotation.x = tiltX;
-    spike.rotation.z = tiltZ;
-    group.add(spike);
+    return material;
+  };
+  const long = appearance.hairLength === 'long';
+  buildHair(group, appearance.hairStyle, long, hairMat);
+
+  // Garments beyond the basic gi.
+  if (appearance.garment === 'cape') {
+    const cape = new THREE.Mesh(new THREE.BoxGeometry(0.95, 1.5, 0.05), trimMaterial);
+    cape.position.set(0, 1.2, -0.4);
+    cape.rotation.x = 0.12;
+    group.add(cape);
+  } else if (appearance.garment === 'armor') {
+    const plate = new THREE.Mesh(new THREE.CapsuleGeometry(0.5, 0.5, 6, 12), trimMaterial);
+    plate.position.y = 1.32;
+    plate.scale.set(girl ? 0.9 : 1.02, 0.8, girl ? 0.78 : 0.9);
+    group.add(plate);
+    for (const side of [-1, 1]) {
+      const pad = new THREE.Mesh(new THREE.SphereGeometry(0.2, 10, 8), trimMaterial);
+      pad.position.set(side * (shoulder + 0.06), 1.6, 0);
+      group.add(pad);
+    }
   }
 
   const auraMaterial = new THREE.MeshBasicMaterial({
@@ -507,6 +550,69 @@ function buildHero(): HeroRig {
   }
 
   return { group, hairMaterials, bodyMaterial, trimMaterial, aura, auraMaterial, cosmetics };
+}
+
+type HairMat = () => THREE.MeshStandardMaterial;
+
+/** Anime hair styles, each in a short and a long variant. */
+function buildHair(group: THREE.Group, style: HairStyle, long: boolean, hairMat: HairMat): void {
+  const spike = (
+    x: number,
+    y: number,
+    z: number,
+    tiltX: number,
+    tiltZ: number,
+    radius = 0.14,
+    height = 0.55,
+  ) => {
+    const cone = new THREE.Mesh(new THREE.ConeGeometry(radius, height, 6), hairMat());
+    cone.position.set(x, y, z);
+    cone.rotation.x = tiltX;
+    cone.rotation.z = tiltZ;
+    group.add(cone);
+  };
+  const cap = (radiusScale: number, flatten: number, y: number) => {
+    const mesh = new THREE.Mesh(new THREE.SphereGeometry(0.37 * radiusScale, 16, 12), hairMat());
+    mesh.scale.set(1, flatten, 1);
+    mesh.position.y = y;
+    group.add(mesh);
+  };
+
+  switch (style) {
+    case 'spiky': {
+      spike(0, 2.62, 0, 0, 0);
+      spike(0.18, 2.55, 0.05, 0, -0.5);
+      spike(-0.18, 2.55, 0.05, 0, 0.5);
+      spike(0.1, 2.5, -0.18, 0.5, -0.25);
+      spike(-0.1, 2.5, -0.18, 0.5, 0.25);
+      spike(0.05, 2.52, 0.2, -0.45, -0.15);
+      spike(-0.05, 2.52, 0.2, -0.45, 0.15);
+      if (long) {
+        // A wild mane cascading down the back.
+        spike(0.14, 2.0, -0.34, 2.7, -0.1, 0.13, 0.85);
+        spike(-0.14, 2.0, -0.34, 2.7, 0.1, 0.13, 0.85);
+        spike(0, 1.9, -0.38, 2.8, 0, 0.15, 1.0);
+      }
+      break;
+    }
+    case 'flame': {
+      // One big swept-back flame of hair.
+      spike(0, 2.55, -0.05, -0.55, 0, 0.24, long ? 1.1 : 0.75);
+      spike(0.14, 2.45, -0.12, -0.7, -0.2, 0.18, long ? 0.9 : 0.6);
+      spike(-0.14, 2.45, -0.12, -0.7, 0.2, 0.18, long ? 0.9 : 0.6);
+      break;
+    }
+    case 'ponytail': {
+      cap(1.02, 0.75, 2.15);
+      spike(0, 2.35, -0.3, 2.45, 0, 0.12, long ? 0.9 : 0.5);
+      if (long) spike(0, 1.75, -0.42, 2.9, 0, 0.1, 0.7);
+      break;
+    }
+    case 'buzz': {
+      cap(long ? 1.06 : 1.0, long ? 0.75 : 0.6, long ? 2.18 : 2.22);
+      break;
+    }
+  }
 }
 
 /** One simple mesh per milestone cosmetic id from the core's table. */

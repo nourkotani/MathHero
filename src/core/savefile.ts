@@ -2,6 +2,8 @@
 // single validate + migrate pipeline. Export/import reuses this exact
 // codepath — anything that turns bytes into a valid document lives here.
 
+import { validAppearance } from './appearance';
+import type { HeroAppearance } from './appearance';
 import { MAX_NAME_LENGTH, validColors } from './players';
 import type { PlayerRecord } from './players';
 import type { GameState } from './types';
@@ -11,7 +13,7 @@ function validCount(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0;
 }
 
-export const SAVE_FILE_VERSION = 6;
+export const SAVE_FILE_VERSION = 7;
 
 export interface SaveFile {
   version: number;
@@ -68,6 +70,17 @@ const MIGRATIONS: Array<(doc: Record<string, unknown>) => Record<string, unknown
   (doc) => ({ ...doc, version: 5, lastExportAt: null }),
   // v5 → v6: the family-wide mute toggle persists.
   (doc) => ({ ...doc, version: 6, muted: false }),
+  // v6 → v7: players gain a hero appearance; older heroes keep their old look.
+  (doc) => ({
+    ...doc,
+    version: 7,
+    players: (Array.isArray(doc.players) ? doc.players : []).map(
+      (p: Record<string, unknown>) => ({
+        ...p,
+        appearance: { body: 'boy', hairStyle: 'spiky', hairLength: 'short', garment: 'gi' },
+      }),
+    ),
+  }),
 ];
 
 /**
@@ -136,6 +149,7 @@ function validatePlayer(entry: unknown): PlayerRecord | null {
     !validCount(p.xp) ||
     !validBests(p.bests) ||
     !validFactStats(p.factStats) ||
+    !validPlayerAppearance(p.appearance) ||
     typeof colors !== 'object' ||
     colors === null ||
     typeof colors.hair !== 'string' ||
@@ -154,11 +168,17 @@ function validatePlayer(entry: unknown): PlayerRecord | null {
     id: p.id,
     name,
     colors: playerColors,
+    appearance: p.appearance as HeroAppearance,
     roundsPlayed: p.roundsPlayed as number,
     xp: p.xp as number,
     bests: p.bests as PlayerRecord['bests'],
     factStats: p.factStats as PlayerRecord['factStats'],
   };
+}
+
+function validPlayerAppearance(appearance: unknown): boolean {
+  if (typeof appearance !== 'object' || appearance === null) return false;
+  return validAppearance(appearance as HeroAppearance);
 }
 
 function validFactStats(stats: unknown): boolean {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { familyLeaderboard, parseSaveFile, SAVE_FILE_VERSION, update } from './index';
-import type { GameState } from './index';
+import type { GameState, PlayerRecord } from './index';
 import { answerCorrectly, freshRound } from './test-helpers';
 
 /** Play a round scoring `corrects` correct answers, then end it. */
@@ -61,10 +61,10 @@ describe('Personal Bests', () => {
 
 describe('Family Leaderboard', () => {
   it('is derived from player bests and ordered by top score', () => {
-    const players = [
-      { id: 'p1', name: 'Zara', colors: { hair: 'gold', outfitPrimary: 'blue', outfitSecondary: 'teal' }, roundsPlayed: 1, xp: 100, bests: { easy: 100 }, factStats: {} },
-      { id: 'p2', name: 'Milo', colors: { hair: 'sky', outfitPrimary: 'red', outfitSecondary: 'white' }, roundsPlayed: 2, xp: 400, bests: { easy: 80, hard: 300 }, factStats: {} },
-      { id: 'p3', name: 'Ana', colors: { hair: 'rose', outfitPrimary: 'green', outfitSecondary: 'blue' }, roundsPlayed: 0, xp: 0, bests: {}, factStats: {} },
+    const players: PlayerRecord[] = [
+      { id: 'p1', name: 'Zara', colors: { hair: 'gold', outfitPrimary: 'blue', outfitSecondary: 'teal' }, appearance: { body: 'boy', hairStyle: 'spiky', hairLength: 'short', garment: 'gi' }, roundsPlayed: 1, xp: 100, bests: { easy: 100 }, factStats: {} },
+      { id: 'p2', name: 'Milo', colors: { hair: 'sky', outfitPrimary: 'red', outfitSecondary: 'white' }, appearance: { body: 'boy', hairStyle: 'spiky', hairLength: 'short', garment: 'gi' }, roundsPlayed: 2, xp: 400, bests: { easy: 80, hard: 300 }, factStats: {} },
+      { id: 'p3', name: 'Ana', colors: { hair: 'rose', outfitPrimary: 'green', outfitSecondary: 'blue' }, appearance: { body: 'boy', hairStyle: 'spiky', hairLength: 'short', garment: 'gi' }, roundsPlayed: 0, xp: 0, bests: {}, factStats: {} },
     ];
     const board = familyLeaderboard(players);
     expect(board.map((e) => e.id)).toEqual(['p2', 'p1', 'p3']);

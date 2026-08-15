@@ -1,6 +1,7 @@
 // The Game Core's public vocabulary. Later tickets extend these unions —
 // they never add a second entry point (ADR 0003, docs/ARCHITECTURE.md).
 
+import type { HeroAppearance } from './appearance';
 import type { Difficulty } from './difficulty';
 import type { CosmeticTier } from './level';
 import type { PlayerColors, PlayerRecord } from './players';
@@ -28,6 +29,8 @@ export interface GameState {
   phase: Phase;
   /** The family's heroes — the persisted heart of the Save File. */
   players: PlayerRecord[];
+  /** Hero-creation work in progress; the renderer previews it live. */
+  draft: { colors: PlayerColors; appearance: HeroAppearance } | null;
   activePlayerId: string | null;
   /** Monotonic counter minting stable player ids. */
   nextPlayerId: number;
@@ -65,7 +68,8 @@ export type GameEvent =
   | { type: 'TICK'; now: number }
   | { type: 'HERO_CREATION_OPENED' }
   | { type: 'CREATION_CANCELLED' }
-  | { type: 'PLAYER_CREATED'; name: string; colors: PlayerColors }
+  | { type: 'DRAFT_CHANGED'; colors: PlayerColors; appearance: HeroAppearance }
+  | { type: 'PLAYER_CREATED'; name: string; colors: PlayerColors; appearance: HeroAppearance }
   | { type: 'PLAYER_SELECTED'; id: string }
   | { type: 'PLAYER_RENAMED'; id: string; name: string }
   | { type: 'PLAYER_DELETED'; id: string }
@@ -77,6 +81,7 @@ export type GameEvent =
   | { type: 'DIFFICULTY_CHANGED'; difficulty: Difficulty }
   | { type: 'PRACTICE_TABLE_CHANGED'; table: number | null }
   | { type: 'ROUND_STARTED' }
+  | { type: 'ROUND_QUIT' }
   | { type: 'PLAY_AGAIN' }
   | { type: 'DIGIT_PRESSED'; digit: number }
   | { type: 'BACKSPACE_PRESSED' }
@@ -90,6 +95,8 @@ export type GameEffect =
   | { type: 'STREAK_BROKEN' }
   | { type: 'BLAST_FIRED' }
   | { type: 'ROUND_ENDED'; finalScore: number }
+  /** The player gave up mid-Round: nothing is recorded, no ceremony plays. */
+  | { type: 'ROUND_ABANDONED' }
   /** One per Hero Level gained, in order; carries any cosmetic tier unlocked. */
   | { type: 'LEVEL_UP'; level: number; cosmetic?: CosmeticTier }
   | { type: 'NEW_PERSONAL_BEST'; difficulty: Difficulty; score: number }

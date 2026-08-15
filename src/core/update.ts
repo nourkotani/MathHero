@@ -1,9 +1,10 @@
+import { DEFAULT_APPEARANCE, validAppearance } from './appearance';
 import { MAX_PRACTICE_TABLE, MIN_PRACTICE_TABLE } from './difficulty';
 import { factKey } from './facts';
 import { cosmeticUnlockedAt, levelForXp } from './level';
 import { recordAttempt } from './mastery';
 import type { FactStats } from './mastery';
-import { MAX_NAME_LENGTH, validColors } from './players';
+import { HAIR_PRESETS, MAX_NAME_LENGTH, OUTFIT_PRESETS, validColors } from './players';
 import { seedPrng } from './prng';
 import { buildSaveFile, parseSaveFile, serializeSaveFile } from './savefile';
 import { pointsForCorrect } from './scoring';
@@ -30,6 +31,7 @@ export function initialState(config: GameConfig): GameState {
     phase: 'title',
     practiceTable: null,
     players: config.save?.players ?? [],
+    draft: null,
     activePlayerId: null,
     nextPlayerId: config.save?.nextPlayerId ?? 1,
     lastExportAt: config.save?.lastExportAt ?? null,
@@ -143,18 +145,40 @@ export function update(state: GameState, event: GameEvent): UpdateResult {
 
     case 'HERO_CREATION_OPENED': {
       if (state.phase !== 'title') return noop(state);
-      return { state: { ...state, phase: 'hero-creation' }, effects: [] };
+      const defaultColors = {
+        hair: HAIR_PRESETS[0]?.id ?? '',
+        outfitPrimary: OUTFIT_PRESETS[0]?.id ?? '',
+        outfitSecondary: OUTFIT_PRESETS[1]?.id ?? '',
+      };
+      return {
+        state: {
+          ...state,
+          phase: 'hero-creation',
+          draft: { colors: defaultColors, appearance: DEFAULT_APPEARANCE },
+        },
+        effects: [],
+      };
     }
 
     case 'CREATION_CANCELLED': {
       if (state.phase !== 'hero-creation') return noop(state);
-      return { state: { ...state, phase: 'title' }, effects: [] };
+      return { state: { ...state, phase: 'title', draft: null }, effects: [] };
+    }
+
+    case 'DRAFT_CHANGED': {
+      if (state.phase !== 'hero-creation') return noop(state);
+      if (!validColors(event.colors) || !validAppearance(event.appearance)) return noop(state);
+      return {
+        state: { ...state, draft: { colors: event.colors, appearance: event.appearance } },
+        effects: [],
+      };
     }
 
     case 'PLAYER_CREATED': {
       if (state.phase !== 'hero-creation') return noop(state);
       const name = event.name.trim().slice(0, MAX_NAME_LENGTH);
-      if (name === '' || !validColors(event.colors)) return noop(state);
+      if (name === '' || !validColors(event.colors) || !validAppearance(event.appearance))
+        return noop(state);
       const id = `p${state.nextPlayerId}`;
       // First play starts the backup-reminder clock.
       const lastExportAt = state.lastExportAt ?? state.now;
@@ -162,6 +186,7 @@ export function update(state: GameState, event: GameEvent): UpdateResult {
         id,
         name,
         colors: event.colors,
+        appearance: event.appearance,
         roundsPlayed: 0,
         xp: 0,
         bests: {},
@@ -174,6 +199,7 @@ export function update(state: GameState, event: GameEvent): UpdateResult {
           nextPlayerId: state.nextPlayerId + 1,
           activePlayerId: id,
           lastExportAt,
+          draft: null,
           phase: 'pre-round',
         },
         effects: [{ type: 'SAVE_FILE_CHANGED' }],
@@ -303,6 +329,15 @@ export function update(state: GameState, event: GameEvent): UpdateResult {
           feedback: null,
         },
         effects: [{ type: 'QUESTION_ASKED', question: selected.question }],
+      };
+    }
+
+    case 'ROUND_QUIT': {
+      if (state.phase !== 'in-round') return noop(state);
+      // Abandoning a Round records nothing — no XP, no attribution, no best.
+      return {
+        state: { ...state, phase: 'pre-round', answerBuffer: '', feedback: null, streak: 0 },
+        effects: [{ type: 'ROUND_ABANDONED' }],
       };
     }
 

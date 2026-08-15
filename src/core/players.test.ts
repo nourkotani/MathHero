@@ -7,7 +7,7 @@ import {
   serializeSaveFile,
   update,
 } from './index';
-import { dispatchAll, preRound, TEST_COLORS } from './test-helpers';
+import { dispatchAll, preRound, TEST_APPEARANCE, TEST_COLORS } from './test-helpers';
 
 describe('hero creation', () => {
   it('creates a player with a stable id, makes them active, and heads to pre-round', () => {
@@ -15,9 +15,9 @@ describe('hero creation', () => {
     const opened = update(state, { type: 'HERO_CREATION_OPENED' }).state;
     expect(opened.phase).toBe('hero-creation');
 
-    const result = update(opened, { type: 'PLAYER_CREATED', name: '  Zara  ', colors: TEST_COLORS });
+    const result = update(opened, { type: 'PLAYER_CREATED', name: '  Zara  ', colors: TEST_COLORS, appearance: TEST_APPEARANCE });
     expect(result.state.players).toEqual([
-      { id: 'p1', name: 'Zara', colors: TEST_COLORS, roundsPlayed: 0, xp: 0, bests: {}, factStats: {} },
+      { id: 'p1', name: 'Zara', colors: TEST_COLORS, appearance: TEST_APPEARANCE, roundsPlayed: 0, xp: 0, bests: {}, factStats: {} },
     ]);
     expect(result.state.activePlayerId).toBe('p1');
     expect(result.state.phase).toBe('pre-round');
@@ -26,12 +26,13 @@ describe('hero creation', () => {
 
   it('rejects an empty name and unknown color presets', () => {
     const opened = update(initialState({ seed: 1 }), { type: 'HERO_CREATION_OPENED' }).state;
-    expect(update(opened, { type: 'PLAYER_CREATED', name: '   ', colors: TEST_COLORS }).state).toEqual(opened);
+    expect(update(opened, { type: 'PLAYER_CREATED', name: '   ', colors: TEST_COLORS, appearance: TEST_APPEARANCE }).state).toEqual(opened);
     expect(
       update(opened, {
         type: 'PLAYER_CREATED',
         name: 'Zara',
         colors: { ...TEST_COLORS, hair: 'nope' },
+        appearance: TEST_APPEARANCE,
       }).state,
     ).toEqual(opened);
   });
@@ -42,7 +43,7 @@ describe('hero creation', () => {
       { type: 'TITLE_OPENED' },
       { type: 'PLAYER_DELETED', id: 'p1' },
       { type: 'HERO_CREATION_OPENED' },
-      { type: 'PLAYER_CREATED', name: 'Second', colors: TEST_COLORS },
+      { type: 'PLAYER_CREATED', name: 'Second', colors: TEST_COLORS, appearance: TEST_APPEARANCE },
     ]);
     expect(state.players.map((p) => p.id)).toEqual(['p2']);
   });
@@ -53,7 +54,7 @@ describe('selection, rename, delete', () => {
     let state = dispatchAll(preRound(1, 'Zara'), [
       { type: 'TITLE_OPENED' },
       { type: 'HERO_CREATION_OPENED' },
-      { type: 'PLAYER_CREATED', name: 'Milo', colors: TEST_COLORS },
+      { type: 'PLAYER_CREATED', name: 'Milo', colors: TEST_COLORS, appearance: TEST_APPEARANCE },
       { type: 'TITLE_OPENED' },
     ]);
     state = update(state, { type: 'PLAYER_SELECTED', id: 'p1' }).state;

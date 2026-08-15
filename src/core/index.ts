@@ -22,6 +22,22 @@ export {
   xpForLevel,
 } from './level';
 export type { CosmeticTier } from './level';
+export {
+  BODY_OPTIONS,
+  DEFAULT_APPEARANCE,
+  GARMENT_OPTIONS,
+  HAIR_LENGTH_OPTIONS,
+  HAIR_STYLE_OPTIONS,
+  validAppearance,
+} from './appearance';
+export type {
+  AppearanceOption,
+  BodyStyle,
+  Garment,
+  HairLength,
+  HairStyle,
+  HeroAppearance,
+} from './appearance';
 export { factKey } from './facts';
 export type { FactKey } from './facts';
 export {

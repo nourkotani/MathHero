@@ -10,7 +10,7 @@ export function ResultsScreen({ state, dispatch, newBest, levelUps = [] }: AppPr
     <div class="hud screen-center">
       <h1 class="screen-title">Time's up!</h1>
       <div class="final-score" data-testid="final-score">
-        ⭐ {state.score} points
+        <span class="power-orb" /> {state.score} points
       </div>
       <div class="results-row">
         <div class="xp-gain" data-testid="xp-gain">

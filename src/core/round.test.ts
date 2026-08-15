@@ -77,6 +77,21 @@ describe('Round lifecycle', () => {
     expect(result.state.score).toBe(10);
   });
 
+  it('quitting a Round records nothing and returns to pre-round', () => {
+    const state = answerCorrectly(freshRound(9)).state;
+    const result = update(state, { type: 'ROUND_QUIT' });
+
+    expect(result.state.phase).toBe('pre-round');
+    expect(result.effects).toEqual([{ type: 'ROUND_ABANDONED' }]);
+    const player = result.state.players[0];
+    expect(player?.xp).toBe(0);
+    expect(player?.roundsPlayed).toBe(0);
+    expect(player?.bests).toEqual({});
+
+    // Quit is only meaningful mid-Round.
+    expect(update(result.state, { type: 'ROUND_QUIT' }).state).toEqual(result.state);
+  });
+
   it('play again returns to pre-round and keeps the timer setting', () => {
     let state = dispatchAll(preRound(1), [
       { type: 'TIMER_CHANGED', seconds: 300 },

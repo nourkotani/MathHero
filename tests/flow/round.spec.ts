@@ -23,6 +23,22 @@ for (const difficulty of ['easy', 'medium', 'hard'] as const) {
   });
 }
 
+test('a Round can be quit and nothing is recorded', async ({ page }) => {
+  await openGame(page, '?testClock=1&seed=55');
+  await createHero(page, 'Zara');
+  await startRound(page);
+
+  const answer = await readCorrectAnswer(page);
+  await answerOnPad(page, answer);
+  await page.getByTestId('quit-round').click();
+
+  // Straight back to pre-round; no Results, no recorded progress.
+  await expect(page.getByTestId('start-round')).toBeVisible();
+  await page.getByTestId('back-to-title').click();
+  await expect(page.getByTestId('player-p1')).toContainText('Lv 0');
+  await expect(page.getByTestId('leaderboard')).not.toBeVisible();
+});
+
 test('a complete Round: countdown, urgency pulse, Results, play again', async ({ page }) => {
   await openGame(page, '?testClock=1&seed=777');
   await createHero(page);

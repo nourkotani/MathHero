@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { buildSaveFile, initialState, parseSaveFile, serializeSaveFile, update } from './index';
+import {
+  buildSaveFile,
+  initialState,
+  parseSaveFile,
+  SAVE_FILE_VERSION,
+  serializeSaveFile,
+  update,
+} from './index';
 
 describe('the mute toggle', () => {
   it('flips and persists through the Save File', () => {
@@ -27,7 +34,7 @@ describe('the mute toggle', () => {
       lastExportAt: null,
     });
     const migrated = parseSaveFile(v5);
-    expect(migrated?.version).toBe(6);
+    expect(migrated?.version).toBe(SAVE_FILE_VERSION);
     expect(migrated?.muted).toBe(false);
   });
 });

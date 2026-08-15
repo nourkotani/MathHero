@@ -34,6 +34,7 @@ export interface PlayerColors {
   outfitSecondary: string;
 }
 
+import type { HeroAppearance } from './appearance';
 import type { Difficulty } from './difficulty';
 import type { FactStats } from './mastery';
 
@@ -42,6 +43,7 @@ export interface PlayerRecord {
   id: string;
   name: string;
   colors: PlayerColors;
+  appearance: HeroAppearance;
   /** Rounds completed by this Player — every Round is attributed to someone. */
   roundsPlayed: number;
   /** Lifetime XP: the sum of every Round's final score. Never resets. */

@@ -8,9 +8,16 @@ export function RoundScreen({ state, dispatch }: AppProps) {
   const tier = tierForStreak(state.streak);
   return (
     <div class="hud">
+      <button
+        class="corner-button quit-button"
+        data-testid="quit-round"
+        onClick={() => dispatch({ type: 'ROUND_QUIT' })}
+      >
+        ✕ Quit
+      </button>
       <div class="round-top">
         <div class="score" data-testid="score">
-          ⭐ {state.score}
+          <span class="power-orb" /> {state.score}
         </div>
         {state.practiceTable !== null && (
           <div class="practice-badge" data-testid="practice-badge">
