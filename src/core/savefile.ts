@@ -6,7 +6,7 @@ import { validColors } from './players';
 import type { PlayerRecord } from './players';
 import type { GameState } from './types';
 
-export const SAVE_FILE_VERSION = 1;
+export const SAVE_FILE_VERSION = 2;
 
 export interface SaveFile {
   version: number;
@@ -27,11 +27,17 @@ export function serializeSaveFile(save: SaveFile): string {
   return JSON.stringify(save, null, 2);
 }
 
-/**
- * Ordered migrations, index N upgrading version N+1 → N+2. Empty until the
- * schema first changes; the pipeline runs them all the same.
- */
-const MIGRATIONS: Array<(doc: Record<string, unknown>) => Record<string, unknown>> = [];
+/** Ordered migrations: MIGRATIONS[N - 1] upgrades a version-N document to N + 1. */
+const MIGRATIONS: Array<(doc: Record<string, unknown>) => Record<string, unknown>> = [
+  // v1 → v2: players gain lifetime XP.
+  (doc) => ({
+    ...doc,
+    version: 2,
+    players: (Array.isArray(doc.players) ? doc.players : []).map(
+      (p: Record<string, unknown>) => ({ ...p, xp: 0 }),
+    ),
+  }),
+];
 
 /**
  * The one codepath from bytes to a valid, current-version document —
@@ -82,6 +88,7 @@ function validatePlayer(entry: unknown): PlayerRecord | null {
     typeof p.name !== 'string' ||
     p.name.length === 0 ||
     typeof p.roundsPlayed !== 'number' ||
+    typeof p.xp !== 'number' ||
     typeof colors !== 'object' ||
     colors === null ||
     typeof colors.hair !== 'string' ||
@@ -101,5 +108,6 @@ function validatePlayer(entry: unknown): PlayerRecord | null {
     name: p.name,
     colors: playerColors,
     roundsPlayed: p.roundsPlayed,
+    xp: p.xp,
   };
 }

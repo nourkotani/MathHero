@@ -2,7 +2,14 @@
 // plus frame(dt) from the shell's animation loop. Scene internals are private.
 
 import * as THREE from 'three';
-import { HAIR_PRESETS, OUTFIT_PRESETS, presetHex } from '../core';
+import {
+  glowIntensityForLevel,
+  HAIR_PRESETS,
+  levelForXp,
+  OUTFIT_PRESETS,
+  presetHex,
+  unlockedCosmetics,
+} from '../core';
 import type { GameEffect, GameState, StreakForm } from '../core';
 
 export interface Renderer {
@@ -70,6 +77,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
   let dummyKick = 0; // seconds remaining in the dummy's recoil
   let currentForm: StreakForm = 'base';
   let playerHair = 0x2b2b2b;
+  let playerGlow = 0; // permanent per-level glow, derived from Hero Level
 
   function applyForm(form: StreakForm) {
     currentForm = form;
@@ -77,20 +85,26 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     const hairHex = look.hair ?? playerHair;
     hero.hairMaterial.color.setHex(hairHex);
     hero.hairMaterial.emissive.setHex(hairHex);
-    hero.hairMaterial.emissiveIntensity = look.emissive;
-    hero.bodyMaterial.emissive.setHex(look.auraColor);
-    hero.bodyMaterial.emissiveIntensity = look.emissive;
+    hero.hairMaterial.emissiveIntensity = Math.max(look.emissive, playerGlow * 0.5);
+    hero.bodyMaterial.emissive.setHex(look.auraColor === 0 ? 0xffffff : look.auraColor);
+    hero.bodyMaterial.emissiveIntensity = Math.max(look.emissive, playerGlow * 0.25);
     hero.auraMaterial.color.setHex(look.auraColor);
-    hero.auraMaterial.opacity = look.auraOpacity;
+    hero.auraMaterial.opacity = Math.max(look.auraOpacity, playerGlow * 0.2);
   }
   applyForm('base');
 
   function applyPlayerColors(state: GameState) {
     const player = state.players.find((p) => p.id === state.activePlayerId);
     if (!player) return;
+    const level = levelForXp(player.xp);
     playerHair = presetHex(HAIR_PRESETS, player.colors.hair);
+    playerGlow = glowIntensityForLevel(level);
     hero.bodyMaterial.color.setHex(presetHex(OUTFIT_PRESETS, player.colors.outfitPrimary));
     hero.trimMaterial.color.setHex(presetHex(OUTFIT_PRESETS, player.colors.outfitSecondary));
+    const unlockedIds = new Set(unlockedCosmetics(level).map((c) => c.id));
+    for (const [id, mesh] of hero.cosmetics) {
+      mesh.visible = unlockedIds.has(id);
+    }
     applyForm(currentForm);
   }
 
@@ -179,6 +193,8 @@ interface HeroRig {
   trimMaterial: THREE.MeshStandardMaterial;
   aura: THREE.Mesh;
   auraMaterial: THREE.MeshBasicMaterial;
+  /** Milestone cosmetic meshes keyed by their table id; hidden until unlocked. */
+  cosmetics: Map<string, THREE.Object3D>;
 }
 
 function buildPlaceholderHero(): HeroRig {
@@ -215,7 +231,70 @@ function buildPlaceholderHero(): HeroRig {
   aura.position.y = 1.4;
   group.add(aura);
 
-  return { group, hairMaterial, bodyMaterial, trimMaterial, aura, auraMaterial };
+  const cosmetics = buildCosmetics();
+  for (const mesh of cosmetics.values()) {
+    mesh.visible = false;
+    group.add(mesh);
+  }
+
+  return { group, hairMaterial, bodyMaterial, trimMaterial, aura, auraMaterial, cosmetics };
+}
+
+/** One simple mesh per milestone cosmetic id from the core's table. */
+function buildCosmetics(): Map<string, THREE.Object3D> {
+  const cosmetics = new Map<string, THREE.Object3D>();
+  const glowMaterial = (color: number) =>
+    new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.85 });
+
+  const crimsonAura = new THREE.Mesh(
+    new THREE.TorusGeometry(0.85, 0.06, 10, 32),
+    glowMaterial(0xff3b3b),
+  );
+  crimsonAura.rotation.x = Math.PI / 2;
+  crimsonAura.position.y = 0.15;
+  cosmetics.set('crimson-aura', crimsonAura);
+
+  const crown = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.05, 8, 24), glowMaterial(0xffd700));
+  crown.rotation.x = Math.PI / 2;
+  crown.position.y = 2.85;
+  cosmetics.set('energy-crown', crown);
+
+  const wisps = new THREE.Group();
+  for (const [x, y] of [
+    [-0.7, 1.4],
+    [0.7, 1.7],
+    [-0.5, 2.2],
+  ] as const) {
+    const wisp = new THREE.Mesh(new THREE.OctahedronGeometry(0.1), glowMaterial(0x9be7ff));
+    wisp.position.set(x, y, 0.2);
+    wisps.add(wisp);
+  }
+  cosmetics.set('lightning-wisps', wisps);
+
+  const wings = new THREE.Group();
+  for (const side of [-1, 1]) {
+    const wing = new THREE.Mesh(new THREE.ConeGeometry(0.35, 1.4, 6), glowMaterial(0x7dffa0));
+    wing.position.set(side * 0.6, 1.5, -0.4);
+    wing.rotation.z = side * 2.4;
+    wings.add(wing);
+  }
+  cosmetics.set('energy-wings', wings);
+
+  const trail = new THREE.Mesh(new THREE.ConeGeometry(0.2, 1.2, 8), glowMaterial(0xffa94d));
+  trail.position.set(0, 1.0, -0.7);
+  trail.rotation.x = Math.PI / 2;
+  cosmetics.set('comet-trail', trail);
+
+  const halo = new THREE.Group();
+  for (const dy of [0, 0.25] as const) {
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.45, 0.04, 8, 24), glowMaterial(0xfff3b0));
+    ring.rotation.x = Math.PI / 2;
+    ring.position.y = 3.0 + dy;
+    halo.add(ring);
+  }
+  cosmetics.set('twin-halo', halo);
+
+  return cosmetics;
 }
 
 function buildTrainingDummy(): THREE.Group {

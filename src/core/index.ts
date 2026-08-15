@@ -6,6 +6,16 @@ export { DIFFICULTY_TIERS, tierFor } from './difficulty';
 export type { Difficulty, DifficultyTier } from './difficulty';
 export { STREAK_TIERS, tierForStreak } from './streak';
 export type { StreakForm, StreakTier } from './streak';
+export {
+  COSMETIC_MILESTONES,
+  cosmeticUnlockedAt,
+  glowIntensityForLevel,
+  levelForXp,
+  unlockedCosmetics,
+  XP_PER_LEVEL,
+  xpForLevel,
+} from './level';
+export type { CosmeticTier } from './level';
 export { HAIR_PRESETS, MAX_NAME_LENGTH, OUTFIT_PRESETS, presetHex } from './players';
 export type { ColorPreset, PlayerColors, PlayerRecord } from './players';
 export {

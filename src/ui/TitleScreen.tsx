@@ -1,4 +1,5 @@
 import { useState } from 'preact/hooks';
+import { levelForXp } from '../core';
 import type { PlayerRecord } from '../core';
 import type { AppProps } from './App';
 
@@ -41,7 +42,7 @@ export function TitleScreen({ state, dispatch }: AppProps) {
                 data-testid={`player-${player.id}`}
                 onClick={() => dispatch({ type: 'PLAYER_SELECTED', id: player.id })}
               >
-                {player.name}
+                {player.name} <span class="player-level">Lv {levelForXp(player.xp)}</span>
               </button>
               <button
                 class="pad-key row-button"

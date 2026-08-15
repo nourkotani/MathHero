@@ -2,6 +2,7 @@
 // they never add a second entry point (ADR 0003, docs/ARCHITECTURE.md).
 
 import type { Difficulty } from './difficulty';
+import type { CosmeticTier } from './level';
 import type { PlayerColors, PlayerRecord } from './players';
 import type { SaveFile } from './savefile';
 import type { StreakForm } from './streak';
@@ -72,6 +73,8 @@ export type GameEffect =
   | { type: 'STREAK_BROKEN' }
   | { type: 'BLAST_FIRED' }
   | { type: 'ROUND_ENDED'; finalScore: number }
+  /** One per Hero Level gained, in order; carries any cosmetic tier unlocked. */
+  | { type: 'LEVEL_UP'; level: number; cosmetic?: CosmeticTier }
   /** The persisted slice changed — the persistence subscriber must save. */
   | { type: 'SAVE_FILE_CHANGED' };
 

@@ -41,6 +41,8 @@ export interface PlayerRecord {
   colors: PlayerColors;
   /** Rounds completed by this Player — every Round is attributed to someone. */
   roundsPlayed: number;
+  /** Lifetime XP: the sum of every Round's final score. Never resets. */
+  xp: number;
 }
 
 export const MAX_NAME_LENGTH = 20;

@@ -201,6 +201,42 @@ body {
   text-shadow: 0 3px 10px rgba(0, 0, 0, 0.6);
 }
 
+.xp-gain {
+  font-size: 2rem;
+  font-weight: 800;
+  color: #7dffa0;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+
+.level-up-banner {
+  font-size: 1.8rem;
+  font-weight: 800;
+  color: #fff;
+  background: linear-gradient(90deg, #ff9f1c, #ffd24d);
+  border-radius: 1.5rem;
+  padding: 1rem 2rem;
+  text-align: center;
+  animation: countdown-pulse 0.6s ease-in-out infinite alternate;
+}
+
+.cosmetic-unlock {
+  font-size: 1.3rem;
+  margin-top: 0.4rem;
+}
+
+.hero-level {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+
+.player-level {
+  font-size: 1.1rem;
+  color: #888;
+  font-weight: 700;
+}
+
 .encourage {
   font-size: 1.5rem;
   color: #fff;
