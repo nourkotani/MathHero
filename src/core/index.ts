@@ -16,6 +16,8 @@ export {
   xpForLevel,
 } from './level';
 export type { CosmeticTier } from './level';
+export { familyLeaderboard } from './leaderboard';
+export type { LeaderboardEntry } from './leaderboard';
 export { HAIR_PRESETS, MAX_NAME_LENGTH, OUTFIT_PRESETS, presetHex } from './players';
 export type { ColorPreset, PlayerColors, PlayerRecord } from './players';
 export {

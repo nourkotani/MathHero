@@ -34,6 +34,8 @@ export interface PlayerColors {
   outfitSecondary: string;
 }
 
+import type { Difficulty } from './difficulty';
+
 export interface PlayerRecord {
   /** Stable id; names are display data, so renames keep every stat. */
   id: string;
@@ -43,6 +45,8 @@ export interface PlayerRecord {
   roundsPlayed: number;
   /** Lifetime XP: the sum of every Round's final score. Never resets. */
   xp: number;
+  /** Personal Bests: highest Round score per Difficulty (absent until scored). */
+  bests: Partial<Record<Difficulty, number>>;
 }
 
 export const MAX_NAME_LENGTH = 20;

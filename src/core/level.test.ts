@@ -86,7 +86,7 @@ describe('XP accumulation', () => {
       nextPlayerId: 2,
     });
     const migrated = parseSaveFile(v1);
-    expect(migrated?.version).toBe(2);
+    expect(migrated?.version).toBe(3);
     expect(migrated?.players[0]).toMatchObject({ id: 'p1', xp: 0, roundsPlayed: 3 });
   });
 });

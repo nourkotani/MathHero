@@ -201,6 +201,47 @@ body {
   text-shadow: 0 3px 10px rgba(0, 0, 0, 0.6);
 }
 
+.best-banner {
+  font-size: 1.8rem;
+  font-weight: 800;
+  color: #fff;
+  background: linear-gradient(90deg, #8f5aff, #3ac0ff);
+  border-radius: 1.5rem;
+  padding: 0.8rem 2rem;
+  animation: countdown-pulse 0.6s ease-in-out infinite alternate;
+}
+
+.leaderboard {
+  background: rgba(0, 0, 0, 0.45);
+  border-radius: 1.2rem;
+  padding: 1rem 1.6rem;
+  color: #fff;
+  pointer-events: auto;
+}
+
+.leaderboard-title {
+  font-size: 1.4rem;
+  font-weight: 800;
+  margin-bottom: 0.5rem;
+  text-align: center;
+}
+
+.leaderboard-row {
+  display: flex;
+  gap: 1rem;
+  font-size: 1.1rem;
+  padding: 0.2rem 0;
+}
+
+.leaderboard-name {
+  font-weight: 800;
+  min-width: 8rem;
+}
+
+.leaderboard-best {
+  color: #ffe14d;
+}
+
 .xp-gain {
   font-size: 2rem;
   font-weight: 800;

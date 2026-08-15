@@ -50,6 +50,7 @@ export function update(state: GameState, event: GameEvent): UpdateResult {
         // scores nothing — the typed buffer is simply discarded. The outcome
         // is attributed to the active Player: the final score becomes XP.
         const effects: GameEffect[] = [{ type: 'ROUND_ENDED', finalScore: ticked.score }];
+        const bestEffects: GameEffect[] = [];
         const players = ticked.players.map((p) => {
           if (p.id !== ticked.activePlayerId) return p;
           const levelBefore = levelForXp(p.xp);
@@ -58,9 +59,19 @@ export function update(state: GameState, event: GameEvent): UpdateResult {
             const cosmetic = cosmeticUnlockedAt(level);
             effects.push(cosmetic ? { type: 'LEVEL_UP', level, cosmetic } : { type: 'LEVEL_UP', level });
           }
-          return { ...p, roundsPlayed: p.roundsPlayed + 1, xp };
+          let bests = p.bests;
+          if (ticked.score > (bests[ticked.difficulty] ?? 0)) {
+            bests = { ...bests, [ticked.difficulty]: ticked.score };
+            bestEffects.push({
+              type: 'NEW_PERSONAL_BEST',
+              difficulty: ticked.difficulty,
+              score: ticked.score,
+            });
+          }
+          return { ...p, roundsPlayed: p.roundsPlayed + 1, xp, bests };
         });
-        effects.push({ type: 'SAVE_FILE_CHANGED' });
+        // Ceremony order: ROUND_ENDED, LEVEL_UPs, NEW_PERSONAL_BEST, then save.
+        effects.push(...bestEffects, { type: 'SAVE_FILE_CHANGED' });
         return {
           state: { ...ticked, phase: 'results', answerBuffer: '', feedback: null, players },
           effects,
@@ -96,7 +107,7 @@ export function update(state: GameState, event: GameEvent): UpdateResult {
       const name = event.name.trim().slice(0, MAX_NAME_LENGTH);
       if (name === '' || !validColors(event.colors)) return noop(state);
       const id = `p${state.nextPlayerId}`;
-      const player = { id, name, colors: event.colors, roundsPlayed: 0, xp: 0 };
+      const player = { id, name, colors: event.colors, roundsPlayed: 0, xp: 0, bests: {} };
       return {
         state: {
           ...state,

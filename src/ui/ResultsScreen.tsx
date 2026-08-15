@@ -1,7 +1,7 @@
 import { levelForXp, unlockedCosmetics } from '../core';
 import type { AppProps } from './App';
 
-export function ResultsScreen({ state, dispatch }: AppProps) {
+export function ResultsScreen({ state, dispatch, newBest }: AppProps) {
   const player = state.players.find((p) => p.id === state.activePlayerId);
   const xp = player?.xp ?? 0;
   const level = levelForXp(xp);
@@ -18,6 +18,11 @@ export function ResultsScreen({ state, dispatch }: AppProps) {
       <div class="xp-gain" data-testid="xp-gain">
         +{state.score} XP
       </div>
+      {newBest && (
+        <div class="best-banner" data-testid="personal-best">
+          🏆 NEW PERSONAL BEST!
+        </div>
+      )}
       {levelsGained > 0 && (
         <div class="level-up-banner" data-testid="level-up">
           🎉 LEVEL UP! You reached Level {level}!

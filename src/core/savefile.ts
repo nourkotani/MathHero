@@ -6,7 +6,7 @@ import { validColors } from './players';
 import type { PlayerRecord } from './players';
 import type { GameState } from './types';
 
-export const SAVE_FILE_VERSION = 2;
+export const SAVE_FILE_VERSION = 3;
 
 export interface SaveFile {
   version: number;
@@ -35,6 +35,14 @@ const MIGRATIONS: Array<(doc: Record<string, unknown>) => Record<string, unknown
     version: 2,
     players: (Array.isArray(doc.players) ? doc.players : []).map(
       (p: Record<string, unknown>) => ({ ...p, xp: 0 }),
+    ),
+  }),
+  // v2 → v3: players gain per-difficulty Personal Bests.
+  (doc) => ({
+    ...doc,
+    version: 3,
+    players: (Array.isArray(doc.players) ? doc.players : []).map(
+      (p: Record<string, unknown>) => ({ ...p, bests: {} }),
     ),
   }),
 ];
@@ -89,6 +97,7 @@ function validatePlayer(entry: unknown): PlayerRecord | null {
     p.name.length === 0 ||
     typeof p.roundsPlayed !== 'number' ||
     typeof p.xp !== 'number' ||
+    !validBests(p.bests) ||
     typeof colors !== 'object' ||
     colors === null ||
     typeof colors.hair !== 'string' ||
@@ -109,5 +118,13 @@ function validatePlayer(entry: unknown): PlayerRecord | null {
     colors: playerColors,
     roundsPlayed: p.roundsPlayed,
     xp: p.xp,
+    bests: p.bests as PlayerRecord['bests'],
   };
+}
+
+function validBests(bests: unknown): boolean {
+  if (typeof bests !== 'object' || bests === null) return false;
+  return Object.entries(bests).every(
+    ([key, value]) => ['easy', 'medium', 'hard'].includes(key) && typeof value === 'number',
+  );
 }

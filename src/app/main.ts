@@ -38,9 +38,18 @@ const renderer = createRenderer(canvas);
 store.subscribe((state, effects) => renderer.onStoreUpdate(state, effects));
 
 // Preact owns the DOM overlay; it re-renders from core state on every dispatch.
+// The personal-best celebration is effect-driven: the banner shows while the
+// Results screen that earned it is up, never inferred by diffing state.
 const uiRoot = document.getElementById('ui') as HTMLElement;
-store.subscribe((state) => {
-  render(createElement(App, { state, dispatch: store.dispatch }), uiRoot);
+let newBest: { difficulty: string; score: number } | null = null;
+store.subscribe((state, effects) => {
+  for (const effect of effects) {
+    if (effect.type === 'NEW_PERSONAL_BEST') {
+      newBest = { difficulty: effect.difficulty, score: effect.score };
+    }
+  }
+  if (state.phase !== 'results') newBest = null;
+  render(createElement(App, { state, dispatch: store.dispatch, newBest }), uiRoot);
 });
 
 // Keyboard is a second way to drive the same events as the on-screen pad.

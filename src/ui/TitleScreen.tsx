@@ -1,7 +1,30 @@
 import { useState } from 'preact/hooks';
-import { levelForXp } from '../core';
+import { familyLeaderboard, levelForXp, tierFor } from '../core';
 import type { PlayerRecord } from '../core';
 import type { AppProps } from './App';
+
+function Leaderboard({ state }: Pick<AppProps, 'state'>) {
+  const entries = familyLeaderboard(state.players);
+  if (entries.length === 0 || entries.every((e) => e.topScore === 0)) return null;
+  return (
+    <div class="leaderboard" data-testid="leaderboard">
+      <div class="leaderboard-title">🏆 Family Leaderboard</div>
+      {entries.map((entry, rank) => (
+        <div class="leaderboard-row" key={entry.id} data-testid={`leaderboard-${entry.id}`}>
+          <span class="leaderboard-name">
+            {rank === 0 ? '👑 ' : ''}
+            {entry.name}
+          </span>
+          {(['easy', 'medium', 'hard'] as const).map((d) => (
+            <span class="leaderboard-best" key={d}>
+              {tierFor(d).label}: {entry.bests[d] ?? '—'}
+            </span>
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export function TitleScreen({ state, dispatch }: AppProps) {
   const [renamingId, setRenamingId] = useState<string | null>(null);
@@ -67,6 +90,7 @@ export function TitleScreen({ state, dispatch }: AppProps) {
           ),
         )}
       </div>
+      <Leaderboard state={state} />
       <button
         class="big-button"
         data-testid="new-hero"

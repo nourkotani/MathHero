@@ -75,6 +75,7 @@ export type GameEffect =
   | { type: 'ROUND_ENDED'; finalScore: number }
   /** One per Hero Level gained, in order; carries any cosmetic tier unlocked. */
   | { type: 'LEVEL_UP'; level: number; cosmetic?: CosmeticTier }
+  | { type: 'NEW_PERSONAL_BEST'; difficulty: Difficulty; score: number }
   /** The persisted slice changed — the persistence subscriber must save. */
   | { type: 'SAVE_FILE_CHANGED' };
 

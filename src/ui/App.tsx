@@ -8,11 +8,13 @@ import { TitleScreen } from './TitleScreen';
 export interface AppProps {
   state: GameState;
   dispatch: (event: GameEvent) => void;
+  /** Set by the shell when a NEW_PERSONAL_BEST effect fires; cleared on leaving Results. */
+  newBest?: { difficulty: string; score: number } | null;
 }
 
 // Screens key off the core's phase field; a future screen is a new phase
 // value, not new wiring.
-export function App({ state, dispatch }: AppProps) {
+export function App({ state, dispatch, newBest }: AppProps) {
   switch (state.phase) {
     case 'title':
       return <TitleScreen state={state} dispatch={dispatch} />;
@@ -23,6 +25,6 @@ export function App({ state, dispatch }: AppProps) {
     case 'in-round':
       return <RoundScreen state={state} dispatch={dispatch} />;
     case 'results':
-      return <ResultsScreen state={state} dispatch={dispatch} />;
+      return <ResultsScreen state={state} dispatch={dispatch} newBest={newBest} />;
   }
 }
