@@ -78,38 +78,73 @@ body {
   text-shadow: var(--glow-text);
 }
 
+/* Arcade coin buttons: domed face, chunky 3D base, shine sweep on hover,
+   and a bright press flash — every key press should feel like a cabinet. */
 .pad-key {
+  position: relative;
+  overflow: hidden;
   height: 4.5rem;
   font-size: 2rem;
   font-weight: 800;
-  border: 2px solid var(--panel-border);
+  border: 2px solid rgba(58, 192, 255, 0.35);
   border-radius: 1rem;
-  background: var(--panel-solid);
+  background: radial-gradient(circle at 50% 28%, #2c2846, #171330 75%);
   color: var(--text);
+  text-shadow: 0 0 10px rgba(58, 192, 255, 0.5);
   cursor: pointer;
   box-shadow:
-    0 4px 0 rgba(0, 0, 0, 0.5),
-    inset 0 0 14px rgba(58, 192, 255, 0.08);
+    0 5px 0 #0a0816,
+    inset 0 2px 0 rgba(255, 255, 255, 0.09),
+    inset 0 0 16px rgba(58, 192, 255, 0.1);
   transition:
     transform 0.05s,
     border-color 0.15s,
+    filter 0.05s,
     box-shadow 0.15s;
+}
+
+.pad-key::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(115deg, transparent 30%, rgba(255, 255, 255, 0.25) 50%, transparent 70%);
+  transform: translateX(-130%);
 }
 
 .pad-key:hover {
   border-color: var(--ki-blue);
   box-shadow:
-    0 4px 0 rgba(0, 0, 0, 0.5),
-    0 0 14px rgba(58, 192, 255, 0.45);
+    0 5px 0 #0a0816,
+    0 0 16px rgba(58, 192, 255, 0.5),
+    inset 0 2px 0 rgba(255, 255, 255, 0.09);
+}
+
+.pad-key:hover::after {
+  animation: shine-sweep 0.45s ease-out;
 }
 
 .pad-key:active {
-  transform: translateY(3px);
-  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.5);
+  transform: translateY(4px) scale(0.97);
+  filter: brightness(1.4);
+  box-shadow:
+    0 1px 0 #0a0816,
+    0 0 22px rgba(58, 192, 255, 0.6);
+}
+
+@keyframes shine-sweep {
+  from {
+    transform: translateX(-130%);
+  }
+  to {
+    transform: translateX(130%);
+  }
 }
 
 .big-button {
   pointer-events: auto;
+  position: relative;
+  overflow: hidden;
   font-size: 2.2rem;
   font-weight: 800;
   letter-spacing: 0.04em;
@@ -126,6 +161,17 @@ body {
   transition:
     transform 0.05s,
     box-shadow 0.15s;
+}
+
+/* Attract mode: a slow arcade shine keeps sweeping the action button. */
+.big-button::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(115deg, transparent 35%, rgba(255, 255, 255, 0.35) 50%, transparent 65%);
+  transform: translateX(-130%);
+  animation: shine-sweep 2.8s ease-in-out infinite;
 }
 
 .big-button:hover {
@@ -706,6 +752,20 @@ body {
     0 0 10px rgba(255, 179, 0, 0.9),
     inset 0 -2px 4px rgba(120, 50, 0, 0.5);
   vertical-align: -0.06em;
+  animation: orb-breathe 1.6s ease-in-out infinite alternate;
+}
+
+@keyframes orb-breathe {
+  from {
+    box-shadow:
+      0 0 8px rgba(255, 179, 0, 0.7),
+      inset 0 -2px 4px rgba(120, 50, 0, 0.5);
+  }
+  to {
+    box-shadow:
+      0 0 18px rgba(255, 210, 77, 1),
+      inset 0 -2px 4px rgba(120, 50, 0, 0.5);
+  }
 }
 
 .quit-button {
@@ -731,6 +791,24 @@ body {
   font-weight: 800;
   color: var(--ki-gold);
   text-shadow: 0 0 14px rgba(255, 210, 77, 0.5), 0 2px 8px rgba(0, 0, 0, 0.8);
+}
+
+/* Keyed by value in the JSX: every point earned slams the number in like
+   an arcade score counter. */
+.score-value {
+  display: inline-block;
+  animation: score-pop 0.35s cubic-bezier(0.2, 2.2, 0.4, 1);
+}
+
+@keyframes score-pop {
+  0% {
+    transform: scale(1.6);
+    filter: brightness(1.9);
+  }
+  100% {
+    transform: scale(1);
+    filter: none;
+  }
 }
 
 .countdown {
@@ -790,6 +868,17 @@ body {
   min-width: 2ch;
   text-align: center;
   color: var(--ki-gold);
+  /* Keyed by the buffer: each typed digit pops the slot. */
+  animation: digit-pop 0.16s cubic-bezier(0.2, 2, 0.4, 1);
+}
+
+@keyframes digit-pop {
+  from {
+    transform: scale(1.45);
+  }
+  to {
+    transform: scale(1);
+  }
 }
 
 .multiplier {
@@ -799,6 +888,23 @@ body {
   border-radius: 1rem;
   color: #fff;
   text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+  /* Keyed by tier: each transformation slams its badge in with a twist. */
+  animation: multiplier-in 0.45s cubic-bezier(0.2, 2.4, 0.4, 1);
+}
+
+@keyframes multiplier-in {
+  0% {
+    transform: scale(0.2) rotate(-14deg);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.25) rotate(4deg);
+    opacity: 1;
+  }
+  100% {
+    transform: none;
+    opacity: 1;
+  }
 }
 
 .multiplier-aura {
@@ -814,7 +920,9 @@ body {
 .multiplier-super {
   background: rgba(255, 179, 0, 0.9);
   box-shadow: 0 0 22px rgba(255, 179, 0, 0.9);
-  animation: countdown-pulse 0.4s ease-in-out infinite alternate;
+  animation:
+    multiplier-in 0.45s cubic-bezier(0.2, 2.4, 0.4, 1),
+    countdown-pulse 0.4s ease-in-out 0.45s infinite alternate;
 }
 
 .number-pad {
@@ -826,17 +934,38 @@ body {
 }
 
 .pad-backspace {
-  background: linear-gradient(180deg, #2a2138, var(--panel-solid));
+  background: radial-gradient(circle at 50% 28%, #342847, #1b1229 80%);
   border-color: rgba(255, 159, 28, 0.45);
+  text-shadow: 0 0 10px rgba(255, 159, 28, 0.5);
 }
 
 .pad-submit {
-  background: linear-gradient(180deg, #2fae4f, #1f8a3b);
+  background: radial-gradient(circle at 50% 28%, #35c05a, #1c7d36 80%);
   border-color: rgba(90, 214, 90, 0.6);
   color: #fff;
   box-shadow:
-    0 4px 0 rgba(0, 0, 0, 0.5),
+    0 5px 0 #0a0816,
     0 0 16px rgba(90, 214, 90, 0.4);
+}
+
+/* A typed answer is waiting: the fire button throbs, begging to be hit. */
+.pad-submit-armed {
+  animation: fire-ready 0.6s ease-in-out infinite alternate;
+}
+
+@keyframes fire-ready {
+  from {
+    box-shadow:
+      0 5px 0 #0a0816,
+      0 0 14px rgba(90, 214, 90, 0.5);
+    border-color: rgba(90, 214, 90, 0.6);
+  }
+  to {
+    box-shadow:
+      0 5px 0 #0a0816,
+      0 0 32px rgba(140, 255, 140, 1);
+    border-color: rgba(190, 255, 190, 0.95);
+  }
 }
 
 /* Wrong answer: the teaching moment slams in with an impact shake. */

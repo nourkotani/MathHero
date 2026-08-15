@@ -2,6 +2,8 @@ import type { GameEvent } from '../core';
 
 export interface NumberPadProps {
   dispatch: (event: GameEvent) => void;
+  /** A typed answer is waiting: the ✓ fire button throbs, ready to launch. */
+  armed: boolean;
 }
 
 const ROWS: number[][] = [
@@ -14,7 +16,7 @@ const ROWS: number[][] = [
 // Enter that submits the answer, sneaking a stray digit into the next buffer.
 const keepFocus = (e: MouseEvent) => e.preventDefault();
 
-export function NumberPad({ dispatch }: NumberPadProps) {
+export function NumberPad({ dispatch, armed }: NumberPadProps) {
   return (
     <div class="number-pad">
       {ROWS.flat().map((digit) => (
@@ -46,7 +48,7 @@ export function NumberPad({ dispatch }: NumberPadProps) {
         0
       </button>
       <button
-        class="pad-key pad-submit"
+        class={`pad-key pad-submit${armed ? ' pad-submit-armed' : ''}`}
         data-testid="pad-submit"
         aria-label="Submit answer"
         onMouseDown={keepFocus}

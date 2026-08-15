@@ -17,7 +17,11 @@ export function RoundScreen({ state, dispatch }: AppProps) {
       </button>
       <div class="round-top">
         <div class="score" data-testid="score">
-          <span class="power-orb" /> {state.score}
+          <span class="power-orb" />{' '}
+          {/* Keyed by value: every score change replays the arcade pop. */}
+          <span class="score-value" key={state.score}>
+            {state.score}
+          </span>
         </div>
         {state.practiceTable !== null && (
           <div class="practice-badge" data-testid="practice-badge">
@@ -25,7 +29,11 @@ export function RoundScreen({ state, dispatch }: AppProps) {
           </div>
         )}
         {tier.multiplier > 1 && (
-          <div class={`multiplier multiplier-${tier.form}`} data-testid="multiplier">
+          <div
+            class={`multiplier multiplier-${tier.form}`}
+            data-testid="multiplier"
+            key={tier.multiplier}
+          >
             ×{tier.multiplier}
           </div>
         )}
@@ -35,13 +43,20 @@ export function RoundScreen({ state, dispatch }: AppProps) {
       </div>
       {state.feedback === null ? (
         <>
-          <div class="question" data-testid="question">
+          {/* Keyed so each fresh Question replays its entrance (the same
+              Question never repeats twice in a row, so the key always turns
+              over) and each typed digit replays the answer pop. */}
+          <div
+            class="question"
+            data-testid="question"
+            key={`${state.question.a}x${state.question.b}`}
+          >
             {state.question.a} × {state.question.b} ={' '}
-            <span class="answer" data-testid="answer">
+            <span class="answer" data-testid="answer" key={state.answerBuffer}>
               {state.answerBuffer === '' ? '?' : state.answerBuffer}
             </span>
           </div>
-          <NumberPad dispatch={dispatch} />
+          <NumberPad dispatch={dispatch} armed={state.answerBuffer !== ''} />
         </>
       ) : (
         <div class="feedback" data-testid="feedback">
