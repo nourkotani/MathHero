@@ -3,7 +3,13 @@ import { DEFAULT_APPEARANCE, initialState, parseSaveFile, SAVE_FILE_VERSION, upd
 import type { HeroAppearance } from './index';
 import { dispatchAll, TEST_APPEARANCE, TEST_COLORS } from './test-helpers';
 
-const CUSTOM: HeroAppearance = { body: 'boy', hairStyle: 'flame', hairLength: 'long', garment: 'armor' };
+const CUSTOM: HeroAppearance = {
+  body: 'boy',
+  hairStyle: 'flame',
+  hairLength: 'long',
+  garment: 'armor',
+  skinTone: 'deep',
+};
 
 describe('the creation draft', () => {
   it('opens with defaults, previews changes, and clears on cancel', () => {
@@ -66,6 +72,37 @@ describe('appearance migration', () => {
       hairStyle: 'spiky',
       hairLength: 'short',
       garment: 'gi',
+      skinTone: 'tan',
+    });
+  });
+
+  it('v7 Save Files gain the classic tan skin tone', () => {
+    const v7 = JSON.stringify({
+      version: 7,
+      players: [
+        {
+          id: 'p1',
+          name: 'Zara',
+          colors: { hair: 'gold', outfitPrimary: 'blue', outfitSecondary: 'teal' },
+          appearance: { body: 'girl', hairStyle: 'ponytail', hairLength: 'long', garment: 'cape' },
+          roundsPlayed: 1,
+          xp: 50,
+          bests: {},
+          factStats: {},
+        },
+      ],
+      nextPlayerId: 2,
+      lastExportAt: null,
+      muted: false,
+    });
+    const migrated = parseSaveFile(v7);
+    expect(migrated?.version).toBe(SAVE_FILE_VERSION);
+    expect(migrated?.players[0]?.appearance).toEqual({
+      body: 'girl',
+      hairStyle: 'ponytail',
+      hairLength: 'long',
+      garment: 'cape',
+      skinTone: 'tan',
     });
   });
 
@@ -77,7 +114,13 @@ describe('appearance migration', () => {
           id: 'p1',
           name: 'Zara',
           colors: { hair: 'gold', outfitPrimary: 'blue', outfitSecondary: 'teal' },
-          appearance: { body: 'alien', hairStyle: 'spiky', hairLength: 'short', garment: 'gi' },
+          appearance: {
+            body: 'alien',
+            hairStyle: 'spiky',
+            hairLength: 'short',
+            garment: 'gi',
+            skinTone: 'tan',
+          },
           roundsPlayed: 0,
           xp: 0,
           bests: {},

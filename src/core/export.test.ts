@@ -75,7 +75,13 @@ describe('the 7-day backup reminder', () => {
         type: 'PLAYER_CREATED',
         name: 'Zara',
         colors: { hair: 'gold', outfitPrimary: 'blue', outfitSecondary: 'teal' },
-        appearance: { body: 'girl', hairStyle: 'ponytail', hairLength: 'long', garment: 'gi' },
+        appearance: {
+          body: 'girl',
+          hairStyle: 'ponytail',
+          hairLength: 'long',
+          garment: 'gi',
+          skinTone: 'golden',
+        },
       },
     ]);
     expect(backupReminderDue(state)).toBe(false);
@@ -134,7 +140,13 @@ describe('Save File validation hardening', () => {
     id: 'p1',
     name: 'Zara',
     colors: { hair: 'gold', outfitPrimary: 'blue', outfitSecondary: 'teal' },
-    appearance: { body: 'girl', hairStyle: 'flame', hairLength: 'long', garment: 'cape' },
+    appearance: {
+      body: 'girl',
+      hairStyle: 'flame',
+      hairLength: 'long',
+      garment: 'cape',
+      skinTone: 'bronze',
+    },
     roundsPlayed: 1,
     xp: 100,
     bests: {},

@@ -28,6 +28,7 @@ export {
   GARMENT_OPTIONS,
   HAIR_LENGTH_OPTIONS,
   HAIR_STYLE_OPTIONS,
+  SKIN_PRESETS,
   validAppearance,
 } from './appearance';
 export type {
@@ -37,6 +38,8 @@ export type {
   HairLength,
   HairStyle,
   HeroAppearance,
+  SkinPreset,
+  SkinTone,
 } from './appearance';
 export { factKey } from './facts';
 export type { FactKey } from './facts';

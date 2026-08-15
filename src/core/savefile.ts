@@ -13,7 +13,7 @@ function validCount(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0;
 }
 
-export const SAVE_FILE_VERSION = 7;
+export const SAVE_FILE_VERSION = 8;
 
 export interface SaveFile {
   version: number;
@@ -78,6 +78,20 @@ const MIGRATIONS: Array<(doc: Record<string, unknown>) => Record<string, unknown
       (p: Record<string, unknown>) => ({
         ...p,
         appearance: { body: 'boy', hairStyle: 'spiky', hairLength: 'short', garment: 'gi' },
+      }),
+    ),
+  }),
+  // v7 → v8: heroes gain a skin tone; existing heroes keep the classic tan.
+  (doc) => ({
+    ...doc,
+    version: 8,
+    players: (Array.isArray(doc.players) ? doc.players : []).map(
+      (p: Record<string, unknown>) => ({
+        ...p,
+        appearance: {
+          ...(typeof p.appearance === 'object' && p.appearance !== null ? p.appearance : {}),
+          skinTone: 'tan',
+        },
       }),
     ),
   }),

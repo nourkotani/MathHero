@@ -6,12 +6,14 @@ export type BodyStyle = 'girl' | 'boy';
 export type HairStyle = 'spiky' | 'flame' | 'ponytail' | 'buzz';
 export type HairLength = 'short' | 'long';
 export type Garment = 'gi' | 'cape' | 'armor';
+export type SkinTone = 'fair' | 'tan' | 'golden' | 'bronze' | 'deep';
 
 export interface HeroAppearance {
   body: BodyStyle;
   hairStyle: HairStyle;
   hairLength: HairLength;
   garment: Garment;
+  skinTone: SkinTone;
 }
 
 export interface AppearanceOption<T extends string> {
@@ -42,11 +44,27 @@ export const GARMENT_OPTIONS: readonly AppearanceOption<Garment>[] = [
   { id: 'armor', label: 'Battle armor' },
 ];
 
+/** Skin tones carry a hex so the creation swatches and renderer share it. */
+export interface SkinPreset {
+  id: SkinTone;
+  label: string;
+  hex: number;
+}
+
+export const SKIN_PRESETS: readonly SkinPreset[] = [
+  { id: 'fair', label: 'Fair', hex: 0xffdbc4 },
+  { id: 'tan', label: 'Tan', hex: 0xf2c09a },
+  { id: 'golden', label: 'Golden', hex: 0xd9a066 },
+  { id: 'bronze', label: 'Bronze', hex: 0xa9714b },
+  { id: 'deep', label: 'Deep', hex: 0x6f4a30 },
+];
+
 export const DEFAULT_APPEARANCE: HeroAppearance = {
   body: 'girl',
   hairStyle: 'spiky',
   hairLength: 'short',
   garment: 'gi',
+  skinTone: 'tan',
 };
 
 export function validAppearance(appearance: HeroAppearance): boolean {
@@ -54,6 +72,7 @@ export function validAppearance(appearance: HeroAppearance): boolean {
     BODY_OPTIONS.some((o) => o.id === appearance.body) &&
     HAIR_STYLE_OPTIONS.some((o) => o.id === appearance.hairStyle) &&
     HAIR_LENGTH_OPTIONS.some((o) => o.id === appearance.hairLength) &&
-    GARMENT_OPTIONS.some((o) => o.id === appearance.garment)
+    GARMENT_OPTIONS.some((o) => o.id === appearance.garment) &&
+    SKIN_PRESETS.some((o) => o.id === appearance.skinTone)
   );
 }

@@ -77,7 +77,7 @@ describe('Adaptive Selection', () => {
 
   it('weights selection toward Facts the Player gets wrong', () => {
     const mkSave = (factStats: Record<string, FactAttempt[]>): SaveFile => ({
-      version: 7,
+      version: 8,
       lastExportAt: null,
       muted: false,
       players: [
@@ -85,7 +85,13 @@ describe('Adaptive Selection', () => {
           id: 'p1',
           name: 'Zara',
           colors: { hair: 'gold', outfitPrimary: 'blue', outfitSecondary: 'teal' },
-          appearance: { body: 'girl', hairStyle: 'spiky', hairLength: 'short', garment: 'gi' },
+          appearance: {
+            body: 'girl',
+            hairStyle: 'spiky',
+            hairLength: 'short',
+            garment: 'gi',
+            skinTone: 'tan',
+          },
           roundsPlayed: 0,
           xp: 0,
           bests: {},

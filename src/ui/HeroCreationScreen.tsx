@@ -8,8 +8,15 @@ import {
   HAIR_PRESETS,
   MAX_NAME_LENGTH,
   OUTFIT_PRESETS,
+  SKIN_PRESETS,
 } from '../core';
-import type { AppearanceOption, ColorPreset, HeroAppearance, PlayerColors } from '../core';
+import type {
+  AppearanceOption,
+  ColorPreset,
+  HeroAppearance,
+  PlayerColors,
+  SkinTone,
+} from '../core';
 import type { AppProps } from './App';
 
 function hexCss(hex: number): string {
@@ -135,6 +142,13 @@ export function HeroCreationScreen({ state, dispatch }: AppProps) {
           prefix="garment"
           selected={draft.appearance.garment}
           onPick={(garment) => changeAppearance({ garment })}
+        />
+        <SwatchRow
+          title="Skin"
+          presets={SKIN_PRESETS}
+          prefix="skin"
+          selected={draft.appearance.skinTone}
+          onPick={(skinTone) => changeAppearance({ skinTone: skinTone as SkinTone })}
         />
         <SwatchRow
           title="Hair color"
