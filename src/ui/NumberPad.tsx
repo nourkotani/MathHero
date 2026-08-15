@@ -10,6 +10,10 @@ const ROWS: number[][] = [
   [7, 8, 9],
 ];
 
+// Pad clicks must never move focus: a focused key gets re-activated by the
+// Enter that submits the answer, sneaking a stray digit into the next buffer.
+const keepFocus = (e: MouseEvent) => e.preventDefault();
+
 export function NumberPad({ dispatch }: NumberPadProps) {
   return (
     <div class="number-pad">
@@ -18,6 +22,7 @@ export function NumberPad({ dispatch }: NumberPadProps) {
           key={digit}
           class="pad-key"
           data-testid={`pad-${digit}`}
+          onMouseDown={keepFocus}
           onClick={() => dispatch({ type: 'DIGIT_PRESSED', digit })}
         >
           {digit}
@@ -27,6 +32,7 @@ export function NumberPad({ dispatch }: NumberPadProps) {
         class="pad-key pad-backspace"
         data-testid="pad-backspace"
         aria-label="Erase"
+        onMouseDown={keepFocus}
         onClick={() => dispatch({ type: 'BACKSPACE_PRESSED' })}
       >
         ⌫
@@ -34,6 +40,7 @@ export function NumberPad({ dispatch }: NumberPadProps) {
       <button
         class="pad-key"
         data-testid="pad-0"
+        onMouseDown={keepFocus}
         onClick={() => dispatch({ type: 'DIGIT_PRESSED', digit: 0 })}
       >
         0
@@ -42,6 +49,7 @@ export function NumberPad({ dispatch }: NumberPadProps) {
         class="pad-key pad-submit"
         data-testid="pad-submit"
         aria-label="Submit answer"
+        onMouseDown={keepFocus}
         onClick={() => dispatch({ type: 'ANSWER_SUBMITTED' })}
       >
         ✓

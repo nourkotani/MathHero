@@ -10,7 +10,8 @@ export interface PersistenceAdapter {
   save(text: string): void;
 }
 
-const STORAGE_KEY = 'mathhero-save';
+/** Exposed so the shell can recognize cross-tab `storage` events for our document. */
+export const STORAGE_KEY = 'mathhero-save';
 
 export function localStorageAdapter(): PersistenceAdapter {
   return {

@@ -3,7 +3,7 @@ import '../ui/styles.css';
 import { initialState } from '../core';
 import type { GameEvent } from '../core';
 import { createAudio } from '../audio';
-import { loadSaveFile, localStorageAdapter, persistenceSubscriber } from '../persistence';
+import { loadSaveFile, localStorageAdapter, persistenceSubscriber, STORAGE_KEY } from '../persistence';
 import { createRenderer } from '../renderer';
 import { App } from '../ui/App';
 import { manualClock, realClock } from './clock';
@@ -77,9 +77,29 @@ store.subscribe((_state, effects) => {
       link.href = url;
       link.download = 'MathHero-save.json';
       link.click();
-      URL.revokeObjectURL(url);
+      // Revoking immediately can cut the download short on slow devices.
+      setTimeout(() => URL.revokeObjectURL(url), 10_000);
     }
   }
+});
+
+// The family may have the game open twice (a second tab or window). Each
+// copy loads the Save File once at startup, so a stale copy could export —
+// or overwrite — old heroes. Refresh whenever another copy saves (storage)
+// or this one returns to the foreground (focus AND visibilitychange: two
+// windows swap focus without any visibility change).
+const reloadSave = () => {
+  const text = persistence.load();
+  if (text !== null) store.dispatch({ type: 'SAVE_RELOADED', text });
+};
+window.addEventListener('storage', (e) => {
+  if (e.key === STORAGE_KEY && typeof e.newValue === 'string') {
+    store.dispatch({ type: 'SAVE_RELOADED', text: e.newValue });
+  }
+});
+window.addEventListener('focus', reloadSave);
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) reloadSave();
 });
 
 // Keyboard is a second way to drive the same events as the on-screen pad.
@@ -90,6 +110,9 @@ window.addEventListener('keydown', (e) => {
   } else if (e.key === 'Backspace') {
     store.dispatch({ type: 'BACKSPACE_PRESSED' });
   } else if (e.key === 'Enter') {
+    // A focused button must act as that button (its click fires on Enter);
+    // dispatching submit as well would double-act on one keypress.
+    if (e.target instanceof HTMLButtonElement) return;
     store.dispatch({ type: 'ANSWER_SUBMITTED' });
   }
 });

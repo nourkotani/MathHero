@@ -283,6 +283,30 @@ export function update(state: GameState, event: GameEvent): UpdateResult {
       };
     }
 
+    case 'SAVE_RELOADED': {
+      // Another open copy of the game saved: adopt its document so this tab
+      // never exports or overwrites with stale heroes. Never mid-Round (the
+      // Round is mutating player stats), and never at the cost of losing the
+      // selected hero.
+      if (state.phase === 'in-round') return noop(state);
+      const save = parseSaveFile(event.text);
+      if (save === null) return noop(state);
+      if (state.activePlayerId !== null && !save.players.some((p) => p.id === state.activePlayerId))
+        return noop(state);
+      return {
+        state: {
+          ...state,
+          players: save.players,
+          nextPlayerId: save.nextPlayerId,
+          lastExportAt: save.lastExportAt,
+          muted: save.muted,
+        },
+        // No SAVE_FILE_CHANGED: this document came from storage — echoing it
+        // back would ping-pong writes between tabs.
+        effects: [],
+      };
+    }
+
     case 'TIMER_CHANGED': {
       if (state.phase !== 'pre-round') return noop(state);
       const seconds = Math.min(MAX_TIMER_SECONDS, Math.max(MIN_TIMER_SECONDS, event.seconds));

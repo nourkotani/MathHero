@@ -65,6 +65,68 @@ describe('import', () => {
   });
 });
 
+describe('cross-tab Save File reload', () => {
+  const otherTabDoc = (names: string[], firstId = 1) =>
+    JSON.stringify({
+      version: SAVE_FILE_VERSION,
+      players: names.map((name, i) => ({
+        id: `p${firstId + i}`,
+        name,
+        colors: { hair: 'gold', outfitPrimary: 'blue', outfitSecondary: 'teal' },
+        appearance: {
+          body: 'boy',
+          hairStyle: 'spiky',
+          hairLength: 'short',
+          garment: 'gi',
+          skinTone: 'tan',
+        },
+        roundsPlayed: 0,
+        xp: 0,
+        bests: {},
+        factStats: {},
+      })),
+      nextPlayerId: names.length + 1,
+      lastExportAt: 4321,
+      muted: true,
+    });
+
+  it('adopts another tab\'s document silently, so exports are never stale', () => {
+    const state = dispatchAll(preRound(81, 'Zara'), [{ type: 'TITLE_OPENED' }]);
+    const result = update(state, { type: 'SAVE_RELOADED', text: otherTabDoc(['Zara', 'Kai']) });
+    expect(result.state.players.map((p) => p.name)).toEqual(['Zara', 'Kai']);
+    expect(result.state.nextPlayerId).toBe(3);
+    expect(result.state.lastExportAt).toBe(4321);
+    expect(result.state.muted).toBe(true);
+    // No SAVE_FILE_CHANGED: echoing storage back would ping-pong between tabs.
+    expect(result.effects).toEqual([]);
+
+    const exported = update(result.state, { type: 'SAVE_EXPORTED' });
+    const text = (
+      exported.effects.find((e) => e.type === 'EXPORT_READY') as { text: string } | undefined
+    )?.text;
+    expect(parseSaveFile(text ?? '')?.players.map((p) => p.name)).toEqual(['Zara', 'Kai']);
+  });
+
+  it('ignores invalid documents', () => {
+    const state = dispatchAll(preRound(82, 'Zara'), [{ type: 'TITLE_OPENED' }]);
+    const result = update(state, { type: 'SAVE_RELOADED', text: 'garbage' });
+    expect(result.state).toEqual(state);
+    expect(result.effects).toEqual([]);
+  });
+
+  it('never reloads mid-Round — the Round is mutating player stats', () => {
+    const state = dispatchAll(preRound(83, 'Zara'), [{ type: 'ROUND_STARTED' }]);
+    const result = update(state, { type: 'SAVE_RELOADED', text: otherTabDoc(['Zara', 'Kai']) });
+    expect(result.state).toEqual(state);
+  });
+
+  it('never drops the selected hero', () => {
+    const state = preRound(84, 'Zara'); // Zara is p1 and selected.
+    const result = update(state, { type: 'SAVE_RELOADED', text: otherTabDoc(['Milo'], 2) });
+    expect(result.state).toEqual(state);
+  });
+});
+
 describe('the 7-day backup reminder', () => {
   it('starts its clock at first play and fires after 7 quiet days', () => {
     // Creating the first hero at now = 1000 sets the baseline.

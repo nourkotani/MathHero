@@ -77,6 +77,8 @@ export type GameEvent =
   | { type: 'SAVE_EXPORTED' }
   | { type: 'MUTE_TOGGLED' }
   | { type: 'SAVE_IMPORTED'; text: string }
+  /** The persisted Save File changed outside this tab (another open copy of the game saved). */
+  | { type: 'SAVE_RELOADED'; text: string }
   | { type: 'TIMER_CHANGED'; seconds: number }
   | { type: 'DIFFICULTY_CHANGED'; difficulty: Difficulty }
   | { type: 'PRACTICE_TABLE_CHANGED'; table: number | null }

@@ -42,6 +42,25 @@ test('keyboard entry with backspace works and submits on Enter', async ({ page }
   await expect(page.getByTestId('score')).toContainText('10');
 });
 
+test('mixing pad clicks with the Enter key leaves no stray digit behind', async ({ page }) => {
+  await openGame(page);
+  await createHero(page);
+  await startRound(page);
+
+  // The way a kid mixes mouse and keyboard: click the answer on the pad,
+  // then submit with Enter. The last-clicked pad key must not be
+  // re-activated by that Enter.
+  const answer = await readCorrectAnswer(page);
+  for (const digit of String(answer)) {
+    await page.getByTestId(`pad-${digit}`).click();
+  }
+  await page.keyboard.press('Enter');
+
+  await expect(page.getByTestId('score')).toContainText('10');
+  // The next question starts from a truly empty answer.
+  await expect(page.getByTestId('answer')).toHaveText('?');
+});
+
 test('a wrong answer scores nothing and moves on after the teaching moment', async ({ page }) => {
   await openGame(page, '?testClock=1&seed=12345');
   await createHero(page);
