@@ -4,6 +4,7 @@
 
 import * as THREE from 'three';
 import { characterSurface } from './materials';
+import { applyCelTreatment } from './cel';
 import { ATTACK_DURATION, DUMMY_X } from './constants';
 
 export interface Dummy {
@@ -17,6 +18,7 @@ export interface Dummy {
 
 export function createDummy(): Dummy {
   const group = buildTrainingDummy();
+  applyCelTreatment(group);
   group.position.set(DUMMY_X, 0.3, 0);
 
   let kickTimer = 0;
@@ -61,35 +63,35 @@ function buildTrainingDummy(): THREE.Group {
   const group = new THREE.Group();
   const base = new THREE.Mesh(
     new THREE.CylinderGeometry(0.55, 0.7, 0.35, 20),
-    characterSurface(0x8a6642, 1),
+    characterSurface(0x8a6642),
   );
   base.position.y = 0.18;
   group.add(base);
 
   const post = new THREE.Mesh(
     new THREE.CylinderGeometry(0.16, 0.16, 1.1, 12),
-    characterSurface(0xa8834f, 1),
+    characterSurface(0xa8834f),
   );
   post.position.y = 0.9;
   group.add(post);
 
   const torso = new THREE.Mesh(
     new THREE.CapsuleGeometry(0.42, 0.6, 6, 12),
-    characterSurface(0xc9584a, 1),
+    characterSurface(0xc9584a),
   );
   torso.position.y = 1.8;
   group.add(torso);
 
   const face = new THREE.Mesh(
     new THREE.SphereGeometry(0.3, 20, 16),
-    characterSurface(0xd9d9d9, 1),
+    characterSurface(0xd9d9d9),
   );
   face.position.y = 2.55;
   group.add(face);
 
   const target = new THREE.Mesh(
     new THREE.TorusGeometry(0.18, 0.045, 8, 20),
-    characterSurface(0xffffff, 1),
+    characterSurface(0xffffff),
   );
   target.position.set(-0.38, 1.8, 0);
   target.rotation.y = Math.PI / 2;

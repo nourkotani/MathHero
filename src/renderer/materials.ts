@@ -5,6 +5,7 @@
 // here, not to every construction site.
 
 import * as THREE from 'three';
+import { STYLE } from './style';
 
 /** The lit-material interface rig and reaction code may rely on. */
 export type Surface = THREE.Material & {
@@ -13,9 +14,34 @@ export type Surface = THREE.Material & {
   emissiveIntensity: number;
 };
 
-/** Lit surfaces on the hero and the Training Dummy. */
-export function characterSurface(color: number, roughness: number): Surface {
-  return new THREE.MeshStandardMaterial({ color, roughness });
+/**
+ * The cel-shading ramp: a procedurally generated 1-D gradient texture (no
+ * asset files) that quantizes lighting into hand-drawn anime bands. One
+ * texture is shared by every character material.
+ */
+function createToonRamp(bands: readonly number[]): THREE.DataTexture {
+  const data = new Uint8Array(bands.length);
+  bands.forEach((band, i) => {
+    data[i] = Math.round(band * 255);
+  });
+  const ramp = new THREE.DataTexture(data, bands.length, 1, THREE.RedFormat);
+  // Nearest filtering keeps the band edges crisp — that IS the cel look.
+  ramp.minFilter = THREE.NearestFilter;
+  ramp.magFilter = THREE.NearestFilter;
+  ramp.needsUpdate = true;
+  return ramp;
+}
+let sharedRamp: THREE.DataTexture | null = null;
+
+/**
+ * Lit surfaces on the hero and the Training Dummy: banded toon shading, so
+ * the characters read as anime cels against the softer painted environment.
+ */
+export function characterSurface(color: number): Surface {
+  sharedRamp ??= createToonRamp(STYLE.ramp);
+  const material = new THREE.MeshToonMaterial({ color, gradientMap: sharedRamp });
+  material.userData.role = 'character';
+  return material;
 }
 
 /** Lit surfaces on the arena, ground, and rocks. */

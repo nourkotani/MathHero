@@ -4,6 +4,7 @@
 
 import * as THREE from 'three';
 import { environmentSurface, glowSurface } from './materials';
+import { STYLE } from './style';
 
 export interface Stage {
   update(dt: number, elapsed: number, urgent: boolean): void;
@@ -11,27 +12,46 @@ export interface Stage {
 
 export function createStage(scene: THREE.Scene): Stage {
   // A dusk wasteland arena — dramatic anime-battle light, not a sunny field.
-  scene.background = new THREE.Color(0x1b1f3a);
-  scene.fog = new THREE.Fog(0x453156, 26, 68);
+  scene.background = new THREE.Color(STYLE.sky);
+  scene.fog = new THREE.Fog(STYLE.fog.color, STYLE.fog.near, STYLE.fog.far);
 
-  const hemi = new THREE.HemisphereLight(0x8fa3ff, 0x5a3b22, 0.85);
+  const hemi = new THREE.HemisphereLight(STYLE.hemi.sky, STYLE.hemi.ground, STYLE.hemi.intensity);
   scene.add(hemi);
-  const sun = new THREE.DirectionalLight(0xffb26b, 2.0);
+  const sun = new THREE.DirectionalLight(STYLE.sun.color, STYLE.sun.intensity);
   sun.position.set(6, 7, 5);
+  // The one shadow-casting light: characters cast, ground and arena receive.
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(STYLE.shadow.mapSize, STYLE.shadow.mapSize);
+  sun.shadow.camera.left = -STYLE.shadow.range;
+  sun.shadow.camera.right = STYLE.shadow.range;
+  sun.shadow.camera.top = STYLE.shadow.range;
+  sun.shadow.camera.bottom = -STYLE.shadow.range;
+  sun.shadow.camera.near = 1;
+  sun.shadow.camera.far = 30;
+  sun.shadow.bias = -0.002;
   scene.add(sun);
   // Cool rim light from behind, so the figures pop against the dusk.
-  const rim = new THREE.DirectionalLight(0x3ac0ff, 0.7);
+  const rim = new THREE.DirectionalLight(STYLE.rim.color, STYLE.rim.intensity);
   rim.position.set(-5, 6, -8);
   scene.add(rim);
 
+  // Subtle colored fills so no corner of the arena goes muddy.
+  for (const fill of STYLE.fillLights) {
+    const light = new THREE.PointLight(fill.color, fill.intensity);
+    light.position.set(fill.position[0], fill.position[1], fill.position[2]);
+    scene.add(light);
+  }
+
   const ground = new THREE.Mesh(new THREE.CircleGeometry(28, 48), environmentSurface(0x6d6242, 1));
   ground.rotation.x = -Math.PI / 2;
+  ground.receiveShadow = true;
   scene.add(ground);
 
   // Tournament-style stone platform with a glowing energy rim.
   const arenaMaterial = environmentSurface(0xcfc8bd, 0.85);
   const arena = new THREE.Mesh(new THREE.CylinderGeometry(7, 7.4, 0.3, 48), arenaMaterial);
   arena.position.y = 0.15;
+  arena.receiveShadow = true;
   scene.add(arena);
 
   const arenaRim = new THREE.Mesh(

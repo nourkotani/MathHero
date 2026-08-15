@@ -7,6 +7,7 @@ import { presetHex, SKIN_PRESETS } from '../core';
 import type { HairStyle, HeroAppearance, StreakForm } from '../core';
 import { characterSurface, glowSurface } from './materials';
 import type { Surface } from './materials';
+import { applyCelTreatment } from './cel';
 
 // Visual treatment per streak form, keyed by the core's form names.
 // hair: null keeps the Player's own hair color.
@@ -84,9 +85,9 @@ export function buildHero(appearance: HeroAppearance): HeroRig {
   const group = new THREE.Group();
   const girl = appearance.body === 'girl';
 
-  const bodyMaterial = characterSurface(0x3a6fd8, 0.6);
-  const trimMaterial = characterSurface(0xff9f1c, 0.5);
-  const skinMaterial = characterSurface(presetHex(SKIN_PRESETS, appearance.skinTone), 0.7);
+  const bodyMaterial = characterSurface(0x3a6fd8);
+  const trimMaterial = characterSurface(0xff9f1c);
+  const skinMaterial = characterSurface(presetHex(SKIN_PRESETS, appearance.skinTone));
 
   // Pelvis: the gi's trousers. Girls get wider hips, boys a blockier seat.
   const pelvis = new THREE.Mesh(new THREE.SphereGeometry(0.3, 14, 10), bodyMaterial);
@@ -146,7 +147,7 @@ export function buildHero(appearance: HeroAppearance): HeroRig {
   // hair materials so streak forms and player colors recolor them all.
   const hairMaterials: Surface[] = [];
   const hairMat = () => {
-    const material = characterSurface(0x2b2b2b, 0.4);
+    const material = characterSurface(0x2b2b2b);
     hairMaterials.push(material);
     return material;
   };
@@ -255,6 +256,8 @@ export function buildHero(appearance: HeroAppearance): HeroRig {
     mesh.visible = false;
     group.add(mesh);
   }
+
+  applyCelTreatment(group);
 
   return {
     group,

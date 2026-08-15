@@ -4,6 +4,7 @@
 
 import * as THREE from 'three';
 import { glowSurface } from './materials';
+import { isOutlineHull } from './cel';
 import { DUMMY_X, HERO_X } from './constants';
 
 interface Particle {
@@ -22,6 +23,9 @@ interface Blast {
 
 /** Short-lived meshes must release their GPU resources when removed. */
 export function freeMesh(mesh: THREE.Mesh): void {
+  // Outline hulls borrow their parent's geometry and a shared ink material —
+  // the parent's own disposal covers them.
+  if (isOutlineHull(mesh)) return;
   mesh.geometry.dispose();
   (mesh.material as THREE.Material).dispose();
 }

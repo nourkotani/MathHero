@@ -31,6 +31,9 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.setSize(window.innerWidth, window.innerHeight);
+  // One directional shadow grounds the characters (see stage.ts).
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFShadowMap;
 
   const scene = new THREE.Scene();
   const stage = createStage(scene);
