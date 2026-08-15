@@ -1,0 +1,33 @@
+{
+  "name": "mathhero",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Self-contained offline 3D multiplication game for two kids.",
+  "scripts": {
+    "dev": "vite",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tests",
+    "lint": "eslint .",
+    "test:core": "vitest run",
+    "build": "vite build",
+    "test:flow": "playwright test",
+    "check": "npm run typecheck && npm run lint && npm run test:core && npm run build && npm run test:flow"
+  },
+  "dependencies": {
+    "preact": "^10.29.8",
+    "three": "0.185.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.62.1",
+    "@types/node": "^26.2.0",
+    "@types/three": "^0.185.4",
+    "eslint": "^10.8.1",
+    "prettier": "^3.9.6",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.67.0",
+    "vite": "^8.2.1",
+    "vite-plugin-singlefile": "^2.3.3",
+    "vitest": "^4.1.10"
+  }
+}

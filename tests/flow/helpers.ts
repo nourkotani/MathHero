@@ -1,0 +1,26 @@
+import { pathToFileURL } from 'node:url';
+import { resolve } from 'node:path';
+import type { Page } from '@playwright/test';
+
+const BUILT_FILE = resolve(import.meta.dirname, '../../dist/MathHero.html');
+
+/** Open the built single-file game the way the family does: over file://. */
+export async function openGame(page: Page, query = ''): Promise<void> {
+  await page.goto(pathToFileURL(BUILT_FILE).href + query);
+}
+
+/** Read the current question off the HUD and return its correct answer. */
+export async function readCorrectAnswer(page: Page): Promise<number> {
+  const text = await page.getByTestId('question').innerText();
+  const match = text.match(/(\d+)\s*×\s*(\d+)/);
+  if (!match) throw new Error(`could not parse question from HUD: ${text}`);
+  return Number(match[1]) * Number(match[2]);
+}
+
+/** Answer via the on-screen pad, digit by digit, then submit with ✓. */
+export async function answerOnPad(page: Page, answer: number): Promise<void> {
+  for (const digit of String(answer)) {
+    await page.getByTestId(`pad-${digit}`).click();
+  }
+  await page.getByTestId('pad-submit').click();
+}
