@@ -1,10 +1,14 @@
 // The three.js renderer. Interface: (state, effects) in via onStoreUpdate,
-// plus frame(dt) from the shell's animation loop. Scene internals are private.
+// plus frame(dt) from the shell's animation loop. Everything below —
+// character builder, particle bursts, blast projectiles, dummy reactions,
+// screen shake — is private implementation (ADR 0003: moments arrive as
+// effects, never by diffing state).
 
 import * as THREE from 'three';
 import {
   glowIntensityForLevel,
   HAIR_PRESETS,
+  isFinalTenSeconds,
   levelForXp,
   OUTFIT_PRESETS,
   presetHex,
@@ -17,9 +21,8 @@ export interface Renderer {
   frame(dtMs: number): void;
 }
 
-// First-pass visual treatment per streak form; the polish ticket re-skins
-// these mappings without the core knowing. hair: null keeps the Player's own
-// hair color; surge/super override it with charged energy colors.
+// Visual treatment per streak form, keyed by the core's form names.
+// hair: null keeps the Player's own hair color.
 const FORM_LOOKS: Record<
   StreakForm,
   { hair: number | null; auraColor: number; auraOpacity: number; emissive: number }
@@ -29,6 +32,21 @@ const FORM_LOOKS: Record<
   surge: { hair: 0xffe14d, auraColor: 0x8f5aff, auraOpacity: 0.6, emissive: 0.35 },
   super: { hair: 0xffd700, auraColor: 0xffb300, auraOpacity: 0.8, emissive: 0.6 },
 };
+
+const HERO_X = -2.4;
+const DUMMY_X = 2.4;
+
+interface Particle {
+  mesh: THREE.Mesh;
+  velocity: THREE.Vector3;
+  life: number;
+  maxLife: number;
+}
+
+interface Blast {
+  mesh: THREE.Mesh;
+  big: boolean;
+}
 
 export function createRenderer(canvas: HTMLCanvasElement): Renderer {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -40,10 +58,12 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
   scene.fog = new THREE.Fog(0x88bbee, 30, 70);
 
   const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 100);
-  camera.position.set(0, 4.2, 10);
+  const cameraHome = new THREE.Vector3(0, 4.2, 10);
+  camera.position.copy(cameraHome);
   camera.lookAt(0, 1.4, 0);
 
-  scene.add(new THREE.HemisphereLight(0xdfefff, 0x54402a, 1.1));
+  const hemi = new THREE.HemisphereLight(0xdfefff, 0x54402a, 1.1);
+  scene.add(hemi);
   const sun = new THREE.DirectionalLight(0xfff2cc, 1.6);
   sun.position.set(5, 10, 6);
   scene.add(sun);
@@ -55,37 +75,41 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
   ground.rotation.x = -Math.PI / 2;
   scene.add(ground);
 
-  const arena = new THREE.Mesh(
-    new THREE.CylinderGeometry(7, 7.4, 0.3, 48),
-    new THREE.MeshStandardMaterial({ color: 0xd9c9a3 }),
-  );
+  const arenaMaterial = new THREE.MeshStandardMaterial({ color: 0xd9c9a3 });
+  const arena = new THREE.Mesh(new THREE.CylinderGeometry(7, 7.4, 0.3, 48), arenaMaterial);
   arena.position.y = 0.15;
   scene.add(arena);
 
-  const hero = buildPlaceholderHero();
-  hero.group.position.set(-2.4, 0.3, 0);
+  const hero = buildHero();
+  hero.group.position.set(HERO_X, 0.3, 0);
   hero.group.rotation.y = Math.PI / 2;
   scene.add(hero.group);
 
   const dummy = buildTrainingDummy();
-  dummy.position.set(2.4, 0.3, 0);
+  dummy.position.set(DUMMY_X, 0.3, 0);
   scene.add(dummy);
 
-  const blasts: THREE.Mesh[] = [];
+  const blasts: Blast[] = [];
+  const particles: Particle[] = [];
   let elapsed = 0;
-  let punchTimer = 0; // seconds remaining in the hero's strike animation
-  let dummyKick = 0; // seconds remaining in the dummy's recoil
+  let punchTimer = 0; // hero strike animation
+  let dummyKick = 0; // small recoil
+  let dummyLaunch = 0; // dramatic super-blast launch
+  let shake = 0; // camera shake energy
+  let urgent = false; // final ten seconds of the Round
   let currentForm: StreakForm = 'base';
   let playerHair = 0x2b2b2b;
-  let playerGlow = 0; // permanent per-level glow, derived from Hero Level
+  let playerGlow = 0;
 
   function applyForm(form: StreakForm) {
     currentForm = form;
     const look = FORM_LOOKS[form];
     const hairHex = look.hair ?? playerHair;
-    hero.hairMaterial.color.setHex(hairHex);
-    hero.hairMaterial.emissive.setHex(hairHex);
-    hero.hairMaterial.emissiveIntensity = Math.max(look.emissive, playerGlow * 0.5);
+    for (const spike of hero.hairMaterials) {
+      spike.color.setHex(hairHex);
+      spike.emissive.setHex(hairHex);
+      spike.emissiveIntensity = Math.max(look.emissive, playerGlow * 0.5);
+    }
     hero.bodyMaterial.emissive.setHex(look.auraColor === 0 ? 0xffffff : look.auraColor);
     hero.bodyMaterial.emissiveIntensity = Math.max(look.emissive, playerGlow * 0.25);
     hero.auraMaterial.color.setHex(look.auraColor);
@@ -108,6 +132,31 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     applyForm(currentForm);
   }
 
+  function burst(color: number, count: number, origin: THREE.Vector3, speed: number) {
+    for (let i = 0; i < count; i++) {
+      const mesh = new THREE.Mesh(
+        new THREE.OctahedronGeometry(0.09),
+        new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 1 }),
+      );
+      mesh.position.copy(origin);
+      const theta = (i / count) * Math.PI * 2;
+      const up = 1.5 + (i % 3);
+      const velocity = new THREE.Vector3(Math.cos(theta) * speed, up, Math.sin(theta) * speed);
+      scene.add(mesh);
+      particles.push({ mesh, velocity, life: 1, maxLife: 1 });
+    }
+  }
+
+  function fireBlast(big: boolean) {
+    const mesh = new THREE.Mesh(
+      new THREE.SphereGeometry(big ? 0.34 : 0.2, 12, 10),
+      new THREE.MeshBasicMaterial({ color: big ? 0xffe14d : 0x7ad7ff }),
+    );
+    mesh.position.set(HERO_X + 0.8, 1.6, 0);
+    scene.add(mesh);
+    blasts.push({ mesh, big });
+  }
+
   window.addEventListener('resize', () => {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
@@ -117,29 +166,35 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
   return {
     onStoreUpdate(state, effects) {
       applyPlayerColors(state);
+      urgent = isFinalTenSeconds(state);
       for (const effect of effects) {
         switch (effect.type) {
           case 'ANSWER_CORRECT':
             punchTimer = 0.35;
             dummyKick = 0.35;
+            // Any transformed hero throws visible energy with each strike.
+            if (currentForm !== 'base') fireBlast(false);
             break;
           case 'TRANSFORMED':
             applyForm(effect.form);
+            burst(FORM_LOOKS[effect.form].auraColor, 14, hero.group.position.clone().setY(1.5), 3);
+            shake = Math.max(shake, 0.25);
             break;
           case 'STREAK_BROKEN':
           case 'ROUND_ENDED':
             applyForm('base');
             break;
-          case 'BLAST_FIRED': {
-            const blast = new THREE.Mesh(
-              new THREE.SphereGeometry(0.28, 12, 10),
-              new THREE.MeshBasicMaterial({ color: 0xffe14d }),
-            );
-            blast.position.set(-1.6, 1.6, 0);
-            scene.add(blast);
-            blasts.push(blast);
+          case 'BLAST_FIRED':
+            fireBlast(true);
             break;
-          }
+          case 'LEVEL_UP':
+            burst(0xffd700, 26, hero.group.position.clone().setY(1.2), 4);
+            shake = Math.max(shake, 0.3);
+            break;
+          case 'NEW_PERSONAL_BEST':
+            burst(0x8f5aff, 20, new THREE.Vector3(0, 2.0, 0), 4.5);
+            burst(0x3ac0ff, 20, new THREE.Vector3(0, 2.4, 0), 3.5);
+            break;
           default:
             break;
         }
@@ -149,36 +204,96 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       const dt = Math.min(dtMs, 100) / 1000;
       elapsed += dt;
 
-      // Idle bob for both figures; the aura slowly spins.
+      // Idle bob; the aura spins and breathes.
       hero.group.position.y = 0.3 + Math.sin(elapsed * 2.2) * 0.05;
       hero.aura.rotation.y = elapsed * 1.5;
-      dummy.rotation.z = Math.sin(elapsed * 1.1) * 0.03;
+      hero.aura.scale.setScalar(1 + Math.sin(elapsed * 6) * 0.05);
 
       // Strike lunge toward the dummy on a correct answer.
       if (punchTimer > 0) {
         punchTimer = Math.max(0, punchTimer - dt);
         const lunge = Math.sin((1 - punchTimer / 0.35) * Math.PI);
-        hero.group.position.x = -2.4 + lunge * 1.5;
+        hero.group.position.x = HERO_X + lunge * 1.5;
+        hero.group.rotation.z = -lunge * 0.15;
       } else {
-        hero.group.position.x = -2.4;
+        hero.group.position.x = HERO_X;
+        hero.group.rotation.z = 0;
       }
-      if (dummyKick > 0) {
+
+      // Dummy reactions: small recoil on hits, dramatic launch on super blasts.
+      if (dummyLaunch > 0) {
+        dummyLaunch = Math.max(0, dummyLaunch - dt);
+        const t = 1 - dummyLaunch / 0.9; // 0 → 1 over the launch
+        const arc = Math.sin(t * Math.PI);
+        dummy.position.x = DUMMY_X + t * 2.2;
+        dummy.position.y = 0.3 + arc * 2.4;
+        dummy.rotation.x = t * Math.PI * 2;
+        if (dummyLaunch === 0) {
+          dummy.position.set(DUMMY_X, 0.3, 0);
+          dummy.rotation.x = 0;
+        }
+      } else if (dummyKick > 0) {
         dummyKick = Math.max(0, dummyKick - dt);
         dummy.rotation.x = Math.sin((1 - dummyKick / 0.35) * Math.PI) * 0.35;
       } else {
         dummy.rotation.x = 0;
+        dummy.rotation.z = Math.sin(elapsed * 1.1) * 0.03;
       }
 
-      // Energy blasts fly toward the dummy and burst.
+      // Energy blasts fly toward the dummy and burst on impact.
       for (let i = blasts.length - 1; i >= 0; i--) {
         const blast = blasts[i];
         if (!blast) continue;
-        blast.position.x += dt * 14;
-        if (blast.position.x >= dummy.position.x) {
-          scene.remove(blast);
+        blast.mesh.position.x += dt * (blast.big ? 16 : 20);
+        blast.mesh.scale.setScalar(1 + Math.sin(elapsed * 40) * 0.15);
+        if (blast.mesh.position.x >= DUMMY_X - 0.3) {
+          burst(blast.big ? 0xffe14d : 0x7ad7ff, blast.big ? 16 : 8, blast.mesh.position, 2.5);
+          scene.remove(blast.mesh);
           blasts.splice(i, 1);
-          dummyKick = 0.5;
+          if (blast.big) {
+            dummyLaunch = 0.9;
+            shake = Math.max(shake, 0.4);
+          } else {
+            dummyKick = 0.4;
+          }
         }
+      }
+
+      // Particles: rise, fall, fade.
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        if (!p) continue;
+        p.life -= dt;
+        p.velocity.y -= 9 * dt;
+        p.mesh.position.addScaledVector(p.velocity, dt);
+        (p.mesh.material as THREE.MeshBasicMaterial).opacity = Math.max(0, p.life / p.maxLife);
+        if (p.life <= 0) {
+          scene.remove(p.mesh);
+          particles.splice(i, 1);
+        }
+      }
+
+      // Final ten seconds: the whole arena feels the pressure.
+      if (urgent) {
+        const pulse = 0.5 + Math.sin(elapsed * 8) * 0.5;
+        hemi.color.setHSL(0.0, 0.35 * pulse, 0.85);
+        arenaMaterial.emissive.setHex(0xff3b3b);
+        arenaMaterial.emissiveIntensity = 0.12 * pulse;
+      } else {
+        hemi.color.setHex(0xdfefff);
+        arenaMaterial.emissiveIntensity = 0;
+      }
+
+      // Screen shake decays exponentially.
+      if (shake > 0.001) {
+        shake *= Math.exp(-6 * dt);
+        camera.position.set(
+          cameraHome.x + Math.sin(elapsed * 71) * shake * 0.25,
+          cameraHome.y + Math.sin(elapsed * 89) * shake * 0.2,
+          cameraHome.z,
+        );
+      } else {
+        camera.position.copy(cameraHome);
       }
 
       renderer.render(scene, camera);
@@ -188,7 +303,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
 
 interface HeroRig {
   group: THREE.Group;
-  hairMaterial: THREE.MeshStandardMaterial;
+  hairMaterials: THREE.MeshStandardMaterial[];
   bodyMaterial: THREE.MeshStandardMaterial;
   trimMaterial: THREE.MeshStandardMaterial;
   aura: THREE.Mesh;
@@ -197,29 +312,76 @@ interface HeroRig {
   cosmetics: Map<string, THREE.Object3D>;
 }
 
-function buildPlaceholderHero(): HeroRig {
+/** An original, DBZ-inspired (never copied) anime-style hero. */
+function buildHero(): HeroRig {
   const group = new THREE.Group();
-  const bodyMaterial = new THREE.MeshStandardMaterial({ color: 0x3a6fd8 });
-  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.45, 1.0, 6, 12), bodyMaterial);
-  body.position.y = 1.0;
-  group.add(body);
 
-  const trimMaterial = new THREE.MeshStandardMaterial({ color: 0xff9f1c });
-  const belt = new THREE.Mesh(new THREE.CylinderGeometry(0.48, 0.48, 0.18, 16), trimMaterial);
-  belt.position.y = 0.85;
+  const bodyMaterial = new THREE.MeshStandardMaterial({ color: 0x3a6fd8, roughness: 0.6 });
+  const trimMaterial = new THREE.MeshStandardMaterial({ color: 0xff9f1c, roughness: 0.5 });
+  const skinMaterial = new THREE.MeshStandardMaterial({ color: 0xf2c09a, roughness: 0.7 });
+
+  const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.45, 0.8, 6, 12), bodyMaterial);
+  torso.position.y = 1.15;
+  torso.scale.set(1, 1, 0.8);
+  group.add(torso);
+
+  const belt = new THREE.Mesh(new THREE.CylinderGeometry(0.47, 0.47, 0.16, 16), trimMaterial);
+  belt.position.y = 0.82;
   group.add(belt);
 
-  const head = new THREE.Mesh(
-    new THREE.SphereGeometry(0.35, 20, 16),
-    new THREE.MeshStandardMaterial({ color: 0xf2c09a }),
-  );
+  for (const side of [-1, 1]) {
+    const leg = new THREE.Mesh(new THREE.CapsuleGeometry(0.16, 0.5, 4, 8), bodyMaterial);
+    leg.position.set(side * 0.22, 0.4, 0);
+    group.add(leg);
+
+    const boot = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.2, 0.22, 10), trimMaterial);
+    boot.position.set(side * 0.22, 0.11, 0.02);
+    group.add(boot);
+
+    const arm = new THREE.Mesh(new THREE.CapsuleGeometry(0.13, 0.5, 4, 8), bodyMaterial);
+    arm.position.set(side * 0.58, 1.25, 0);
+    arm.rotation.z = side * 0.35;
+    group.add(arm);
+
+    const fist = new THREE.Mesh(new THREE.SphereGeometry(0.15, 10, 8), skinMaterial);
+    fist.position.set(side * 0.72, 0.92, 0);
+    group.add(fist);
+  }
+
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.36, 20, 16), skinMaterial);
   head.position.y = 2.05;
   group.add(head);
 
-  const hairMaterial = new THREE.MeshStandardMaterial({ color: 0x2b2b2b });
-  const hair = new THREE.Mesh(new THREE.ConeGeometry(0.32, 0.55, 8), hairMaterial);
-  hair.position.y = 2.45;
-  group.add(hair);
+  for (const side of [-1, 1]) {
+    const eye = new THREE.Mesh(
+      new THREE.SphereGeometry(0.045, 8, 6),
+      new THREE.MeshBasicMaterial({ color: 0x222222 }),
+    );
+    eye.position.set(side * 0.13, 2.1, 0.31);
+    group.add(eye);
+  }
+
+  // Spiky anime hair: a crown of tilted cones, all sharing swappable materials.
+  const hairMaterials: THREE.MeshStandardMaterial[] = [];
+  const spikes: Array<[number, number, number, number, number]> = [
+    // [x, y, z, tiltX, tiltZ]
+    [0, 2.62, 0, 0, 0],
+    [0.18, 2.55, 0.05, 0, -0.5],
+    [-0.18, 2.55, 0.05, 0, 0.5],
+    [0.1, 2.5, -0.18, 0.5, -0.25],
+    [-0.1, 2.5, -0.18, 0.5, 0.25],
+    [0.05, 2.52, 0.2, -0.45, -0.15],
+    [-0.05, 2.52, 0.2, -0.45, 0.15],
+  ];
+  for (const [x, y, z, tiltX, tiltZ] of spikes) {
+    const material = new THREE.MeshStandardMaterial({ color: 0x2b2b2b, roughness: 0.4 });
+    hairMaterials.push(material);
+    const spike = new THREE.Mesh(new THREE.ConeGeometry(0.14, 0.55, 6), material);
+    spike.position.set(x, y, z);
+    spike.rotation.x = tiltX;
+    spike.rotation.z = tiltZ;
+    group.add(spike);
+  }
 
   const auraMaterial = new THREE.MeshBasicMaterial({
     color: 0x3ac0ff,
@@ -237,7 +399,7 @@ function buildPlaceholderHero(): HeroRig {
     group.add(mesh);
   }
 
-  return { group, hairMaterial, bodyMaterial, trimMaterial, aura, auraMaterial, cosmetics };
+  return { group, hairMaterials, bodyMaterial, trimMaterial, aura, auraMaterial, cosmetics };
 }
 
 /** One simple mesh per milestone cosmetic id from the core's table. */
@@ -320,11 +482,20 @@ function buildTrainingDummy(): THREE.Group {
   torso.position.y = 1.8;
   group.add(torso);
 
-  const head = new THREE.Mesh(
+  const face = new THREE.Mesh(
     new THREE.SphereGeometry(0.3, 20, 16),
     new THREE.MeshStandardMaterial({ color: 0xd9d9d9 }),
   );
-  head.position.y = 2.55;
-  group.add(head);
+  face.position.y = 2.55;
+  group.add(face);
+
+  const target = new THREE.Mesh(
+    new THREE.TorusGeometry(0.18, 0.045, 8, 20),
+    new THREE.MeshStandardMaterial({ color: 0xffffff }),
+  );
+  target.position.set(-0.38, 1.8, 0);
+  target.rotation.y = Math.PI / 2;
+  group.add(target);
+
   return group;
 }
