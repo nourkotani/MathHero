@@ -9,6 +9,9 @@ export default defineConfig({
   // Each test boots a full three.js scene on software WebGL; too many at
   // once starves the pages' main threads and produces timeout flakes.
   workers: 2,
+  // Software WebGL renders the cel-shaded scene (outline hulls + a shadow
+  // pass) far slower than any real GPU; answer-heavy tests need the room.
+  timeout: 60_000,
   projects: [
     {
       name: 'chromium',

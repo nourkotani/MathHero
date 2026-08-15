@@ -3,7 +3,7 @@
 // urgency treatment, since that plays on the arena and the ambient light.
 
 import * as THREE from 'three';
-import { environmentSurface, glowSurface } from './materials';
+import { backdropSurface, environmentSurface, glowSurface, starSurface } from './materials';
 import { STYLE } from './style';
 
 export interface Stage {
@@ -14,6 +14,7 @@ export function createStage(scene: THREE.Scene): Stage {
   // A dusk wasteland arena — dramatic anime-battle light, not a sunny field.
   scene.background = new THREE.Color(STYLE.sky);
   scene.fog = new THREE.Fog(STYLE.fog.color, STYLE.fog.near, STYLE.fog.far);
+  buildBackdrop(scene);
 
   const hemi = new THREE.HemisphereLight(STYLE.hemi.sky, STYLE.hemi.ground, STYLE.hemi.intensity);
   scene.add(hemi);
@@ -42,7 +43,8 @@ export function createStage(scene: THREE.Scene): Stage {
     scene.add(light);
   }
 
-  const ground = new THREE.Mesh(new THREE.CircleGeometry(28, 48), environmentSurface(0x6d6242, 1));
+  // The wasteland runs all the way to the dome; fog hazes the far distance.
+  const ground = new THREE.Mesh(new THREE.CircleGeometry(75, 48), environmentSurface(0x6d6242, 1));
   ground.rotation.x = -Math.PI / 2;
   ground.receiveShadow = true;
   scene.add(ground);
@@ -105,4 +107,79 @@ export function createStage(scene: THREE.Scene): Stage {
       }
     },
   };
+}
+
+/**
+ * The backdrop beyond the fog: a gradient dusk dome, a low sun disc, sparse
+ * stars, and silhouette ridges. Pure generated geometry — the ridges sit
+ * inside the fog range so distance is implied by the existing fog; the dome,
+ * sun, and stars sit beyond it, unfogged, as the sky itself.
+ */
+function buildBackdrop(scene: THREE.Scene): void {
+  // Sky dome: one inverted sphere, colored per vertex from warm horizon
+  // through dusk violet to a deep zenith.
+  const domeRadius = 80;
+  const dome = new THREE.SphereGeometry(domeRadius, 32, 18);
+  const position = dome.getAttribute('position');
+  const colors = new Float32Array(position.count * 3);
+  const horizon = new THREE.Color(STYLE.skyDome.horizon);
+  const mid = new THREE.Color(STYLE.skyDome.mid);
+  const zenith = new THREE.Color(STYLE.skyDome.zenith);
+  const shade = new THREE.Color();
+  const { horizonBand, duskBand } = STYLE.skyDome;
+  for (let i = 0; i < position.count; i++) {
+    const h = Math.max(0, position.getY(i) / domeRadius); // 0 at horizon, 1 at zenith
+    if (h < horizonBand) shade.lerpColors(horizon, mid, h / horizonBand);
+    else shade.lerpColors(mid, zenith, Math.min(1, (h - horizonBand) / (duskBand - horizonBand)));
+    colors[i * 3] = shade.r;
+    colors[i * 3 + 1] = shade.g;
+    colors[i * 3 + 2] = shade.b;
+  }
+  dome.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  scene.add(new THREE.Mesh(dome, backdropSurface(0xffffff, { vertexColors: true, backSide: true })));
+
+  // A low dusk sun, half-sunk behind the ridges.
+  const sun = new THREE.Mesh(
+    new THREE.CircleGeometry(STYLE.sunDisc.radius, 32),
+    backdropSurface(STYLE.sunDisc.color),
+  );
+  sun.position.set(...STYLE.sunDisc.position);
+  sun.lookAt(0, 2, 0);
+  scene.add(sun);
+
+  // Sparse early stars, high in the dome where the dusk has deepened.
+  const starPositions = new Float32Array(STYLE.stars.count * 3);
+  for (let i = 0; i < STYLE.stars.count; i++) {
+    // Random upper-hemisphere direction, kept well above the horizon.
+    const azimuth = Math.random() * Math.PI * 2;
+    const altitude = 0.25 + Math.random() * 1.2; // radians above horizon
+    const r = 74;
+    starPositions[i * 3] = Math.cos(azimuth) * Math.cos(altitude) * r;
+    starPositions[i * 3 + 1] = Math.sin(altitude) * r;
+    starPositions[i * 3 + 2] = Math.sin(azimuth) * Math.cos(altitude) * r;
+  }
+  const starGeometry = new THREE.BufferGeometry();
+  starGeometry.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
+  scene.add(
+    new THREE.Points(
+      starGeometry,
+      starSurface(STYLE.stars.color, STYLE.stars.size, STYLE.stars.opacity),
+    ),
+  );
+
+  // Distant silhouette ridges ringing the wasteland, fog-tinted by distance.
+  // Low and far: they must read as a horizon line, never loom over the arena.
+  const ridgeMaterial = glowSurface(STYLE.ridges.color);
+  for (let i = 0; i < 8; i++) {
+    const angle = (i / 8) * Math.PI * 2 + 0.9;
+    const distance = 56 + (i % 3) * 5;
+    const height = 5 + ((i * 5) % 5);
+    const ridge = new THREE.Mesh(
+      new THREE.ConeGeometry(8 + (i % 4) * 3, height, 4),
+      ridgeMaterial,
+    );
+    ridge.position.set(Math.cos(angle) * distance, height / 2 - 1, Math.sin(angle) * distance);
+    ridge.rotation.y = i * 1.3;
+    scene.add(ridge);
+  }
 }

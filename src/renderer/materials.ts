@@ -59,3 +59,24 @@ export function glowSurface(color: number, opacity?: number): THREE.MeshBasicMat
     ? new THREE.MeshBasicMaterial({ color })
     : new THREE.MeshBasicMaterial({ color, transparent: true, opacity });
 }
+
+/**
+ * Backdrop pieces that live beyond the fog — the sky dome and the sun disc.
+ * Fog must not wash them: they ARE the far distance the fog fades into.
+ */
+export function backdropSurface(
+  color: number,
+  opts?: { vertexColors?: boolean; backSide?: boolean },
+): THREE.MeshBasicMaterial {
+  return new THREE.MeshBasicMaterial({
+    color,
+    fog: false,
+    vertexColors: opts?.vertexColors ?? false,
+    side: opts?.backSide ? THREE.BackSide : THREE.FrontSide,
+  });
+}
+
+/** The star field's point material — unlit, unfogged, softly transparent. */
+export function starSurface(color: number, size: number, opacity: number): THREE.PointsMaterial {
+  return new THREE.PointsMaterial({ color, size, transparent: true, opacity, fog: false });
+}
