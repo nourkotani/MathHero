@@ -65,6 +65,17 @@ export interface SelectionContext {
   factStats?: FactStats;
   /** Fact to exclude — the same question never appears twice in a row. */
   excludeKey?: string;
+  /** Practice mode: only this times table, no difficulty weighting. */
+  practiceTable?: number | null;
+}
+
+/** Practice candidates: the chosen table against 1–12, as canonical Facts. */
+export function practiceCandidates(table: number): Question[] {
+  const candidates: Question[] = [];
+  for (let other = 1; other <= 12; other++) {
+    candidates.push({ a: Math.min(table, other), b: Math.max(table, other) });
+  }
+  return candidates;
 }
 
 /**
@@ -76,8 +87,10 @@ export function selectQuestion(
   prng: number,
   context: SelectionContext = {},
 ): { question: Question; prng: number } {
+  const practice = context.practiceTable ?? null;
   const tier = tierFor(difficulty);
-  let candidates = candidatesFor(difficulty);
+  const baseWeigh = practice !== null ? () => 1 : (q: Question) => tier.weight(q);
+  let candidates = practice !== null ? practiceCandidates(practice) : candidatesFor(difficulty);
   if (context.excludeKey !== undefined) {
     const remaining = candidates.filter((q) => factKey(q.a, q.b) !== context.excludeKey);
     if (remaining.length > 0) candidates = remaining;
@@ -85,7 +98,7 @@ export function selectQuestion(
   const selected = weightedSelector({
     candidates,
     prng,
-    weigh: (q) => tier.weight(q) * adaptiveWeight(context.factStats?.[factKey(q.a, q.b)]),
+    weigh: (q) => baseWeigh(q) * adaptiveWeight(context.factStats?.[factKey(q.a, q.b)]),
   });
   // A Fact displays in either operand order at random. Always consume the
   // draw so the PRNG stream doesn't depend on whether a square was selected.

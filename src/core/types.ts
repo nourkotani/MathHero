@@ -36,6 +36,11 @@ export interface GameState {
   /** Family-wide mute toggle; persists in the Save File. */
   muted: boolean;
   difficulty: Difficulty;
+  /**
+   * Practice mode: when set (1–12), Rounds ask only that times table and
+   * difficulty tiers don't apply. Cleared by picking a difficulty.
+   */
+  practiceTable: number | null;
   /** Round length setting in seconds; clamped to 30–600, default 120. */
   timerSeconds: number;
   /** Latest tick timestamp (ms) — the core's only notion of "now". */
@@ -70,6 +75,7 @@ export type GameEvent =
   | { type: 'SAVE_IMPORTED'; text: string }
   | { type: 'TIMER_CHANGED'; seconds: number }
   | { type: 'DIFFICULTY_CHANGED'; difficulty: Difficulty }
+  | { type: 'PRACTICE_TABLE_CHANGED'; table: number | null }
   | { type: 'ROUND_STARTED' }
   | { type: 'PLAY_AGAIN' }
   | { type: 'DIGIT_PRESSED'; digit: number }

@@ -69,20 +69,113 @@ body {
   text-shadow: 0 3px 10px rgba(0, 0, 0, 0.6);
 }
 
+.pre-round {
+  gap: 1.1rem;
+}
+
+.picker-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.picker-label {
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: #fff;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.picker-hint {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.35);
+  border-radius: 0.8rem;
+  padding: 0.35rem 1rem;
+  max-width: 34rem;
+  text-align: center;
+}
+
 .difficulty-picker {
   display: flex;
   gap: 0.8rem;
   pointer-events: auto;
 }
 
-.difficulty-button {
-  padding: 0 1.5rem;
-  font-size: 1.5rem;
+.mode-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  padding: 0.7rem 1.6rem;
+  border: 4px solid transparent;
+  border-radius: 1.2rem;
+  background: rgba(255, 255, 255, 0.92);
+  cursor: pointer;
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.25);
+  transition: transform 0.05s;
 }
 
-.difficulty-selected {
-  background: #5ad65a;
+.mode-card:active {
+  transform: translateY(3px);
+}
+
+.mode-name {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #333;
+}
+
+.mode-detail {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #666;
+}
+
+.mode-points {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #2e9e4f;
+}
+
+.mode-selected {
+  border-color: #5ad65a;
+  background: #eaffea;
+  box-shadow:
+    0 4px 0 rgba(0, 0, 0, 0.25),
+    0 0 12px rgba(90, 214, 90, 0.8);
+}
+
+.practice-picker {
+  display: grid;
+  grid-template-columns: repeat(6, 3.4rem);
+  gap: 0.5rem;
+  pointer-events: auto;
+}
+
+.practice-chip {
+  height: 2.9rem;
+  font-size: 1.2rem;
+  font-weight: 800;
+  border: 4px solid transparent;
+  border-radius: 0.9rem;
+  background: rgba(255, 255, 255, 0.92);
+  color: #333;
+  cursor: pointer;
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.25);
+}
+
+.practice-badge {
+  font-size: 1.4rem;
+  font-weight: 800;
   color: #fff;
+  background: rgba(0, 0, 0, 0.4);
+  border-radius: 1rem;
+  padding: 0.3rem 1rem;
 }
 
 .timer-setting {

@@ -30,6 +30,11 @@ export const DIFFICULTY_TIERS: readonly DifficultyTier[] = [
   },
 ];
 
+/** Practice mode scores like Easy: focus beats farming. */
+export const PRACTICE_BASE_POINTS = 10;
+export const MIN_PRACTICE_TABLE = 1;
+export const MAX_PRACTICE_TABLE = 12;
+
 export function tierFor(difficulty: Difficulty): DifficultyTier {
   const tier = DIFFICULTY_TIERS.find((t) => t.id === difficulty);
   if (!tier) throw new Error(`unknown difficulty: ${difficulty}`);

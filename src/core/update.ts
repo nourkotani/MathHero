@@ -1,3 +1,4 @@
+import { MAX_PRACTICE_TABLE, MIN_PRACTICE_TABLE } from './difficulty';
 import { factKey } from './facts';
 import { cosmeticUnlockedAt, levelForXp } from './level';
 import { recordAttempt } from './mastery';
@@ -27,6 +28,7 @@ export function initialState(config: GameConfig): GameState {
     prng: selected.prng,
     questionAskedAt: 0,
     phase: 'title',
+    practiceTable: null,
     players: config.save?.players ?? [],
     activePlayerId: null,
     nextPlayerId: config.save?.nextPlayerId ?? 1,
@@ -86,7 +88,9 @@ export function update(state: GameState, event: GameEvent): UpdateResult {
             effects.push(cosmetic ? { type: 'LEVEL_UP', level, cosmetic } : { type: 'LEVEL_UP', level });
           }
           let bests = p.bests;
-          if (ticked.score > (bests[ticked.difficulty] ?? 0)) {
+          // Practice Rounds award XP but never set Personal Bests — a focused
+          // 2× table score isn't comparable to a real difficulty Round.
+          if (ticked.practiceTable === null && ticked.score > (bests[ticked.difficulty] ?? 0)) {
             bests = { ...bests, [ticked.difficulty]: ticked.score };
             bestEffects.push({
               type: 'NEW_PERSONAL_BEST',
@@ -121,6 +125,7 @@ export function update(state: GameState, event: GameEvent): UpdateResult {
         const selected = selectQuestion(state.difficulty, state.prng, {
           factStats: activeFactStats(ticked),
           excludeKey: factKey(ticked.question.a, ticked.question.b),
+          practiceTable: ticked.practiceTable,
         });
         return {
           state: {
@@ -260,13 +265,28 @@ export function update(state: GameState, event: GameEvent): UpdateResult {
 
     case 'DIFFICULTY_CHANGED': {
       if (state.phase !== 'pre-round') return noop(state);
-      return { state: { ...state, difficulty: event.difficulty }, effects: [] };
+      // Picking a difficulty always returns to tier mode.
+      return {
+        state: { ...state, difficulty: event.difficulty, practiceTable: null },
+        effects: [],
+      };
+    }
+
+    case 'PRACTICE_TABLE_CHANGED': {
+      if (state.phase !== 'pre-round') return noop(state);
+      if (event.table === null) {
+        return { state: { ...state, practiceTable: null }, effects: [] };
+      }
+      const table = Math.round(event.table);
+      if (table < MIN_PRACTICE_TABLE || table > MAX_PRACTICE_TABLE) return noop(state);
+      return { state: { ...state, practiceTable: table }, effects: [] };
     }
 
     case 'ROUND_STARTED': {
       if (state.phase !== 'pre-round' || state.activePlayerId === null) return noop(state);
       const selected = selectQuestion(state.difficulty, state.prng, {
         factStats: activeFactStats(state),
+        practiceTable: state.practiceTable,
       });
       return {
         state: {
@@ -334,12 +354,13 @@ export function update(state: GameState, event: GameEvent): UpdateResult {
 
       const streak = state.streak + 1;
       const tier = tierForStreak(streak);
-      const points = pointsForCorrect(state.difficulty, streak);
+      const points = pointsForCorrect(state, streak);
       const transformed = tier.threshold === streak && tier.multiplier > 1;
 
       const selected = selectQuestion(state.difficulty, state.prng, {
         factStats: activeFactStats(recorded),
         excludeKey: factKey(question.a, question.b),
+        practiceTable: state.practiceTable,
       });
       const effects: GameEffect[] = [{ type: 'ANSWER_CORRECT', question, points }];
       if (transformed) {

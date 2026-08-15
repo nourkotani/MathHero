@@ -12,6 +12,11 @@ export function RoundScreen({ state, dispatch }: AppProps) {
         <div class="score" data-testid="score">
           ⭐ {state.score}
         </div>
+        {state.practiceTable !== null && (
+          <div class="practice-badge" data-testid="practice-badge">
+            ✏️ {state.practiceTable}× practice
+          </div>
+        )}
         {tier.multiplier > 1 && (
           <div class={`multiplier multiplier-${tier.form}`} data-testid="multiplier">
             ×{tier.multiplier}

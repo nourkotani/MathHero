@@ -1,17 +1,30 @@
-import { DIFFICULTY_TIERS, MAX_TIMER_SECONDS, MIN_TIMER_SECONDS } from '../core';
+import {
+  DIFFICULTY_TIERS,
+  MAX_PRACTICE_TABLE,
+  MAX_TIMER_SECONDS,
+  MIN_PRACTICE_TABLE,
+  MIN_TIMER_SECONDS,
+  PRACTICE_BASE_POINTS,
+} from '../core';
 import type { AppProps } from './App';
 import { formatClock } from './format';
 
 const TIMER_STEP_SECONDS = 30;
+
+const PRACTICE_TABLES = Array.from(
+  { length: MAX_PRACTICE_TABLE - MIN_PRACTICE_TABLE + 1 },
+  (_, i) => MIN_PRACTICE_TABLE + i,
+);
 
 export function PreRoundScreen({ state, dispatch }: AppProps) {
   const change = (delta: number) =>
     dispatch({ type: 'TIMER_CHANGED', seconds: state.timerSeconds + delta });
 
   const activePlayer = state.players.find((p) => p.id === state.activePlayerId);
+  const practicing = state.practiceTable !== null;
 
   return (
-    <div class="hud screen-center">
+    <div class="hud screen-center pre-round">
       <button
         class="corner-button"
         data-testid="back-to-title"
@@ -22,18 +35,48 @@ export function PreRoundScreen({ state, dispatch }: AppProps) {
       <h1 class="screen-title" data-testid="active-player">
         Ready, {activePlayer?.name ?? 'hero'}?
       </h1>
-      <div class="difficulty-picker">
-        {DIFFICULTY_TIERS.map((tier) => (
-          <button
-            key={tier.id}
-            class={`pad-key difficulty-button${state.difficulty === tier.id ? ' difficulty-selected' : ''}`}
-            data-testid={`difficulty-${tier.id}`}
-            onClick={() => dispatch({ type: 'DIFFICULTY_CHANGED', difficulty: tier.id })}
-          >
-            {tier.label}
-          </button>
-        ))}
+
+      <div class="picker-section">
+        <div class="picker-label">Pick your challenge</div>
+        <div class="difficulty-picker">
+          {DIFFICULTY_TIERS.map((tier) => (
+            <button
+              key={tier.id}
+              class={`mode-card${!practicing && state.difficulty === tier.id ? ' mode-selected' : ''}`}
+              data-testid={`difficulty-${tier.id}`}
+              onClick={() => dispatch({ type: 'DIFFICULTY_CHANGED', difficulty: tier.id })}
+            >
+              <span class="mode-name">{tier.label}</span>
+              <span class="mode-detail">
+                Tables {tier.tableMin}–{tier.tableMax}
+              </span>
+              <span class="mode-points">+{tier.basePoints} pts</span>
+            </button>
+          ))}
+        </div>
+        <div class="picker-hint" data-testid="mode-hint">
+          {practicing
+            ? `Only ${state.practiceTable}× questions — go master that table! (+${PRACTICE_BASE_POINTS} pts each)`
+            : 'One number comes from those tables — the other can be anything up to 12!'}
+        </div>
       </div>
+
+      <div class="picker-section">
+        <div class="picker-label">…or practice one times table</div>
+        <div class="practice-picker">
+          {PRACTICE_TABLES.map((table) => (
+            <button
+              key={table}
+              class={`practice-chip${state.practiceTable === table ? ' mode-selected' : ''}`}
+              data-testid={`practice-${table}`}
+              onClick={() => dispatch({ type: 'PRACTICE_TABLE_CHANGED', table })}
+            >
+              {table}×
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div class="timer-setting">
         <button
           class="pad-key timer-button"

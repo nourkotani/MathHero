@@ -2,7 +2,13 @@
 // they speak, and derived-value selectors. Everything else is implementation.
 
 export { FEEDBACK_MS, initialState, update } from './update';
-export { DIFFICULTY_TIERS, tierFor } from './difficulty';
+export {
+  DIFFICULTY_TIERS,
+  MAX_PRACTICE_TABLE,
+  MIN_PRACTICE_TABLE,
+  PRACTICE_BASE_POINTS,
+  tierFor,
+} from './difficulty';
 export type { Difficulty, DifficultyTier } from './difficulty';
 export { STREAK_TIERS, tierForStreak } from './streak';
 export type { StreakForm, StreakTier } from './streak';

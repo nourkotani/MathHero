@@ -1,10 +1,16 @@
 // The single place "points for this correct answer" is computed:
-// difficulty base points × Power Streak multiplier.
+// base points (difficulty tier, or the flat practice rate) × Power Streak
+// multiplier.
 
-import { tierFor } from './difficulty';
-import type { Difficulty } from './difficulty';
+import { PRACTICE_BASE_POINTS, tierFor } from './difficulty';
 import { tierForStreak } from './streak';
+import type { GameState } from './types';
 
-export function pointsForCorrect(difficulty: Difficulty, streak: number): number {
-  return tierFor(difficulty).basePoints * tierForStreak(streak).multiplier;
+export function pointsForCorrect(
+  state: Pick<GameState, 'difficulty' | 'practiceTable'>,
+  streak: number,
+): number {
+  const base =
+    state.practiceTable !== null ? PRACTICE_BASE_POINTS : tierFor(state.difficulty).basePoints;
+  return base * tierForStreak(streak).multiplier;
 }
