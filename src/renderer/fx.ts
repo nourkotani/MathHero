@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { glowSurface } from './materials';
 import { isOutlineHull } from './cel';
 import { DUMMY_X, HERO_X } from './constants';
+import { STYLE } from './style';
 
 interface Particle {
   mesh: THREE.Mesh;
@@ -96,7 +97,14 @@ export function createFx(scene: THREE.Scene, onBlastImpact: (big: boolean) => vo
         const blast = blasts[i];
         if (!blast) continue;
         blast.mesh.position.x += dt * (blast.big ? 16 : 20);
-        blast.mesh.scale.setScalar(1 + Math.sin(elapsed * 40) * 0.2);
+        // Smear: stretched along its flight, squashed across it, still
+        // pulsing. The impact burst is the snap-back.
+        const pulse = 1 + Math.sin(elapsed * 40) * 0.15;
+        blast.mesh.scale.set(
+          STYLE.juice.smear.along * pulse,
+          STYLE.juice.smear.across * pulse,
+          STYLE.juice.smear.across * pulse,
+        );
         // Energy crackles off the projectile as it screams across the arena.
         spark(
           blast.big ? 0xffe14d : 0x7ad7ff,

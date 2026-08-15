@@ -15,12 +15,14 @@ import {
   unlockedCosmetics,
 } from '../core';
 import type { GameEffect, GameState, HeroAppearance } from '../core';
+import { createCameraRig } from './cameraRig';
 import { HERO_X } from './constants';
 import { createDummy } from './dummy';
 import { createFx, freeMesh } from './fx';
 import { buildHero } from './hero';
 import { createReactions } from './reactions';
 import { createStage } from './stage';
+import { STYLE } from './style';
 
 export interface Renderer {
   onStoreUpdate(state: GameState, effects: GameEffect[]): void;
@@ -39,15 +41,10 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
   const stage = createStage(scene);
 
   const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 100);
-  const cameraHome = new THREE.Vector3(0, 4.2, 10);
-  camera.position.copy(cameraHome);
-  camera.lookAt(0, 1.4, 0);
+  const rig = createCameraRig(camera);
 
-  // Camera shake energy; reactions feed it, the frame loop decays it.
-  let shake = 0;
-  const addShake = (amount: number) => {
-    shake = Math.max(shake, amount);
-  };
+  // Hitstop: a render-time freeze on big hits, applied at the dt pipeline.
+  let hitstopTimer = 0;
 
   let hero = buildHero(DEFAULT_APPEARANCE);
   let appearanceKey = JSON.stringify(DEFAULT_APPEARANCE);
@@ -76,13 +73,24 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
   const fx = createFx(scene, (big) => {
     if (big) {
       dummy.launch();
-      addShake(0.4);
+      rig.addShake(0.4);
     } else {
-      dummy.kick(0.4);
+      dummy.hit();
     }
   });
 
-  const reactions = createReactions({ getHero: () => hero, dummy, fx, addShake });
+  const reactions = createReactions({
+    getHero: () => hero,
+    dummy,
+    fx,
+    juice: {
+      addShake: (amount) => rig.addShake(amount),
+      hitstop: () => {
+        hitstopTimer = Math.max(hitstopTimer, STYLE.juice.hitstop.duration);
+      },
+      punchCamera: () => rig.punch(),
+    },
+  });
 
   let elapsed = 0;
   let urgent = false; // final ten seconds of the Round
@@ -127,28 +135,23 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     },
     frame(dtMs) {
       // The single point all render-time flows through: everything below
-      // animates from this dt and nothing else. (The Game Core's TICK clock
-      // never passes through here, so scaling render-time can never touch
-      // the Round timer.)
-      const dt = Math.min(dtMs, 100) / 1000;
+      // animates from this dt and nothing else. Hitstop scales it to a
+      // near-freeze for a beat — render-only by construction, because the
+      // Game Core's TICK clock never passes through here, so the Round
+      // timer cannot be touched.
+      const rawDt = Math.min(dtMs, 100) / 1000;
+      let dt = rawDt;
+      if (hitstopTimer > 0) {
+        hitstopTimer = Math.max(0, hitstopTimer - rawDt);
+        dt = rawDt * STYLE.juice.hitstop.timeScale;
+      }
       elapsed += dt;
 
       reactions.update(dt, elapsed, previewing);
       dummy.update(dt, elapsed, reactions.isStaggering());
       fx.update(dt, elapsed);
       stage.update(dt, elapsed, urgent);
-
-      // Screen shake decays exponentially.
-      if (shake > 0.001) {
-        shake *= Math.exp(-6 * dt);
-        camera.position.set(
-          cameraHome.x + Math.sin(elapsed * 71) * shake * 0.25,
-          cameraHome.y + Math.sin(elapsed * 89) * shake * 0.2,
-          cameraHome.z,
-        );
-      } else {
-        camera.position.copy(cameraHome);
-      }
+      rig.update(dt, elapsed);
 
       renderer.render(scene, camera);
     },

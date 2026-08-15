@@ -1,15 +1,32 @@
 // The reactions module: the single place that maps the core's effects[] to
 // animations, particles, and ceremonies (ADR 0003 — moments arrive as
-// effects, never by diffing state). Owns the hero's action state: streak
-// form, attack and stagger timers, and the aura's shed sparks.
+// effects, never by diffing state). Hero actions are clips on a shared
+// channel: attacks (with anticipation wind-up) and the wrong-answer stagger.
 
 import * as THREE from 'three';
 import type { GameEffect, StreakForm } from '../core';
-import { ATTACK_DURATION, DUMMY_X, HERO_X, STAGGER_DURATION } from './constants';
+import {
+  ANTICIPATION_DURATION,
+  ATTACK_DURATION,
+  DUMMY_X,
+  HERO_X,
+  STAGGER_DURATION,
+} from './constants';
 import { applyFormToRig, FORM_LOOKS } from './hero';
 import type { HeroRig } from './hero';
 import type { Dummy } from './dummy';
 import type { Fx } from './fx';
+import { createChannel } from './timeline';
+import type { Clip } from './timeline';
+
+/** The juice hooks reactions may pull: shake, render freeze, camera punch. */
+export interface Juice {
+  addShake(amount: number): void;
+  /** Render-side freeze; the Game Core clock is untouchable from here. */
+  hitstop(): void;
+  /** Camera punch-in on Super-mode blasts. */
+  punchCamera(): void;
+}
 
 export interface Reactions {
   handleEffects(effects: GameEffect[]): void;
@@ -25,15 +42,12 @@ export function createReactions(opts: {
   getHero(): HeroRig;
   dummy: Dummy;
   fx: Fx;
-  addShake(amount: number): void;
+  juice: Juice;
 }): Reactions {
-  const { getHero, dummy, fx, addShake } = opts;
+  const { getHero, dummy, fx, juice } = opts;
 
-  let punchTimer = 0; // hero attack animation
-  let attackKind = 0; // which attack plays: punch / flying kick / spin / uppercut
+  const heroChannel = createChannel();
   let attackCycle = 0;
-  let staggerTimer = 0; // wrong-answer recoil
-  let hitPending = false; // impact burst waiting for the strike to land
   let sparkAccum = 0; // fractional aura-spark spawns carried between frames
   let currentForm: StreakForm = 'base';
   let playerHair = 0x2b2b2b;
@@ -45,125 +59,36 @@ export function createReactions(opts: {
   }
   applyForm('base');
 
-  return {
-    handleEffects(effects) {
-      const hero = getHero();
-      for (const effect of effects) {
-        switch (effect.type) {
-          case 'ANSWER_CORRECT':
-            // Cycle through different attacks so every strike feels fresh.
-            attackKind = attackCycle++ % 4;
-            punchTimer = ATTACK_DURATION;
-            staggerTimer = 0;
-            dummy.kick(ATTACK_DURATION);
-            hitPending = true;
-            // A crackle of charge energy as the hero coils to strike.
-            fx.burst(currentForm === 'base' ? 0xffffff : FORM_LOOKS[currentForm].auraColor, 6, new THREE.Vector3(HERO_X + 0.4, 1.5, 0), 1.2);
-            // Any transformed hero throws visible energy with each strike.
-            if (currentForm !== 'base') fx.fireBlast(false);
-            break;
-          case 'ANSWER_WRONG':
-            staggerTimer = STAGGER_DURATION;
-            punchTimer = 0;
-            hitPending = false;
-            addShake(0.15);
-            break;
-          case 'TRANSFORMED':
-            applyForm(effect.form);
-            fx.burst(FORM_LOOKS[effect.form].auraColor, 24, hero.group.position.clone().setY(1.5), 3.5);
-            addShake(0.25);
-            break;
-          case 'STREAK_BROKEN':
-          case 'ROUND_ENDED':
-          case 'ROUND_ABANDONED':
-            applyForm('base');
-            break;
-          case 'BLAST_FIRED':
-            fx.fireBlast(true);
-            break;
-          case 'LEVEL_UP':
-            fx.burst(0xffd700, 26, hero.group.position.clone().setY(1.2), 4);
-            addShake(0.3);
-            break;
-          case 'NEW_PERSONAL_BEST':
-            fx.burst(0x8f5aff, 20, new THREE.Vector3(0, 2.0, 0), 4.5);
-            fx.burst(0x3ac0ff, 20, new THREE.Vector3(0, 2.4, 0), 3.5);
-            break;
-          default:
-            break;
+  /**
+   * One of four DBZ-style strikes: an anticipation crouch, then the original
+   * wind-up/strike curve — w coils and releases, s snaps out to the hit and
+   * settles home. The impact burst (and hitstop at high streaks) fires at
+   * the exact moment the strike lands.
+   */
+  function attackClip(kind: number): Clip {
+    let hitPending = true;
+    const total = ANTICIPATION_DURATION + ATTACK_DURATION;
+    return {
+      duration: total,
+      apply(tc, elapsed) {
+        const hero = getHero();
+        const j = hero.joints;
+        const bobY = 0.26 + Math.sin(elapsed * 2.2) * 0.04;
+        const tAbs = tc * total;
+        if (tAbs < ANTICIPATION_DURATION) {
+          // Anticipation: a coiled crouch, fists drawn, before the release.
+          const c = tAbs / ANTICIPATION_DURATION;
+          hero.group.position.y = bobY - c * 0.16;
+          j.torso.rotation.x = 0.06 + c * 0.3;
+          j.legL.rotation.x = -0.22 - c * 0.5;
+          j.legR.rotation.x = 0.26 - c * 0.35;
+          j.kneeL.rotation.x = 0.38 + c * 0.85;
+          j.kneeR.rotation.x = 0.34 + c * 0.85;
+          j.armL.rotation.x = -0.55 - c * 0.4;
+          j.armR.rotation.x = -0.55 - c * 0.4;
+          return;
         }
-      }
-    },
-    setPlayerLook(hair, glow) {
-      playerHair = hair;
-      playerGlow = glow;
-    },
-    refreshForm() {
-      applyForm(currentForm);
-    },
-    isStaggering: () => staggerTimer > 0,
-    update(dt, elapsed, previewing) {
-      const hero = getHero();
-
-      // Pose the rig fresh every frame: fighting stance + idle breathing
-      // first, then whichever action is running overrides the joints it
-      // needs. Resetting first means an interrupted action can never leave
-      // a limb stuck mid-swing.
-      const bobY = 0.26 + Math.sin(elapsed * 2.2) * 0.04;
-      // The flame churns: shells counter-rotate so the sculpted lobes slide
-      // past each other, while the whole teardrop licks taller and thinner.
-      hero.auraOuter.rotation.y = elapsed * 1.1;
-      hero.auraInner.rotation.y = -elapsed * 1.9;
-      const lick = 1 + Math.sin(elapsed * 9) * 0.05 + Math.sin(elapsed * 23) * 0.025;
-      hero.aura.scale.set(
-        1 + Math.sin(elapsed * 6) * 0.04,
-        lick,
-        1 + Math.cos(elapsed * 6) * 0.04,
-      );
-      hero.group.position.set(HERO_X, bobY, 0);
-      hero.group.rotation.set(0, previewing ? 0.35 : Math.PI / 2, 0);
-
-      // Guard stance: left foot forward, knees soft, fists raised.
-      const j = hero.joints;
-      const breathe = Math.sin(elapsed * 2.2);
-      j.torso.rotation.set(0.06 + breathe * 0.02, 0, 0);
-      j.head.rotation.set(-0.04, Math.sin(elapsed * 0.7) * 0.08, 0);
-      j.armL.rotation.set(-0.55 + breathe * 0.04, 0, 0.3);
-      j.armR.rotation.set(-0.55 + breathe * 0.04, 0, -0.3);
-      j.elbowL.rotation.set(-1.55, 0, 0);
-      j.elbowR.rotation.set(-1.55, 0, 0);
-      j.legL.rotation.set(-0.22, 0, 0);
-      j.legR.rotation.set(0.26, 0, 0);
-      j.kneeL.rotation.set(0.38, 0, 0);
-      j.kneeR.rotation.set(0.34, 0, 0);
-
-      if (staggerTimer > 0) {
-        // Wrong answer: knocked off balance — stumbling back, arms
-        // windmilling, head rattling, front leg up, with a red wince.
-        staggerTimer = Math.max(0, staggerTimer - dt);
-        const recoil = Math.sin((staggerTimer / STAGGER_DURATION) * Math.PI);
-        hero.group.position.x = HERO_X - recoil * 0.7;
-        hero.group.rotation.z = recoil * 0.22;
-        j.torso.rotation.x = -recoil * 0.5;
-        j.head.rotation.y = Math.sin(elapsed * 30) * 0.35 * recoil;
-        j.armL.rotation.set(-2.3 * recoil - 0.3, 0, 0.3 + Math.sin(elapsed * 24) * 0.5 * recoil);
-        j.armR.rotation.set(-2.3 * recoil - 0.3, 0, -0.3 - Math.cos(elapsed * 24) * 0.5 * recoil);
-        j.elbowL.rotation.x = -0.4;
-        j.elbowR.rotation.x = -0.4;
-        j.legL.rotation.x = -0.9 * recoil;
-        j.kneeL.rotation.x = 1.2 * recoil + 0.2;
-        if (staggerTimer > 0) {
-          hero.bodyMaterial.emissive.setHex(0xff3b3b);
-          hero.bodyMaterial.emissiveIntensity = recoil * 0.5;
-        } else {
-          applyForm(currentForm);
-        }
-      } else if (punchTimer > 0) {
-        punchTimer = Math.max(0, punchTimer - dt);
-        const t = 1 - punchTimer / ATTACK_DURATION;
-        // Every attack reads DBZ-style: a coiled wind-up (w ramps then
-        // releases), the strike snapping out and following through (s
-        // rises to the hit and settles home).
+        const t = (tAbs - ANTICIPATION_DURATION) / ATTACK_DURATION;
         const w = t < 0.3 ? t / 0.3 : Math.max(0, 1 - (t - 0.3) / 0.2);
         const s = t < 0.3 ? 0 : Math.sin(((t - 0.3) / 0.7) * Math.PI);
         // The exact moment the strike lands: impact sparks fly off the dummy.
@@ -171,9 +96,11 @@ export function createReactions(opts: {
           hitPending = false;
           const hitColor = currentForm === 'base' ? 0xffffff : FORM_LOOKS[currentForm].auraColor;
           fx.burst(hitColor, currentForm === 'base' ? 12 : 18, new THREE.Vector3(DUMMY_X - 0.55, 1.7, 0), 3.2);
-          addShake(currentForm === 'base' ? 0.12 : 0.2);
+          juice.addShake(currentForm === 'base' ? 0.12 : 0.2);
+          // High-streak hits freeze the frame for a beat — weight, not lag.
+          if (currentForm === 'surge' || currentForm === 'super') juice.hitstop();
         }
-        switch (attackKind) {
+        switch (kind) {
           case 0: // dash punch: coil back, lunge in with a straight right
             hero.group.position.x = HERO_X - w * 0.35 + s * 1.7;
             j.torso.rotation.set(s * 0.2, w * 0.5 - s * 0.55, 0);
@@ -215,7 +142,129 @@ export function createReactions(opts: {
             j.armL.rotation.x = -0.3 + s * 0.5;
             break;
         }
+      },
+    };
+  }
+
+  /**
+   * Wrong answer: knocked off balance — stumbling back, arms windmilling,
+   * head rattling, front leg up, with a red wince that fades on recovery.
+   */
+  function staggerClip(): Clip {
+    return {
+      duration: STAGGER_DURATION,
+      apply(t, elapsed) {
+        const hero = getHero();
+        const j = hero.joints;
+        const recoil = Math.sin(t * Math.PI);
+        hero.group.position.x = HERO_X - recoil * 0.7;
+        hero.group.rotation.z = recoil * 0.22;
+        j.torso.rotation.x = -recoil * 0.5;
+        j.head.rotation.y = Math.sin(elapsed * 30) * 0.35 * recoil;
+        j.armL.rotation.set(-2.3 * recoil - 0.3, 0, 0.3 + Math.sin(elapsed * 24) * 0.5 * recoil);
+        j.armR.rotation.set(-2.3 * recoil - 0.3, 0, -0.3 - Math.cos(elapsed * 24) * 0.5 * recoil);
+        j.elbowL.rotation.x = -0.4;
+        j.elbowR.rotation.x = -0.4;
+        j.legL.rotation.x = -0.9 * recoil;
+        j.kneeL.rotation.x = 1.2 * recoil + 0.2;
+        hero.bodyMaterial.emissive.setHex(0xff3b3b);
+        hero.bodyMaterial.emissiveIntensity = recoil * 0.5;
+      },
+      onDone() {
+        applyForm(currentForm);
+      },
+    };
+  }
+
+  return {
+    handleEffects(effects) {
+      const hero = getHero();
+      for (const effect of effects) {
+        switch (effect.type) {
+          case 'ANSWER_CORRECT':
+            // Cycle through different attacks so every strike feels fresh.
+            heroChannel.play(attackClip(attackCycle++ % 4), 'attack');
+            dummy.hit();
+            // A crackle of charge energy as the hero coils to strike.
+            fx.burst(currentForm === 'base' ? 0xffffff : FORM_LOOKS[currentForm].auraColor, 6, new THREE.Vector3(HERO_X + 0.4, 1.5, 0), 1.2);
+            // Any transformed hero throws visible energy with each strike.
+            if (currentForm !== 'base') fx.fireBlast(false);
+            break;
+          case 'ANSWER_WRONG':
+            heroChannel.play(staggerClip(), 'stagger');
+            juice.addShake(0.15);
+            break;
+          case 'TRANSFORMED':
+            applyForm(effect.form);
+            fx.burst(FORM_LOOKS[effect.form].auraColor, 24, hero.group.position.clone().setY(1.5), 3.5);
+            juice.addShake(0.25);
+            break;
+          case 'STREAK_BROKEN':
+          case 'ROUND_ENDED':
+          case 'ROUND_ABANDONED':
+            applyForm('base');
+            break;
+          case 'BLAST_FIRED':
+            fx.fireBlast(true);
+            juice.punchCamera();
+            break;
+          case 'LEVEL_UP':
+            fx.burst(0xffd700, 26, hero.group.position.clone().setY(1.2), 4);
+            juice.addShake(0.3);
+            break;
+          case 'NEW_PERSONAL_BEST':
+            fx.burst(0x8f5aff, 20, new THREE.Vector3(0, 2.0, 0), 4.5);
+            fx.burst(0x3ac0ff, 20, new THREE.Vector3(0, 2.4, 0), 3.5);
+            break;
+          default:
+            break;
+        }
       }
+    },
+    setPlayerLook(hair, glow) {
+      playerHair = hair;
+      playerGlow = glow;
+    },
+    refreshForm() {
+      applyForm(currentForm);
+    },
+    isStaggering: () => heroChannel.label() === 'stagger',
+    update(dt, elapsed, previewing) {
+      const hero = getHero();
+
+      // Pose the rig fresh every frame: fighting stance + idle breathing
+      // first, then whichever clip is running overrides the joints it
+      // needs. Resetting first means an interrupted action can never leave
+      // a limb stuck mid-swing.
+      const bobY = 0.26 + Math.sin(elapsed * 2.2) * 0.04;
+      // The flame churns: shells counter-rotate so the sculpted lobes slide
+      // past each other, while the whole teardrop licks taller and thinner.
+      hero.auraOuter.rotation.y = elapsed * 1.1;
+      hero.auraInner.rotation.y = -elapsed * 1.9;
+      const lick = 1 + Math.sin(elapsed * 9) * 0.05 + Math.sin(elapsed * 23) * 0.025;
+      hero.aura.scale.set(
+        1 + Math.sin(elapsed * 6) * 0.04,
+        lick,
+        1 + Math.cos(elapsed * 6) * 0.04,
+      );
+      hero.group.position.set(HERO_X, bobY, 0);
+      hero.group.rotation.set(0, previewing ? 0.35 : Math.PI / 2, 0);
+
+      // Guard stance: left foot forward, knees soft, fists raised.
+      const j = hero.joints;
+      const breathe = Math.sin(elapsed * 2.2);
+      j.torso.rotation.set(0.06 + breathe * 0.02, 0, 0);
+      j.head.rotation.set(-0.04, Math.sin(elapsed * 0.7) * 0.08, 0);
+      j.armL.rotation.set(-0.55 + breathe * 0.04, 0, 0.3);
+      j.armR.rotation.set(-0.55 + breathe * 0.04, 0, -0.3);
+      j.elbowL.rotation.set(-1.55, 0, 0);
+      j.elbowR.rotation.set(-1.55, 0, 0);
+      j.legL.rotation.set(-0.22, 0, 0);
+      j.legR.rotation.set(0.26, 0, 0);
+      j.kneeL.rotation.set(0.38, 0, 0);
+      j.kneeR.rotation.set(0.34, 0, 0);
+
+      heroChannel.update(dt, elapsed);
 
       // Transformed heroes shed rising energy motes that hug the body's
       // silhouette — narrow at the boots and head, widest at the torso —

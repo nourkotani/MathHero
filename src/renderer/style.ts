@@ -38,6 +38,16 @@ export const STYLE = {
     { color: 0x6f5aff, intensity: 2.5, position: [6, 1.0, -4] as const },
   ],
 
+  /** Motion feel: hitstop, camera punch, blast smear. */
+  juice: {
+    /** Render freeze on high-streak hits: duration and how frozen it is. */
+    hitstop: { duration: 0.07, timeScale: 0.02 },
+    /** Camera punch-in on Super-mode blasts. */
+    punch: { dolly: 1.5, drop: 0.12, duration: 0.5, shake: 0.3 },
+    /** Blasts stretch along their flight and squash across it. */
+    smear: { along: 1.7, across: 0.72 },
+  },
+
   /** One directional shadow grounds the characters. */
   shadow: {
     mapSize: 1024,
