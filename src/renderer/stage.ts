@@ -3,7 +3,7 @@
 // urgency treatment, since that plays on the arena and the ambient light.
 
 import * as THREE from 'three';
-import { backdropSurface, environmentSurface, glowSurface, starSurface } from './materials';
+import { backdropSurface, environmentSurface, glowSurface, markBloom, starSurface } from './materials';
 import { STYLE } from './style';
 
 export interface Stage {
@@ -60,6 +60,7 @@ export function createStage(scene: THREE.Scene): Stage {
     new THREE.TorusGeometry(7.05, 0.07, 8, 64),
     glowSurface(0xffd24d, 0.7),
   );
+  markBloom(arenaRim);
   arenaRim.rotation.x = Math.PI / 2;
   arenaRim.position.y = 0.31;
   scene.add(arenaRim);
@@ -143,6 +144,7 @@ function buildBackdrop(scene: THREE.Scene): void {
     new THREE.CircleGeometry(STYLE.sunDisc.radius, 32),
     backdropSurface(STYLE.sunDisc.color),
   );
+  markBloom(sun);
   sun.position.set(...STYLE.sunDisc.position);
   sun.lookAt(0, 2, 0);
   scene.add(sun);

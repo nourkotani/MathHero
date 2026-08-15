@@ -38,6 +38,13 @@ export const STYLE = {
     { color: 0x6f5aff, intensity: 2.5, position: [6, 1.0, -4] as const },
   ],
 
+  /** Real bloom on the marked glow meshes (ADR 0004). */
+  bloom: {
+    intensity: 1.35,
+    /** Within the selection; keeps near-black glows (eyes) contributing nothing. */
+    luminanceThreshold: 0.1,
+  },
+
   /** Motion feel: hitstop, camera punch, blast smear. */
   juice: {
     /** Render freeze on high-streak hits: duration and how frozen it is. */

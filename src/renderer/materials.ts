@@ -80,3 +80,14 @@ export function backdropSurface(
 export function starSurface(color: number, size: number, opacity: number): THREE.PointsMaterial {
   return new THREE.PointsMaterial({ color, size, transparent: true, opacity, fog: false });
 }
+
+/**
+ * The layer the bloom pass reads. Marking is opt-in per mesh at its creation
+ * site: auras, blasts, particles, cosmetic energy, the arena rim — the things
+ * that ARE light. Never lit surfaces (they'd haze) or ink hulls.
+ */
+export const BLOOM_LAYER = 11;
+
+export function markBloom(object: THREE.Object3D): void {
+  object.layers.enable(BLOOM_LAYER);
+}

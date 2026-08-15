@@ -5,7 +5,7 @@
 import * as THREE from 'three';
 import { presetHex, SKIN_PRESETS } from '../core';
 import type { HairStyle, HeroAppearance, StreakForm } from '../core';
-import { characterSurface, glowSurface } from './materials';
+import { characterSurface, glowSurface, markBloom } from './materials';
 import type { Surface } from './materials';
 import { applyCelTreatment } from './cel';
 
@@ -244,6 +244,8 @@ export function buildHero(appearance: HeroAppearance): HeroRig {
   const auraGeometry = buildAuraGeometry();
   const auraOuter = new THREE.Mesh(auraGeometry, auraMaterial);
   const auraInner = new THREE.Mesh(auraGeometry, auraMaterial);
+  markBloom(auraOuter);
+  markBloom(auraInner);
   auraInner.scale.set(0.62, 0.82, 0.62);
   const aura = new THREE.Group();
   aura.add(auraOuter);
@@ -254,6 +256,8 @@ export function buildHero(appearance: HeroAppearance): HeroRig {
   const cosmetics = buildCosmetics();
   for (const mesh of cosmetics.values()) {
     mesh.visible = false;
+    // Cosmetic energy glows for real; children too (wisps, wings, halos).
+    mesh.traverse(markBloom);
     group.add(mesh);
   }
 

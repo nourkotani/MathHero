@@ -63,7 +63,7 @@ Violations only surface in the built artifact, which is why the flow-test suite 
 
 - Budget: **60fps on integrated graphics** — this runs on a family machine, not a gaming rig.
 - The hero, arena, Training Dummy, and all effects are procedural (geometry, materials, shaders, particles). No asset files.
-- Whether transformation glow uses post-processing bloom or additive sprites is decided empirically against the fps budget in the spectacle-polish ticket — not fixed here.
+- Transformation glow is real selective bloom via the pmndrs `postprocessing` composer, with the additive sprites kept as an automatic fallback tier on weak devices ([ADR 0004](./adr/0004-composer-bloom-with-sprite-fallback.md)).
 - All readable text (questions, score, menus, HUD) lives in the Preact DOM overlay, never rendered inside the canvas.
 
 ## Audio

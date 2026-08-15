@@ -3,7 +3,7 @@
 // owns their GPU cleanup too.
 
 import * as THREE from 'three';
-import { glowSurface } from './materials';
+import { glowSurface, markBloom } from './materials';
 import { isOutlineHull } from './cel';
 import { DUMMY_X, HERO_X } from './constants';
 import { STYLE } from './style';
@@ -52,6 +52,7 @@ export function createFx(scene: THREE.Scene, onBlastImpact: (big: boolean) => vo
   function burst(color: number, count: number, origin: THREE.Vector3, speed: number) {
     for (let i = 0; i < count; i++) {
       const mesh = new THREE.Mesh(new THREE.OctahedronGeometry(0.09), glowSurface(color, 1));
+      markBloom(mesh);
       mesh.position.copy(origin);
       const theta = (i / count) * Math.PI * 2;
       const up = 1.5 + (i % 3);
@@ -69,6 +70,7 @@ export function createFx(scene: THREE.Scene, onBlastImpact: (big: boolean) => vo
     size = 0.06,
   ) {
     const mesh = new THREE.Mesh(new THREE.TetrahedronGeometry(size), glowSurface(color, 1));
+    markBloom(mesh);
     mesh.position.copy(origin);
     mesh.rotation.set(Math.random() * 3, Math.random() * 3, 0);
     scene.add(mesh);
@@ -80,6 +82,7 @@ export function createFx(scene: THREE.Scene, onBlastImpact: (big: boolean) => vo
       new THREE.SphereGeometry(big ? 0.42 : 0.24, 12, 10),
       glowSurface(big ? 0xffe14d : 0x7ad7ff),
     );
+    markBloom(mesh);
     mesh.position.set(HERO_X + 0.8, 1.6, 0);
     scene.add(mesh);
     blasts.push({ mesh, big });

@@ -20,6 +20,8 @@ import { HERO_X } from './constants';
 import { createDummy } from './dummy';
 import { createFx, freeMesh } from './fx';
 import { buildHero } from './hero';
+import { createPipeline } from './pipeline';
+import { initialTierState, nextTier } from './qualityTier';
 import { createReactions } from './reactions';
 import { createStage } from './stage';
 import { STYLE } from './style';
@@ -42,6 +44,13 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
 
   const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 100);
   const rig = createCameraRig(camera);
+  const pipeline = createPipeline(renderer, scene, camera);
+
+  // The quality tier degrades itself on weak devices — no settings UI. The
+  // rule is the pure reducer in qualityTier.ts; this just feeds it samples.
+  let tierState = initialTierState;
+  let sampleFrames = 0;
+  let sampleSeconds = 0;
 
   // Hitstop: a render-time freeze on big hits, applied at the dt pipeline.
   let hitstopTimer = 0;
@@ -123,7 +132,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
   window.addEventListener('resize', () => {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
+    pipeline.setSize(window.innerWidth, window.innerHeight);
   });
 
   return {
@@ -147,13 +156,24 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       }
       elapsed += dt;
 
+      // Once a second, feed the averaged frame rate to the tier rule.
+      sampleFrames += 1;
+      sampleSeconds += rawDt;
+      if (sampleSeconds >= 1) {
+        const next = nextTier(tierState, sampleFrames / sampleSeconds);
+        if (next.tier !== tierState.tier) pipeline.setTier(next.tier);
+        tierState = next;
+        sampleFrames = 0;
+        sampleSeconds = 0;
+      }
+
       reactions.update(dt, elapsed, previewing);
       dummy.update(dt, elapsed, reactions.isStaggering());
       fx.update(dt, elapsed);
       stage.update(dt, elapsed, urgent);
       rig.update(dt, elapsed);
 
-      renderer.render(scene, camera);
+      pipeline.render(dt);
     },
   };
 }
