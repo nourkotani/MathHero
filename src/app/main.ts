@@ -52,6 +52,21 @@ store.subscribe((state, effects) => {
   render(createElement(App, { state, dispatch: store.dispatch, newBest }), uiRoot);
 });
 
+// The download adapter: hands the exported Save File to the parent as a file.
+store.subscribe((_state, effects) => {
+  for (const effect of effects) {
+    if (effect.type === 'EXPORT_READY') {
+      const blob = new Blob([effect.text], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'MathHero-save.json';
+      link.click();
+      URL.revokeObjectURL(url);
+    }
+  }
+});
+
 // Keyboard is a second way to drive the same events as the on-screen pad.
 window.addEventListener('keydown', (e) => {
   if (e.target instanceof HTMLInputElement) return; // typing a name, not an answer

@@ -4,6 +4,7 @@ import {
   glowIntensityForLevel,
   levelForXp,
   parseSaveFile,
+  SAVE_FILE_VERSION,
   update,
   xpForLevel,
 } from './index';
@@ -86,7 +87,7 @@ describe('XP accumulation', () => {
       nextPlayerId: 2,
     });
     const migrated = parseSaveFile(v1);
-    expect(migrated?.version).toBe(4);
+    expect(migrated?.version).toBe(SAVE_FILE_VERSION);
     expect(migrated?.players[0]).toMatchObject({ id: 'p1', xp: 0, roundsPlayed: 3 });
   });
 });

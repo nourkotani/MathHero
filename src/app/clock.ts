@@ -6,7 +6,9 @@ export interface Clock {
 }
 
 export function realClock(): Clock {
-  return { now: () => performance.now() };
+  // Wall-clock epoch ms: Round durations only need differences, and the
+  // backup reminder's 7-day rule needs timestamps that survive restarts.
+  return { now: () => Date.now() };
 }
 
 export interface ManualClock extends Clock {

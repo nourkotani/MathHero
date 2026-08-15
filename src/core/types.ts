@@ -31,6 +31,8 @@ export interface GameState {
   activePlayerId: string | null;
   /** Monotonic counter minting stable player ids. */
   nextPlayerId: number;
+  /** Epoch ms of the last Save File export; baseline set at first play. */
+  lastExportAt: number | null;
   difficulty: Difficulty;
   /** Round length setting in seconds; clamped to 30–600, default 120. */
   timerSeconds: number;
@@ -59,6 +61,8 @@ export type GameEvent =
   | { type: 'PLAYER_RENAMED'; id: string; name: string }
   | { type: 'PLAYER_DELETED'; id: string }
   | { type: 'TITLE_OPENED' }
+  | { type: 'SAVE_EXPORTED' }
+  | { type: 'SAVE_IMPORTED'; text: string }
   | { type: 'TIMER_CHANGED'; seconds: number }
   | { type: 'DIFFICULTY_CHANGED'; difficulty: Difficulty }
   | { type: 'ROUND_STARTED' }
@@ -79,7 +83,11 @@ export type GameEffect =
   | { type: 'LEVEL_UP'; level: number; cosmetic?: CosmeticTier }
   | { type: 'NEW_PERSONAL_BEST'; difficulty: Difficulty; score: number }
   /** The persisted slice changed — the persistence subscriber must save. */
-  | { type: 'SAVE_FILE_CHANGED' };
+  | { type: 'SAVE_FILE_CHANGED' }
+  /** The download adapter should hand this serialized Save File to the parent. */
+  | { type: 'EXPORT_READY'; text: string }
+  | { type: 'IMPORT_SUCCEEDED' }
+  | { type: 'IMPORT_REJECTED' };
 
 export interface UpdateResult {
   state: GameState;

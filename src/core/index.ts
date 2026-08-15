@@ -39,6 +39,8 @@ export {
 } from './savefile';
 export type { SaveFile } from './savefile';
 export {
+  BACKUP_REMINDER_MS,
+  backupReminderDue,
   DEFAULT_TIMER_SECONDS,
   isFinalTenSeconds,
   MAX_TIMER_SECONDS,

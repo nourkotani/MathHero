@@ -6,12 +6,14 @@ import { validColors } from './players';
 import type { PlayerRecord } from './players';
 import type { GameState } from './types';
 
-export const SAVE_FILE_VERSION = 4;
+export const SAVE_FILE_VERSION = 5;
 
 export interface SaveFile {
   version: number;
   players: PlayerRecord[];
   nextPlayerId: number;
+  /** Epoch ms of the last export (or first play, until one happens). */
+  lastExportAt: number | null;
 }
 
 /** The persisted slice of core state, byte-for-byte what export downloads. */
@@ -20,6 +22,7 @@ export function buildSaveFile(state: GameState): SaveFile {
     version: SAVE_FILE_VERSION,
     players: state.players,
     nextPlayerId: state.nextPlayerId,
+    lastExportAt: state.lastExportAt,
   };
 }
 
@@ -53,6 +56,8 @@ const MIGRATIONS: Array<(doc: Record<string, unknown>) => Record<string, unknown
       (p: Record<string, unknown>) => ({ ...p, factStats: {} }),
     ),
   }),
+  // v4 → v5: the document tracks when it was last exported.
+  (doc) => ({ ...doc, version: 5, lastExportAt: null }),
 ];
 
 /**
@@ -85,6 +90,7 @@ function validateCurrent(doc: Record<string, unknown>): SaveFile | null {
   if (doc.version !== SAVE_FILE_VERSION) return null;
   if (!Array.isArray(doc.players)) return null;
   if (typeof doc.nextPlayerId !== 'number') return null;
+  if (doc.lastExportAt !== null && typeof doc.lastExportAt !== 'number') return null;
 
   const players: PlayerRecord[] = [];
   for (const entry of doc.players) {
@@ -92,7 +98,12 @@ function validateCurrent(doc: Record<string, unknown>): SaveFile | null {
     if (player === null) return null;
     players.push(player);
   }
-  return { version: SAVE_FILE_VERSION, players, nextPlayerId: doc.nextPlayerId };
+  return {
+    version: SAVE_FILE_VERSION,
+    players,
+    nextPlayerId: doc.nextPlayerId,
+    lastExportAt: doc.lastExportAt as number | null,
+  };
 }
 
 function validatePlayer(entry: unknown): PlayerRecord | null {

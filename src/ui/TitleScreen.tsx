@@ -1,5 +1,13 @@
 import { useState } from 'preact/hooks';
-import { factKey, familyLeaderboard, levelForXp, masteryOf, tierFor } from '../core';
+import {
+  backupReminderDue,
+  factKey,
+  familyLeaderboard,
+  levelForXp,
+  masteryOf,
+  parseSaveFile,
+  tierFor,
+} from '../core';
 import type { PlayerRecord } from '../core';
 import type { AppProps } from './App';
 
@@ -75,9 +83,26 @@ export function TitleScreen({ state, dispatch }: AppProps) {
   const [renameText, setRenameText] = useState('');
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [gridId, setGridId] = useState<string | null>(null);
+  const [pendingImport, setPendingImport] = useState<string | null>(null);
+  const [importError, setImportError] = useState(false);
 
   const deleting = state.players.find((p) => p.id === deletingId);
   const gridPlayer = state.players.find((p) => p.id === gridId);
+
+  // The file-upload edge: read the chosen file, pre-check it with the same
+  // core pipeline the import event uses, then ask before overwriting.
+  const onImportFile = async (e: Event) => {
+    const input = e.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file) return;
+    const text = await file.text();
+    if (parseSaveFile(text) === null) {
+      setImportError(true);
+    } else {
+      setPendingImport(text);
+    }
+  };
 
   return (
     <div class="hud screen-center">
@@ -152,6 +177,77 @@ export function TitleScreen({ state, dispatch }: AppProps) {
       >
         {state.players.length === 0 ? 'Make your hero!' : 'New hero'}
       </button>
+
+      {backupReminderDue(state) && (
+        <div class="backup-reminder" data-testid="backup-reminder">
+          💾 It's been a while — back up your heroes!
+        </div>
+      )}
+      <div class="save-actions">
+        <button
+          class="pad-key save-button"
+          data-testid="export-save"
+          onClick={() => dispatch({ type: 'SAVE_EXPORTED' })}
+        >
+          💾 Save backup
+        </button>
+        <label class="pad-key save-button import-label">
+          📥 Load backup
+          <input
+            type="file"
+            accept="application/json,.json"
+            data-testid="import-file"
+            class="import-input"
+            onChange={onImportFile}
+          />
+        </label>
+      </div>
+
+      {pendingImport !== null && (
+        <div class="confirm-overlay" data-testid="import-confirm">
+          <div class="confirm-box">
+            <p class="confirm-text">Load this backup?</p>
+            <p class="confirm-warning">Your current heroes will be replaced by the backup!</p>
+            <div class="confirm-actions">
+              <button
+                class="big-button"
+                data-testid="cancel-import"
+                onClick={() => setPendingImport(null)}
+              >
+                Keep current
+              </button>
+              <button
+                class="big-button danger-button"
+                data-testid="confirm-import"
+                onClick={() => {
+                  dispatch({ type: 'SAVE_IMPORTED', text: pendingImport });
+                  setPendingImport(null);
+                }}
+              >
+                Load backup
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {importError && (
+        <div class="confirm-overlay" data-testid="import-error">
+          <div class="confirm-box">
+            <p class="confirm-text">Hmm, that file isn't a MathHero backup.</p>
+            <p class="confirm-warning">Nothing was changed — your heroes are safe!</p>
+            <div class="confirm-actions">
+              <button
+                class="big-button"
+                data-testid="dismiss-import-error"
+                onClick={() => setImportError(false)}
+              >
+                OK
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {gridPlayer && <MasteryGrid player={gridPlayer} onClose={() => setGridId(null)} />}
       {deleting && (

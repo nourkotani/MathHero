@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { familyLeaderboard, parseSaveFile, update } from './index';
+import { familyLeaderboard, parseSaveFile, SAVE_FILE_VERSION, update } from './index';
 import type { GameState } from './index';
 import { answerCorrectly, freshRound } from './test-helpers';
 
@@ -87,7 +87,7 @@ describe('Family Leaderboard', () => {
       nextPlayerId: 2,
     });
     const migrated = parseSaveFile(v2);
-    expect(migrated?.version).toBe(4);
+    expect(migrated?.version).toBe(SAVE_FILE_VERSION);
     expect(migrated?.players[0]).toMatchObject({ xp: 250, bests: {} });
   });
 });

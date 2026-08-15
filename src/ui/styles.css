@@ -242,6 +242,42 @@ body {
   color: #ffe14d;
 }
 
+.backup-reminder {
+  background: #fff3cd;
+  color: #7a5c00;
+  font-weight: 700;
+  border-radius: 1rem;
+  padding: 0.6rem 1.4rem;
+  pointer-events: auto;
+}
+
+.save-actions {
+  display: flex;
+  gap: 0.8rem;
+  pointer-events: auto;
+}
+
+.save-button {
+  font-size: 1.1rem;
+  padding: 0 1.2rem;
+  height: 3rem;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.import-label {
+  position: relative;
+  overflow: hidden;
+}
+
+.import-input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
 .grid-box {
   background: #fff;
   border-radius: 1.5rem;

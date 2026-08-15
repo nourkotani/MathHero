@@ -4,6 +4,7 @@ import { recordAttempt } from './mastery';
 import type { FactStats } from './mastery';
 import { MAX_NAME_LENGTH, validColors } from './players';
 import { seedPrng } from './prng';
+import { buildSaveFile, parseSaveFile, serializeSaveFile } from './savefile';
 import { pointsForCorrect } from './scoring';
 import { selectQuestion } from './selection';
 import { tierForStreak } from './streak';
@@ -29,6 +30,7 @@ export function initialState(config: GameConfig): GameState {
     players: config.save?.players ?? [],
     activePlayerId: null,
     nextPlayerId: config.save?.nextPlayerId ?? 1,
+    lastExportAt: config.save?.lastExportAt ?? null,
     difficulty: 'easy',
     timerSeconds: DEFAULT_TIMER_SECONDS,
     now: 0,
@@ -138,6 +140,8 @@ export function update(state: GameState, event: GameEvent): UpdateResult {
       const name = event.name.trim().slice(0, MAX_NAME_LENGTH);
       if (name === '' || !validColors(event.colors)) return noop(state);
       const id = `p${state.nextPlayerId}`;
+      // First play starts the backup-reminder clock.
+      const lastExportAt = state.lastExportAt ?? state.now;
       const player = {
         id,
         name,
@@ -153,6 +157,7 @@ export function update(state: GameState, event: GameEvent): UpdateResult {
           players: [...state.players, player],
           nextPlayerId: state.nextPlayerId + 1,
           activePlayerId: id,
+          lastExportAt,
           phase: 'pre-round',
         },
         effects: [{ type: 'SAVE_FILE_CHANGED' }],
@@ -195,6 +200,37 @@ export function update(state: GameState, event: GameEvent): UpdateResult {
     case 'TITLE_OPENED': {
       if (state.phase !== 'pre-round' && state.phase !== 'results') return noop(state);
       return { state: { ...state, phase: 'title' }, effects: [] };
+    }
+
+    case 'SAVE_EXPORTED': {
+      const next = { ...state, lastExportAt: state.now };
+      return {
+        state: next,
+        effects: [
+          { type: 'EXPORT_READY', text: serializeSaveFile(buildSaveFile(next)) },
+          { type: 'SAVE_FILE_CHANGED' },
+        ],
+      };
+    }
+
+    case 'SAVE_IMPORTED': {
+      if (state.phase !== 'title') return noop(state);
+      // All-or-nothing: bytes go through the same validate + migrate pipeline
+      // as localStorage loads; anything invalid changes nothing.
+      const save = parseSaveFile(event.text);
+      if (save === null) {
+        return { state, effects: [{ type: 'IMPORT_REJECTED' }] };
+      }
+      return {
+        state: {
+          ...state,
+          players: save.players,
+          nextPlayerId: save.nextPlayerId,
+          lastExportAt: save.lastExportAt,
+          activePlayerId: null,
+        },
+        effects: [{ type: 'IMPORT_SUCCEEDED' }, { type: 'SAVE_FILE_CHANGED' }],
+      };
     }
 
     case 'TIMER_CHANGED': {

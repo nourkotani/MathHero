@@ -22,3 +22,14 @@ export function remainingSeconds(state: GameState): number {
 export function isFinalTenSeconds(state: GameState): boolean {
   return state.phase === 'in-round' && remainingMs(state) <= 10_000;
 }
+
+export const BACKUP_REMINDER_MS = 7 * 24 * 60 * 60 * 1000;
+
+/** Gently nag when more than 7 days have passed since the last export. */
+export function backupReminderDue(state: GameState): boolean {
+  return (
+    state.players.length > 0 &&
+    state.lastExportAt !== null &&
+    state.now - state.lastExportAt > BACKUP_REMINDER_MS
+  );
+}
