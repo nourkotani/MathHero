@@ -43,9 +43,9 @@ describe('difficulty tiers', () => {
   });
 
   it('on Hard, both-operands-≥6 Facts appear at double sampling weight', () => {
-    // Hard candidates: every (a, b) with a or b in 2–12 → 143 pairs, of which
-    // 49 have both operands ≥ 6 and carry weight 2. Expected frequency of the
-    // high zone: 98 / 192 ≈ 0.51 (vs ≈ 0.34 unweighted).
+    // Hard candidates: every canonical Fact with an operand in 2–12 → 77
+    // Facts, of which 28 have both operands ≥ 6 and carry weight 2. Expected
+    // frequency of the high zone: 56 / 105 ≈ 0.53 (vs ≈ 0.36 unweighted).
     let state = freshRound(2024, 'hard');
     const samples = 4000;
     let bothHigh = 0;

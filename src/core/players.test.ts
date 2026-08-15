@@ -136,7 +136,16 @@ describe('Save File serialization', () => {
   it('the Save File never contains Round-transient state', () => {
     const save = buildSaveFile(preRound(1, 'Zara'));
     const text = serializeSaveFile(save);
-    for (const transient of ['streak', 'score', 'question', 'answerBuffer', 'feedback', 'prng']) {
+    for (const transient of [
+      'streak',
+      'bestStreak',
+      'score',
+      'question',
+      'answerBuffer',
+      'feedback',
+      'prng',
+      'practiceTable',
+    ]) {
       expect(text).not.toContain(`"${transient}"`);
     }
   });

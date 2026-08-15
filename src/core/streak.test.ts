@@ -70,6 +70,32 @@ describe('streak scoring', () => {
   });
 });
 
+describe('best streak', () => {
+  it("tracks the Round's longest streak through breaks and resets per Round", () => {
+    let state = freshRound(18);
+    for (let i = 0; i < 5; i++) state = answerCorrectly(state).state;
+    expect(state.bestStreak).toBe(5);
+
+    state = answerWrongly(state).state;
+    state = update(state, { type: 'TICK', now: FEEDBACK_MS }).state;
+    for (let i = 0; i < 2; i++) state = answerCorrectly(state).state;
+    expect(state.streak).toBe(2);
+    expect(state.bestStreak).toBe(5);
+
+    state = dispatchAll(state, [
+      { type: 'TICK', now: 999_999 },
+      { type: 'PLAY_AGAIN' },
+      { type: 'ROUND_STARTED' },
+    ]);
+    expect(state.bestStreak).toBe(0);
+  });
+
+  it('does not emit STREAK_BROKEN when there was no streak to break', () => {
+    const result = answerWrongly(freshRound(19));
+    expect(result.effects.some((e) => e.type === 'STREAK_BROKEN')).toBe(false);
+  });
+});
+
 describe('wrong answers', () => {
   it('lose no points, break the streak, and show the correct equation', () => {
     let state = freshRound(14);

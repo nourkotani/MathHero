@@ -40,13 +40,18 @@ export const weightedSelector: Selector = ({ candidates, prng, weigh }) => {
   return { question: last, prng: draw.state };
 };
 
-/** Candidates for a difficulty: one operand from the tier's tables, the other 1–12. */
+/**
+ * Candidates for a difficulty: one operand from the tier's tables, the other
+ * 1–12. Enumerated as canonical Facts (a ≤ b) so every commutative pair is one
+ * candidate — otherwise squares like 7×7 would be sampled at half weight.
+ * Display order is randomized after selection.
+ */
 export function candidatesFor(difficulty: Difficulty): Question[] {
   const tier = tierFor(difficulty);
   const inRange = (n: number) => n >= tier.tableMin && n <= tier.tableMax;
   const candidates: Question[] = [];
   for (let a = 1; a <= 12; a++) {
-    for (let b = 1; b <= 12; b++) {
+    for (let b = a; b <= 12; b++) {
       if (inRange(a) || inRange(b)) {
         candidates.push({ a, b });
       }
@@ -77,9 +82,17 @@ export function selectQuestion(
     const remaining = candidates.filter((q) => factKey(q.a, q.b) !== context.excludeKey);
     if (remaining.length > 0) candidates = remaining;
   }
-  return weightedSelector({
+  const selected = weightedSelector({
     candidates,
     prng,
     weigh: (q) => tier.weight(q) * adaptiveWeight(context.factStats?.[factKey(q.a, q.b)]),
   });
+  // A Fact displays in either operand order at random. Always consume the
+  // draw so the PRNG stream doesn't depend on whether a square was selected.
+  const flip = nextRandom(selected.prng);
+  const { a, b } = selected.question;
+  return {
+    question: flip.value < 0.5 && a !== b ? { a: b, b: a } : selected.question,
+    prng: flip.state,
+  };
 }

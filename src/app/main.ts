@@ -39,18 +39,28 @@ const renderer = createRenderer(canvas);
 store.subscribe((state, effects) => renderer.onStoreUpdate(state, effects));
 
 // Preact owns the DOM overlay; it re-renders from core state on every dispatch.
-// The personal-best celebration is effect-driven: the banner shows while the
-// Results screen that earned it is up, never inferred by diffing state.
+// The Results ceremonies are effect-driven: banners show while the Results
+// screen that earned them is up, never inferred by diffing state (ADR 0003).
 const uiRoot = document.getElementById('ui') as HTMLElement;
 let newBest: { difficulty: string; score: number } | null = null;
+let levelUps: Array<{ level: number; cosmeticLabel?: string }> = [];
 store.subscribe((state, effects) => {
   for (const effect of effects) {
     if (effect.type === 'NEW_PERSONAL_BEST') {
       newBest = { difficulty: effect.difficulty, score: effect.score };
+    } else if (effect.type === 'LEVEL_UP') {
+      levelUps.push(
+        effect.cosmetic
+          ? { level: effect.level, cosmeticLabel: effect.cosmetic.label }
+          : { level: effect.level },
+      );
     }
   }
-  if (state.phase !== 'results') newBest = null;
-  render(createElement(App, { state, dispatch: store.dispatch, newBest }), uiRoot);
+  if (state.phase !== 'results') {
+    newBest = null;
+    levelUps = [];
+  }
+  render(createElement(App, { state, dispatch: store.dispatch, newBest, levelUps }), uiRoot);
 });
 
 // Synthesized sound reacts to the same effects as everything else.

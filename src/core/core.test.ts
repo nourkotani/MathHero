@@ -94,12 +94,9 @@ describe('answer judging and scoring', () => {
     const result = answerWrongly(state);
 
     expect(result.state.score).toBe(0);
-    expect(result.effects[0]).toEqual({
-      type: 'ANSWER_WRONG',
-      question,
-      correctAnswer: question.a * question.b,
-    });
-    expect(result.effects[1]).toEqual({ type: 'STREAK_BROKEN' });
+    expect(result.effects).toEqual([
+      { type: 'ANSWER_WRONG', question, correctAnswer: question.a * question.b },
+    ]);
   });
 
   it('consecutive correct answers keep scoring (with streak multipliers)', () => {

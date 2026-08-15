@@ -40,6 +40,7 @@ export function initialState(config: GameConfig): GameState {
     question: selected.question,
     answerBuffer: '',
     streak: 0,
+    bestStreak: 0,
     feedback: null,
   };
 }
@@ -98,7 +99,16 @@ export function update(state: GameState, event: GameEvent): UpdateResult {
         // Ceremony order: ROUND_ENDED, LEVEL_UPs, NEW_PERSONAL_BEST, then save.
         effects.push(...bestEffects, { type: 'SAVE_FILE_CHANGED' });
         return {
-          state: { ...ticked, phase: 'results', answerBuffer: '', feedback: null, players },
+          state: {
+            ...ticked,
+            phase: 'results',
+            answerBuffer: '',
+            feedback: null,
+            players,
+            // Saves migrated from before export tracking start their
+            // backup-reminder clock at the first completed Round.
+            lastExportAt: ticked.lastExportAt ?? ticked.now,
+          },
           effects,
         };
       }
@@ -269,6 +279,7 @@ export function update(state: GameState, event: GameEvent): UpdateResult {
           questionAskedAt: state.now,
           answerBuffer: '',
           streak: 0,
+          bestStreak: 0,
           feedback: null,
         },
         effects: [{ type: 'QUESTION_ASKED', question: selected.question }],
@@ -314,7 +325,10 @@ export function update(state: GameState, event: GameEvent): UpdateResult {
             answerBuffer: '',
             feedback: { question, correctAnswer, until: state.now + FEEDBACK_MS },
           },
-          effects: [{ type: 'ANSWER_WRONG', question, correctAnswer }, { type: 'STREAK_BROKEN' }],
+          effects:
+            state.streak > 0
+              ? [{ type: 'ANSWER_WRONG', question, correctAnswer }, { type: 'STREAK_BROKEN' }]
+              : [{ type: 'ANSWER_WRONG', question, correctAnswer }],
         };
       }
 
@@ -342,6 +356,7 @@ export function update(state: GameState, event: GameEvent): UpdateResult {
           prng: selected.prng,
           score: state.score + points,
           streak,
+          bestStreak: Math.max(state.bestStreak, streak),
           question: selected.question,
           questionAskedAt: state.now,
           answerBuffer: '',

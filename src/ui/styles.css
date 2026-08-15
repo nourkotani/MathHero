@@ -360,10 +360,23 @@ body {
   color: #999;
 }
 
+.results-row {
+  display: flex;
+  gap: 2rem;
+  align-items: center;
+}
+
 .xp-gain {
   font-size: 2rem;
   font-weight: 800;
   color: #7dffa0;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+
+.best-streak {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: #ffb84d;
   text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
 }
 

@@ -10,11 +10,13 @@ export interface AppProps {
   dispatch: (event: GameEvent) => void;
   /** Set by the shell when a NEW_PERSONAL_BEST effect fires; cleared on leaving Results. */
   newBest?: { difficulty: string; score: number } | null;
+  /** LEVEL_UP effects captured by the shell for this Results screen, in order. */
+  levelUps?: Array<{ level: number; cosmeticLabel?: string }>;
 }
 
 // Screens key off the core's phase field; a future screen is a new phase
 // value, not new wiring.
-export function App({ state, dispatch, newBest }: AppProps) {
+export function App({ state, dispatch, newBest, levelUps }: AppProps) {
   switch (state.phase) {
     case 'title':
       return <TitleScreen state={state} dispatch={dispatch} />;
@@ -25,6 +27,6 @@ export function App({ state, dispatch, newBest }: AppProps) {
     case 'in-round':
       return <RoundScreen state={state} dispatch={dispatch} />;
     case 'results':
-      return <ResultsScreen state={state} dispatch={dispatch} newBest={newBest} />;
+      return <ResultsScreen state={state} dispatch={dispatch} newBest={newBest} levelUps={levelUps} />;
   }
 }

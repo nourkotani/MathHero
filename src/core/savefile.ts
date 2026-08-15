@@ -2,9 +2,14 @@
 // single validate + migrate pipeline. Export/import reuses this exact
 // codepath — anything that turns bytes into a valid document lives here.
 
-import { validColors } from './players';
+import { MAX_NAME_LENGTH, validColors } from './players';
 import type { PlayerRecord } from './players';
 import type { GameState } from './types';
+
+/** A well-formed count/score/timestamp: finite, non-negative number. */
+function validCount(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0;
+}
 
 export const SAVE_FILE_VERSION = 6;
 
@@ -94,8 +99,8 @@ export function parseSaveFile(text: string): SaveFile | null {
 function validateCurrent(doc: Record<string, unknown>): SaveFile | null {
   if (doc.version !== SAVE_FILE_VERSION) return null;
   if (!Array.isArray(doc.players)) return null;
-  if (typeof doc.nextPlayerId !== 'number') return null;
-  if (doc.lastExportAt !== null && typeof doc.lastExportAt !== 'number') return null;
+  if (!validCount(doc.nextPlayerId)) return null;
+  if (doc.lastExportAt !== null && !validCount(doc.lastExportAt)) return null;
   if (typeof doc.muted !== 'boolean') return null;
 
   const players: PlayerRecord[] = [];
@@ -104,10 +109,16 @@ function validateCurrent(doc: Record<string, unknown>): SaveFile | null {
     if (player === null) return null;
     players.push(player);
   }
+  // Never mint an id that collides with an existing player, even if the
+  // document's counter is out of step.
+  const maxPlayerId = Math.max(
+    0,
+    ...players.map((p) => (/^p\d+$/.test(p.id) ? Number(p.id.slice(1)) : 0)),
+  );
   return {
     version: SAVE_FILE_VERSION,
     players,
-    nextPlayerId: doc.nextPlayerId,
+    nextPlayerId: Math.max(Math.floor(doc.nextPlayerId), maxPlayerId + 1),
     lastExportAt: doc.lastExportAt as number | null,
     muted: doc.muted,
   };
@@ -117,12 +128,12 @@ function validatePlayer(entry: unknown): PlayerRecord | null {
   if (typeof entry !== 'object' || entry === null) return null;
   const p = entry as Record<string, unknown>;
   const colors = p.colors as Record<string, unknown> | undefined;
+  const name = typeof p.name === 'string' ? p.name.trim().slice(0, MAX_NAME_LENGTH) : '';
   if (
     typeof p.id !== 'string' ||
-    typeof p.name !== 'string' ||
-    p.name.length === 0 ||
-    typeof p.roundsPlayed !== 'number' ||
-    typeof p.xp !== 'number' ||
+    name === '' ||
+    !validCount(p.roundsPlayed) ||
+    !validCount(p.xp) ||
     !validBests(p.bests) ||
     !validFactStats(p.factStats) ||
     typeof colors !== 'object' ||
@@ -141,10 +152,10 @@ function validatePlayer(entry: unknown): PlayerRecord | null {
   if (!validColors(playerColors)) return null;
   return {
     id: p.id,
-    name: p.name,
+    name,
     colors: playerColors,
-    roundsPlayed: p.roundsPlayed,
-    xp: p.xp,
+    roundsPlayed: p.roundsPlayed as number,
+    xp: p.xp as number,
     bests: p.bests as PlayerRecord['bests'],
     factStats: p.factStats as PlayerRecord['factStats'],
   };
@@ -161,7 +172,7 @@ function validFactStats(stats: unknown): boolean {
           typeof a === 'object' &&
           a !== null &&
           typeof (a as Record<string, unknown>).correct === 'boolean' &&
-          typeof (a as Record<string, unknown>).ms === 'number',
+          validCount((a as Record<string, unknown>).ms),
       ),
   );
 }
@@ -169,6 +180,6 @@ function validFactStats(stats: unknown): boolean {
 function validBests(bests: unknown): boolean {
   if (typeof bests !== 'object' || bests === null) return false;
   return Object.entries(bests).every(
-    ([key, value]) => ['easy', 'medium', 'hard'].includes(key) && typeof value === 'number',
+    ([key, value]) => ['easy', 'medium', 'hard'].includes(key) && validCount(value),
   );
 }

@@ -48,6 +48,12 @@ interface Blast {
   big: boolean;
 }
 
+/** Short-lived meshes must release their GPU resources when removed. */
+function freeMesh(mesh: THREE.Mesh): void {
+  mesh.geometry.dispose();
+  (mesh.material as THREE.Material).dispose();
+}
+
 export function createRenderer(canvas: HTMLCanvasElement): Renderer {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -249,6 +255,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
         if (blast.mesh.position.x >= DUMMY_X - 0.3) {
           burst(blast.big ? 0xffe14d : 0x7ad7ff, blast.big ? 16 : 8, blast.mesh.position, 2.5);
           scene.remove(blast.mesh);
+          freeMesh(blast.mesh);
           blasts.splice(i, 1);
           if (blast.big) {
             dummyLaunch = 0.9;
@@ -269,6 +276,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
         (p.mesh.material as THREE.MeshBasicMaterial).opacity = Math.max(0, p.life / p.maxLife);
         if (p.life <= 0) {
           scene.remove(p.mesh);
+          freeMesh(p.mesh);
           particles.splice(i, 1);
         }
       }

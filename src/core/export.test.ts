@@ -94,4 +94,75 @@ describe('the 7-day backup reminder', () => {
     const state = update(initialState({ seed: 75 }), { type: 'TICK', now: 30 * DAY }).state;
     expect(backupReminderDue(state)).toBe(false);
   });
+
+  it('a migrated save with heroes but no export baseline starts its clock at the first Round', () => {
+    const v3 = JSON.stringify({
+      version: 3,
+      players: [
+        {
+          id: 'p1',
+          name: 'Zara',
+          colors: { hair: 'gold', outfitPrimary: 'blue', outfitSecondary: 'teal' },
+          roundsPlayed: 3,
+          xp: 250,
+          bests: {},
+        },
+      ],
+      nextPlayerId: 2,
+    });
+    // Also covers the previously untested v3→v4 and v4→v5 migrations.
+    const save = parseSaveFile(v3);
+    expect(save?.version).toBe(SAVE_FILE_VERSION);
+    expect(save?.players[0]?.factStats).toEqual({});
+    expect(save?.lastExportAt).toBeNull();
+
+    let state = dispatchAll(initialState({ seed: 76, save }), [
+      { type: 'TICK', now: 1000 },
+      { type: 'PLAYER_SELECTED', id: 'p1' },
+      { type: 'ROUND_STARTED' },
+      { type: 'TICK', now: 999_999 },
+    ]);
+    expect(state.lastExportAt).toBe(999_999);
+    state = update(state, { type: 'TICK', now: 999_999 + BACKUP_REMINDER_MS + 1 }).state;
+    expect(backupReminderDue(state)).toBe(true);
+  });
+});
+
+describe('Save File validation hardening', () => {
+  const validPlayer = {
+    id: 'p1',
+    name: 'Zara',
+    colors: { hair: 'gold', outfitPrimary: 'blue', outfitSecondary: 'teal' },
+    roundsPlayed: 1,
+    xp: 100,
+    bests: {},
+    factStats: {},
+  };
+  const doc = (overrides: object, player: object = validPlayer) =>
+    JSON.stringify({
+      version: SAVE_FILE_VERSION,
+      players: [player],
+      nextPlayerId: 2,
+      lastExportAt: null,
+      muted: false,
+      ...overrides,
+    });
+
+  it('rejects non-finite or negative numbers', () => {
+    expect(parseSaveFile(doc({}, { ...validPlayer, xp: Number.NaN }))).toBeNull();
+    expect(parseSaveFile(doc({}, { ...validPlayer, roundsPlayed: -1 }))).toBeNull();
+    expect(parseSaveFile(doc({ nextPlayerId: Number.POSITIVE_INFINITY }))).toBeNull();
+    expect(parseSaveFile(doc({}, { ...validPlayer, bests: { easy: Number.NaN } }))).toBeNull();
+  });
+
+  it('normalizes imported names the way creation does', () => {
+    const parsed = parseSaveFile(doc({}, { ...validPlayer, name: '  Zara  '.padEnd(60, 'x') }));
+    expect(parsed?.players[0]?.name.length).toBeLessThanOrEqual(20);
+    expect(parseSaveFile(doc({}, { ...validPlayer, name: '   ' }))).toBeNull();
+  });
+
+  it('never lets a stale counter mint duplicate player ids', () => {
+    const parsed = parseSaveFile(doc({ nextPlayerId: 1 }, { ...validPlayer, id: 'p7' }));
+    expect(parsed?.nextPlayerId).toBe(8);
+  });
 });

@@ -109,8 +109,8 @@ describe('Adaptive Selection', () => {
     // A player who keeps missing 2×2 sees it far more often than baseline.
     const struggling = firstQuestionCount(mkSave({ '2x2': wrongs(5) }), 400);
     const baseline = firstQuestionCount(mkSave({}), 400);
-    expect(baseline).toBeLessThan(15); // ≈ 1/95 uniform
-    expect(struggling).toBeGreaterThan(20); // ≈ 11/105 weighted
+    expect(baseline).toBeLessThan(15); // ≈ 1/50 uniform over Easy's canonical Facts
+    expect(struggling).toBeGreaterThan(20); // ≈ 11/60 weighted
     expect(struggling).toBeGreaterThan(baseline * 2);
   });
 

@@ -50,6 +50,8 @@ export interface GameState {
   answerBuffer: string;
   /** Consecutive correct answers this Round; resets at Round start. Never persisted. */
   streak: number;
+  /** The Round's longest streak, for the Results screen. Never persisted. */
+  bestStreak: number;
   /** Wrong-answer teaching moment: the correct equation, shown until `until`. */
   feedback: { question: Question; correctAnswer: number; until: number } | null;
 }
