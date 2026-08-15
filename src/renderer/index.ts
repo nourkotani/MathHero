@@ -19,7 +19,7 @@ import { createCameraRig } from './cameraRig';
 import { HERO_X } from './constants';
 import { createDummy } from './dummy';
 import { createFx, freeMesh } from './fx';
-import { buildHero } from './hero';
+import { applyLevelToRig, buildHero } from './hero';
 import { createPipeline } from './pipeline';
 import { initialTierState, nextTier } from './qualityTier';
 import { createReactions } from './reactions';
@@ -122,6 +122,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       rebuildHero(appearance);
     }
     reactions.setPlayerLook(presetHex(HAIR_PRESETS, colors.hair), glowIntensityForLevel(level));
+    applyLevelToRig(hero, level);
     hero.bodyMaterial.color.setHex(presetHex(OUTFIT_PRESETS, colors.outfitPrimary));
     hero.trimMaterial.color.setHex(presetHex(OUTFIT_PRESETS, colors.outfitSecondary));
     const unlockedIds = new Set(unlockedCosmetics(level).map((c) => c.id));

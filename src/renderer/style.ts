@@ -38,6 +38,24 @@ export const STYLE = {
     { color: 0x6f5aff, intensity: 2.5, position: [6, 1.0, -4] as const },
   ],
 
+  /** Hero-Level presence: orbiting power motes + charged trim, by bracket. */
+  levelStyle: {
+    /** One orbiting mote per this many Hero Levels. */
+    levelsPerMote: 3,
+    maxMotes: 6,
+    /** Highest matching bracket wins (min = minimum Hero Level). */
+    // trimGlow stays gentle: the charge must tint the chosen outfit
+    // colors, never bleach them.
+    brackets: [
+      { min: 20, energy: 0xd9b3ff, trimGlow: 0.3 }, // prismatic violet
+      { min: 15, energy: 0x7ad7ff, trimGlow: 0.26 }, // plasma cyan
+      { min: 10, energy: 0xffd24d, trimGlow: 0.22 }, // gold
+      { min: 5, energy: 0xc9d8ff, trimGlow: 0.15 }, // silver starlight
+      { min: 2, energy: 0xffa94d, trimGlow: 0.1 }, // first embers
+      { min: 0, energy: 0xffffff, trimGlow: 0 }, // fresh hero: no charge yet
+    ],
+  },
+
   /** Real bloom on the marked glow meshes (ADR 0004). */
   bloom: {
     intensity: 1.35,

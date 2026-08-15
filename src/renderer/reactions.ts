@@ -250,6 +250,10 @@ export function createReactions(opts: {
       hero.group.position.set(HERO_X, bobY, 0);
       hero.group.rotation.set(0, previewing ? 0.35 : Math.PI / 2, 0);
 
+      // The power-mote ring circles the fighter and breathes vertically.
+      hero.powerMotes.rotation.y = elapsed * 1.3;
+      hero.powerMotes.position.y = 1.05 + Math.sin(elapsed * 2.6) * 0.07;
+
       // Guard stance: left foot forward, knees soft, fists raised.
       const j = hero.joints;
       const breathe = Math.sin(elapsed * 2.2);

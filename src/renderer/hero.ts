@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { presetHex, SKIN_PRESETS } from '../core';
 import type { HairStyle, HeroAppearance, StreakForm } from '../core';
 import { characterSurface, glowSurface, markBloom } from './materials';
+import { STYLE } from './style';
 import type { Surface } from './materials';
 import { applyCelTreatment } from './cel';
 
@@ -64,6 +65,10 @@ export interface HeroRig {
   auraMaterial: THREE.MeshBasicMaterial;
   /** Milestone cosmetic meshes keyed by their table id; hidden until unlocked. */
   cosmetics: Map<string, THREE.Object3D>;
+  /** Hero-Level presence: the orbiting mote ring (spun by the frame loop). */
+  powerMotes: THREE.Group;
+  moteMeshes: THREE.Mesh[];
+  moteMaterial: THREE.MeshBasicMaterial;
 }
 
 /** Dress the rig for a streak form, blended with the Player's permanent glow. */
@@ -84,6 +89,27 @@ export function applyFormToRig(
   rig.bodyMaterial.emissiveIntensity = Math.max(look.emissive, playerGlow * 0.25);
   rig.auraMaterial.color.setHex(look.auraColor);
   rig.auraMaterial.opacity = Math.max(look.auraOpacity, playerGlow * 0.2);
+}
+
+/**
+ * Dress the rig for its Hero Level: charged trim (belt, wristbands, boots)
+ * and the orbiting power motes — one per few levels, so a veteran hero
+ * visibly carries their training even in base form.
+ */
+export function applyLevelToRig(rig: HeroRig, level: number): void {
+  const bracket =
+    STYLE.levelStyle.brackets.find((b) => level >= b.min) ?? STYLE.levelStyle.brackets.at(-1);
+  if (!bracket) return;
+  rig.trimMaterial.emissive.setHex(bracket.energy);
+  rig.trimMaterial.emissiveIntensity = bracket.trimGlow;
+  rig.moteMaterial.color.setHex(bracket.energy);
+  const count = Math.min(
+    STYLE.levelStyle.maxMotes,
+    Math.floor(level / STYLE.levelStyle.levelsPerMote),
+  );
+  rig.moteMeshes.forEach((mote, i) => {
+    mote.visible = i < count;
+  });
 }
 
 /**
@@ -267,6 +293,23 @@ export function buildHero(appearance: HeroAppearance): HeroRig {
   aura.position.y = 0.02;
   group.add(aura);
 
+  // The power-mote ring: small energy shards orbiting the fighter, revealed
+  // one by one as Hero Levels climb. The frame loop spins the group.
+  const powerMotes = new THREE.Group();
+  powerMotes.position.y = 1.05;
+  const moteMaterial = glowSurface(0xffffff, 0.9);
+  const moteMeshes: THREE.Mesh[] = [];
+  for (let i = 0; i < STYLE.levelStyle.maxMotes; i++) {
+    const mote = new THREE.Mesh(new THREE.OctahedronGeometry(0.1), moteMaterial);
+    const angle = (i / STYLE.levelStyle.maxMotes) * Math.PI * 2;
+    mote.position.set(Math.cos(angle) * 0.8, Math.sin(angle * 3) * 0.06, Math.sin(angle) * 0.8);
+    markBloom(mote);
+    mote.visible = false;
+    powerMotes.add(mote);
+    moteMeshes.push(mote);
+  }
+  group.add(powerMotes);
+
   const cosmetics = buildCosmetics();
   for (const mesh of cosmetics.values()) {
     mesh.visible = false;
@@ -288,6 +331,9 @@ export function buildHero(appearance: HeroAppearance): HeroRig {
     auraInner,
     auraMaterial,
     cosmetics,
+    powerMotes,
+    moteMeshes,
+    moteMaterial,
   };
 }
 
@@ -406,8 +452,17 @@ function buildCosmetics(): Map<string, THREE.Object3D> {
   crimsonAura.position.y = 0.15;
   cosmetics.set('crimson-aura', crimsonAura);
 
-  const crown = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.05, 8, 24), glowMaterial(0xffd700));
-  crown.rotation.x = Math.PI / 2;
+  // Energy crown: the ring plus four rising prongs, like held-back power.
+  const crown = new THREE.Group();
+  const crownRing = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.05, 8, 24), glowMaterial(0xffd700));
+  crownRing.rotation.x = Math.PI / 2;
+  crown.add(crownRing);
+  for (let i = 0; i < 4; i++) {
+    const angle = (i / 4) * Math.PI * 2;
+    const prong = new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.22, 6), glowMaterial(0xffe14d));
+    prong.position.set(Math.cos(angle) * 0.3, 0.12, Math.sin(angle) * 0.3);
+    crown.add(prong);
+  }
   crown.position.y = 2.85;
   cosmetics.set('energy-crown', crown);
 
@@ -423,12 +478,21 @@ function buildCosmetics(): Map<string, THREE.Object3D> {
   }
   cosmetics.set('lightning-wisps', wisps);
 
+  // Energy wings: three fanned feathers per side, longest on top.
   const wings = new THREE.Group();
+  const feathers: Array<[number, number, number, number]> = [
+    // [cone radius, length, z-tilt, height]
+    [0.32, 1.5, 2.45, 1.6],
+    [0.24, 1.15, 2.15, 1.42],
+    [0.17, 0.85, 1.85, 1.24],
+  ];
   for (const side of [-1, 1]) {
-    const wing = new THREE.Mesh(new THREE.ConeGeometry(0.35, 1.4, 6), glowMaterial(0x7dffa0));
-    wing.position.set(side * 0.6, 1.5, -0.4);
-    wing.rotation.z = side * 2.4;
-    wings.add(wing);
+    for (const [radius, length, tilt, y] of feathers) {
+      const feather = new THREE.Mesh(new THREE.ConeGeometry(radius, length, 6), glowMaterial(0x7dffa0));
+      feather.position.set(side * (0.45 + length * 0.28), y, -0.4);
+      feather.rotation.z = side * tilt;
+      wings.add(feather);
+    }
   }
   cosmetics.set('energy-wings', wings);
 
