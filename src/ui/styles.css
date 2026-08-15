@@ -242,6 +242,88 @@ body {
   color: #ffe14d;
 }
 
+.grid-box {
+  background: #fff;
+  border-radius: 1.5rem;
+  padding: 1.5rem 2rem;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  align-items: center;
+}
+
+.grid-title {
+  font-size: 1.6rem;
+  font-weight: 800;
+}
+
+.mastery-table {
+  display: grid;
+  grid-template-columns: repeat(13, 1.5rem);
+  gap: 2px;
+}
+
+.mastery-corner,
+.mastery-header {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #555;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 1.5rem;
+}
+
+.mastery-cell {
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 0.25rem;
+}
+
+.mastery-mastered {
+  background: #3dbb61;
+}
+
+.mastery-learning {
+  background: #ffd24d;
+}
+
+.mastery-struggling {
+  background: #e84545;
+}
+
+.mastery-unseen {
+  background: #d9d9d9;
+}
+
+.grid-legend {
+  display: flex;
+  gap: 1rem;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.legend-item::before {
+  content: '■ ';
+}
+
+.legend-mastered {
+  color: #3dbb61;
+}
+
+.legend-learning {
+  color: #cc9900;
+}
+
+.legend-struggling {
+  color: #e84545;
+}
+
+.legend-unseen {
+  color: #999;
+}
+
 .xp-gain {
   font-size: 2rem;
   font-weight: 800;

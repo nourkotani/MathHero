@@ -40,6 +40,8 @@ export interface GameState {
   roundStartedAt: number;
   score: number;
   question: Question;
+  /** Tick timestamp when the current question appeared — answer speed derives from it. */
+  questionAskedAt: number;
   /** Digits typed so far, most recent last. Submit is an explicit event. */
   answerBuffer: string;
   /** Consecutive correct answers this Round; resets at Round start. Never persisted. */

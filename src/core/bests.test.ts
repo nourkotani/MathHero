@@ -62,9 +62,9 @@ describe('Personal Bests', () => {
 describe('Family Leaderboard', () => {
   it('is derived from player bests and ordered by top score', () => {
     const players = [
-      { id: 'p1', name: 'Zara', colors: { hair: 'gold', outfitPrimary: 'blue', outfitSecondary: 'teal' }, roundsPlayed: 1, xp: 100, bests: { easy: 100 } },
-      { id: 'p2', name: 'Milo', colors: { hair: 'sky', outfitPrimary: 'red', outfitSecondary: 'white' }, roundsPlayed: 2, xp: 400, bests: { easy: 80, hard: 300 } },
-      { id: 'p3', name: 'Ana', colors: { hair: 'rose', outfitPrimary: 'green', outfitSecondary: 'blue' }, roundsPlayed: 0, xp: 0, bests: {} },
+      { id: 'p1', name: 'Zara', colors: { hair: 'gold', outfitPrimary: 'blue', outfitSecondary: 'teal' }, roundsPlayed: 1, xp: 100, bests: { easy: 100 }, factStats: {} },
+      { id: 'p2', name: 'Milo', colors: { hair: 'sky', outfitPrimary: 'red', outfitSecondary: 'white' }, roundsPlayed: 2, xp: 400, bests: { easy: 80, hard: 300 }, factStats: {} },
+      { id: 'p3', name: 'Ana', colors: { hair: 'rose', outfitPrimary: 'green', outfitSecondary: 'blue' }, roundsPlayed: 0, xp: 0, bests: {}, factStats: {} },
     ];
     const board = familyLeaderboard(players);
     expect(board.map((e) => e.id)).toEqual(['p2', 'p1', 'p3']);
@@ -87,7 +87,7 @@ describe('Family Leaderboard', () => {
       nextPlayerId: 2,
     });
     const migrated = parseSaveFile(v2);
-    expect(migrated?.version).toBe(3);
+    expect(migrated?.version).toBe(4);
     expect(migrated?.players[0]).toMatchObject({ xp: 250, bests: {} });
   });
 });

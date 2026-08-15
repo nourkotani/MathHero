@@ -1,4 +1,7 @@
+import { factKey } from './facts';
 import { cosmeticUnlockedAt, levelForXp } from './level';
+import { recordAttempt } from './mastery';
+import type { FactStats } from './mastery';
 import { MAX_NAME_LENGTH, validColors } from './players';
 import { seedPrng } from './prng';
 import { pointsForCorrect } from './scoring';
@@ -21,6 +24,7 @@ export function initialState(config: GameConfig): GameState {
   const selected = selectQuestion('easy', seedPrng(config.seed));
   return {
     prng: selected.prng,
+    questionAskedAt: 0,
     phase: 'title',
     players: config.save?.players ?? [],
     activePlayerId: null,
@@ -39,6 +43,24 @@ export function initialState(config: GameConfig): GameState {
 
 function noop(state: GameState): UpdateResult {
   return { state, effects: [] };
+}
+
+function activeFactStats(state: GameState): FactStats | undefined {
+  return state.players.find((p) => p.id === state.activePlayerId)?.factStats;
+}
+
+/** Record one attempt at the current question against the active Player. */
+function withAttemptRecorded(state: GameState, correct: boolean): GameState {
+  const key = factKey(state.question.a, state.question.b);
+  const ms = Math.max(0, state.now - state.questionAskedAt);
+  return {
+    ...state,
+    players: state.players.map((p) =>
+      p.id === state.activePlayerId
+        ? { ...p, factStats: recordAttempt(p.factStats, key, { correct, ms }) }
+        : p,
+    ),
+  };
 }
 
 export function update(state: GameState, event: GameEvent): UpdateResult {
@@ -83,9 +105,18 @@ export function update(state: GameState, event: GameEvent): UpdateResult {
         ticked.now >= ticked.feedback.until
       ) {
         // The teaching moment is over: move on to the next question.
-        const selected = selectQuestion(state.difficulty, state.prng);
+        const selected = selectQuestion(state.difficulty, state.prng, {
+          factStats: activeFactStats(ticked),
+          excludeKey: factKey(ticked.question.a, ticked.question.b),
+        });
         return {
-          state: { ...ticked, prng: selected.prng, question: selected.question, feedback: null },
+          state: {
+            ...ticked,
+            prng: selected.prng,
+            question: selected.question,
+            questionAskedAt: ticked.now,
+            feedback: null,
+          },
           effects: [{ type: 'QUESTION_ASKED', question: selected.question }],
         };
       }
@@ -107,7 +138,15 @@ export function update(state: GameState, event: GameEvent): UpdateResult {
       const name = event.name.trim().slice(0, MAX_NAME_LENGTH);
       if (name === '' || !validColors(event.colors)) return noop(state);
       const id = `p${state.nextPlayerId}`;
-      const player = { id, name, colors: event.colors, roundsPlayed: 0, xp: 0, bests: {} };
+      const player = {
+        id,
+        name,
+        colors: event.colors,
+        roundsPlayed: 0,
+        xp: 0,
+        bests: {},
+        factStats: {},
+      };
       return {
         state: {
           ...state,
@@ -171,7 +210,9 @@ export function update(state: GameState, event: GameEvent): UpdateResult {
 
     case 'ROUND_STARTED': {
       if (state.phase !== 'pre-round' || state.activePlayerId === null) return noop(state);
-      const selected = selectQuestion(state.difficulty, state.prng);
+      const selected = selectQuestion(state.difficulty, state.prng, {
+        factStats: activeFactStats(state),
+      });
       return {
         state: {
           ...state,
@@ -180,6 +221,7 @@ export function update(state: GameState, event: GameEvent): UpdateResult {
           roundStartedAt: state.now,
           score: 0,
           question: selected.question,
+          questionAskedAt: state.now,
           answerBuffer: '',
           streak: 0,
           feedback: null,
@@ -215,12 +257,14 @@ export function update(state: GameState, event: GameEvent): UpdateResult {
       const correctAnswer = question.a * question.b;
       const correct = Number(state.answerBuffer) === correctAnswer;
 
+      const recorded = withAttemptRecorded(state, correct);
+
       if (!correct) {
         // No points lost, no time refunded — but the hero drops to base form
         // and the correct equation teaches until the next question appears.
         return {
           state: {
-            ...state,
+            ...recorded,
             streak: 0,
             answerBuffer: '',
             feedback: { question, correctAnswer, until: state.now + FEEDBACK_MS },
@@ -234,7 +278,10 @@ export function update(state: GameState, event: GameEvent): UpdateResult {
       const points = pointsForCorrect(state.difficulty, streak);
       const transformed = tier.threshold === streak && tier.multiplier > 1;
 
-      const selected = selectQuestion(state.difficulty, state.prng);
+      const selected = selectQuestion(state.difficulty, state.prng, {
+        factStats: activeFactStats(recorded),
+        excludeKey: factKey(question.a, question.b),
+      });
       const effects: GameEffect[] = [{ type: 'ANSWER_CORRECT', question, points }];
       if (transformed) {
         effects.push({ type: 'TRANSFORMED', form: tier.form, multiplier: tier.multiplier, streak });
@@ -246,11 +293,12 @@ export function update(state: GameState, event: GameEvent): UpdateResult {
 
       return {
         state: {
-          ...state,
+          ...recorded,
           prng: selected.prng,
           score: state.score + points,
           streak,
           question: selected.question,
+          questionAskedAt: state.now,
           answerBuffer: '',
         },
         effects,

@@ -6,7 +6,7 @@ import { validColors } from './players';
 import type { PlayerRecord } from './players';
 import type { GameState } from './types';
 
-export const SAVE_FILE_VERSION = 3;
+export const SAVE_FILE_VERSION = 4;
 
 export interface SaveFile {
   version: number;
@@ -43,6 +43,14 @@ const MIGRATIONS: Array<(doc: Record<string, unknown>) => Record<string, unknown
     version: 3,
     players: (Array.isArray(doc.players) ? doc.players : []).map(
       (p: Record<string, unknown>) => ({ ...p, bests: {} }),
+    ),
+  }),
+  // v3 → v4: players gain per-Fact attempt stats.
+  (doc) => ({
+    ...doc,
+    version: 4,
+    players: (Array.isArray(doc.players) ? doc.players : []).map(
+      (p: Record<string, unknown>) => ({ ...p, factStats: {} }),
     ),
   }),
 ];
@@ -98,6 +106,7 @@ function validatePlayer(entry: unknown): PlayerRecord | null {
     typeof p.roundsPlayed !== 'number' ||
     typeof p.xp !== 'number' ||
     !validBests(p.bests) ||
+    !validFactStats(p.factStats) ||
     typeof colors !== 'object' ||
     colors === null ||
     typeof colors.hair !== 'string' ||
@@ -119,7 +128,24 @@ function validatePlayer(entry: unknown): PlayerRecord | null {
     roundsPlayed: p.roundsPlayed,
     xp: p.xp,
     bests: p.bests as PlayerRecord['bests'],
+    factStats: p.factStats as PlayerRecord['factStats'],
   };
+}
+
+function validFactStats(stats: unknown): boolean {
+  if (typeof stats !== 'object' || stats === null) return false;
+  return Object.entries(stats).every(
+    ([key, attempts]) =>
+      /^\d{1,2}x\d{1,2}$/.test(key) &&
+      Array.isArray(attempts) &&
+      attempts.every(
+        (a) =>
+          typeof a === 'object' &&
+          a !== null &&
+          typeof (a as Record<string, unknown>).correct === 'boolean' &&
+          typeof (a as Record<string, unknown>).ms === 'number',
+      ),
+  );
 }
 
 function validBests(bests: unknown): boolean {

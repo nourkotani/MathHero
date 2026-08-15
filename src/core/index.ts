@@ -16,6 +16,17 @@ export {
   xpForLevel,
 } from './level';
 export type { CosmeticTier } from './level';
+export { factKey } from './facts';
+export type { FactKey } from './facts';
+export {
+  adaptiveWeight,
+  ATTEMPT_WINDOW,
+  FAST_MS,
+  masteryOf,
+  MASTERY_STREAK,
+  recordAttempt,
+} from './mastery';
+export type { FactAttempt, FactStats, Mastery } from './mastery';
 export { familyLeaderboard } from './leaderboard';
 export type { LeaderboardEntry } from './leaderboard';
 export { HAIR_PRESETS, MAX_NAME_LENGTH, OUTFIT_PRESETS, presetHex } from './players';

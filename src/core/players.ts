@@ -35,6 +35,7 @@ export interface PlayerColors {
 }
 
 import type { Difficulty } from './difficulty';
+import type { FactStats } from './mastery';
 
 export interface PlayerRecord {
   /** Stable id; names are display data, so renames keep every stat. */
@@ -47,6 +48,8 @@ export interface PlayerRecord {
   xp: number;
   /** Personal Bests: highest Round score per Difficulty (absent until scored). */
   bests: Partial<Record<Difficulty, number>>;
+  /** Recent attempts per Fact — the raw data mastery and weighting derive from. */
+  factStats: FactStats;
 }
 
 export const MAX_NAME_LENGTH = 20;

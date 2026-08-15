@@ -17,7 +17,7 @@ describe('hero creation', () => {
 
     const result = update(opened, { type: 'PLAYER_CREATED', name: '  Zara  ', colors: TEST_COLORS });
     expect(result.state.players).toEqual([
-      { id: 'p1', name: 'Zara', colors: TEST_COLORS, roundsPlayed: 0, xp: 0, bests: {} },
+      { id: 'p1', name: 'Zara', colors: TEST_COLORS, roundsPlayed: 0, xp: 0, bests: {}, factStats: {} },
     ]);
     expect(result.state.activePlayerId).toBe('p1');
     expect(result.state.phase).toBe('pre-round');

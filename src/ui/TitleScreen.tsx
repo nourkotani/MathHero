@@ -1,7 +1,51 @@
 import { useState } from 'preact/hooks';
-import { familyLeaderboard, levelForXp, tierFor } from '../core';
+import { factKey, familyLeaderboard, levelForXp, masteryOf, tierFor } from '../core';
 import type { PlayerRecord } from '../core';
 import type { AppProps } from './App';
+
+const TABLE_RANGE = Array.from({ length: 12 }, (_, i) => i + 1);
+
+function MasteryGrid({ player, onClose }: { player: PlayerRecord; onClose: () => void }) {
+  return (
+    <div class="confirm-overlay" data-testid="mastery-grid">
+      <div class="grid-box">
+        <div class="grid-title">{player.name}'s times tables</div>
+        <div class="mastery-table">
+          <div class="mastery-corner">×</div>
+          {TABLE_RANGE.map((c) => (
+            <div class="mastery-header" key={`h${c}`}>
+              {c}
+            </div>
+          ))}
+          {TABLE_RANGE.map((r) => (
+            <>
+              <div class="mastery-header" key={`r${r}`}>
+                {r}
+              </div>
+              {TABLE_RANGE.map((c) => (
+                <div
+                  key={`${r}-${c}`}
+                  class={`mastery-cell mastery-${masteryOf(player.factStats[factKey(r, c)])}`}
+                  data-testid={`cell-${r}-${c}`}
+                  title={`${r} × ${c}`}
+                />
+              ))}
+            </>
+          ))}
+        </div>
+        <div class="grid-legend">
+          <span class="legend-item legend-mastered">Mastered</span>
+          <span class="legend-item legend-learning">Practicing</span>
+          <span class="legend-item legend-struggling">Tricky</span>
+          <span class="legend-item legend-unseen">Not tried</span>
+        </div>
+        <button class="big-button" data-testid="close-grid" onClick={onClose}>
+          Close
+        </button>
+      </div>
+    </div>
+  );
+}
 
 function Leaderboard({ state }: Pick<AppProps, 'state'>) {
   const entries = familyLeaderboard(state.players);
@@ -30,8 +74,10 @@ export function TitleScreen({ state, dispatch }: AppProps) {
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameText, setRenameText] = useState('');
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [gridId, setGridId] = useState<string | null>(null);
 
   const deleting = state.players.find((p) => p.id === deletingId);
+  const gridPlayer = state.players.find((p) => p.id === gridId);
 
   return (
     <div class="hud screen-center">
@@ -69,6 +115,14 @@ export function TitleScreen({ state, dispatch }: AppProps) {
               </button>
               <button
                 class="pad-key row-button"
+                aria-label={`Times tables for ${player.name}`}
+                data-testid={`grid-${player.id}`}
+                onClick={() => setGridId(player.id)}
+              >
+                📊
+              </button>
+              <button
+                class="pad-key row-button"
                 aria-label={`Rename ${player.name}`}
                 data-testid={`rename-${player.id}`}
                 onClick={() => {
@@ -99,6 +153,7 @@ export function TitleScreen({ state, dispatch }: AppProps) {
         {state.players.length === 0 ? 'Make your hero!' : 'New hero'}
       </button>
 
+      {gridPlayer && <MasteryGrid player={gridPlayer} onClose={() => setGridId(null)} />}
       {deleting && (
         <div class="confirm-overlay" data-testid="delete-confirm">
           <div class="confirm-box">

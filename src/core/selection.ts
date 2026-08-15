@@ -5,6 +5,9 @@
 
 import { tierFor } from './difficulty';
 import type { Difficulty } from './difficulty';
+import { factKey } from './facts';
+import { adaptiveWeight } from './mastery';
+import type { FactStats } from './mastery';
 import { nextRandom } from './prng';
 import type { Question } from './types';
 
@@ -52,15 +55,31 @@ export function candidatesFor(difficulty: Difficulty): Question[] {
   return candidates;
 }
 
-/** Select the next question for the current difficulty. */
+export interface SelectionContext {
+  /** The active Player's per-Fact attempt history, for adaptive weighting. */
+  factStats?: FactStats;
+  /** Fact to exclude — the same question never appears twice in a row. */
+  excludeKey?: string;
+}
+
+/**
+ * Select the next question: tier base weights × adaptive weights × the
+ * no-repeat exclusion, composed at the one selection seam.
+ */
 export function selectQuestion(
   difficulty: Difficulty,
   prng: number,
+  context: SelectionContext = {},
 ): { question: Question; prng: number } {
   const tier = tierFor(difficulty);
+  let candidates = candidatesFor(difficulty);
+  if (context.excludeKey !== undefined) {
+    const remaining = candidates.filter((q) => factKey(q.a, q.b) !== context.excludeKey);
+    if (remaining.length > 0) candidates = remaining;
+  }
   return weightedSelector({
-    candidates: candidatesFor(difficulty),
+    candidates,
     prng,
-    weigh: (q) => tier.weight(q),
+    weigh: (q) => tier.weight(q) * adaptiveWeight(context.factStats?.[factKey(q.a, q.b)]),
   });
 }
