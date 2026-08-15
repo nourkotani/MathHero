@@ -1,4 +1,4 @@
-import { MAX_TIMER_SECONDS, MIN_TIMER_SECONDS } from '../core';
+import { DIFFICULTY_TIERS, MAX_TIMER_SECONDS, MIN_TIMER_SECONDS } from '../core';
 import type { AppProps } from './App';
 import { formatClock } from './format';
 
@@ -11,6 +11,18 @@ export function PreRoundScreen({ state, dispatch }: AppProps) {
   return (
     <div class="hud screen-center">
       <h1 class="screen-title">Ready to train?</h1>
+      <div class="difficulty-picker">
+        {DIFFICULTY_TIERS.map((tier) => (
+          <button
+            key={tier.id}
+            class={`pad-key difficulty-button${state.difficulty === tier.id ? ' difficulty-selected' : ''}`}
+            data-testid={`difficulty-${tier.id}`}
+            onClick={() => dispatch({ type: 'DIFFICULTY_CHANGED', difficulty: tier.id })}
+          >
+            {tier.label}
+          </button>
+        ))}
+      </div>
       <div class="timer-setting">
         <button
           class="pad-key timer-button"

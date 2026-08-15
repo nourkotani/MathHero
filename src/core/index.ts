@@ -2,6 +2,8 @@
 // they speak, and derived-value selectors. Everything else is implementation.
 
 export { initialState, update } from './update';
+export { DIFFICULTY_TIERS, tierFor } from './difficulty';
+export type { Difficulty, DifficultyTier } from './difficulty';
 export {
   DEFAULT_TIMER_SECONDS,
   isFinalTenSeconds,

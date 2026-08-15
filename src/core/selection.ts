@@ -1,36 +1,66 @@
 // Internal selection seam — private to the core, exercised only through
-// update()/initialState(). This ticket ships the uniform adapter; Adaptive
-// Selection later adds a weighted adapter behind the same interface.
+// update()/initialState(). Weights compose: the difficulty tier supplies a
+// static base weight now; Adaptive Selection later multiplies its own
+// weights on top behind this same interface.
 
-import { nextInt } from './prng';
+import { tierFor } from './difficulty';
+import type { Difficulty } from './difficulty';
+import { nextRandom } from './prng';
 import type { Question } from './types';
 
 export interface SelectionArgs {
   candidates: readonly Question[];
   prng: number;
+  /** Relative sampling weight per candidate; defaults to uniform. */
+  weigh?: (question: Question) => number;
 }
 
 export type Selector = (args: SelectionArgs) => { question: Question; prng: number };
 
-export const uniformSelector: Selector = ({ candidates, prng }) => {
+export const weightedSelector: Selector = ({ candidates, prng, weigh }) => {
   if (candidates.length === 0) {
     throw new Error('selection requires at least one candidate');
   }
-  const draw = nextInt(prng, 0, candidates.length - 1);
-  const question = candidates[draw.value];
-  if (question === undefined) {
-    throw new Error('selection index out of range');
+  const weights = candidates.map((q) => (weigh ? weigh(q) : 1));
+  const total = weights.reduce((sum, w) => sum + w, 0);
+  const draw = nextRandom(prng);
+  let remaining = draw.value * total;
+  for (let i = 0; i < candidates.length; i++) {
+    remaining -= weights[i] ?? 0;
+    if (remaining < 0) {
+      const question = candidates[i];
+      if (question !== undefined) return { question, prng: draw.state };
+    }
   }
-  return { question, prng: draw.state };
+  const last = candidates[candidates.length - 1];
+  if (last === undefined) throw new Error('selection index out of range');
+  return { question: last, prng: draw.state };
 };
 
-/** Every displayed operand pair for times tables 1–12. */
-export function allCandidates(): Question[] {
+/** Candidates for a difficulty: one operand from the tier's tables, the other 1–12. */
+export function candidatesFor(difficulty: Difficulty): Question[] {
+  const tier = tierFor(difficulty);
+  const inRange = (n: number) => n >= tier.tableMin && n <= tier.tableMax;
   const candidates: Question[] = [];
   for (let a = 1; a <= 12; a++) {
     for (let b = 1; b <= 12; b++) {
-      candidates.push({ a, b });
+      if (inRange(a) || inRange(b)) {
+        candidates.push({ a, b });
+      }
     }
   }
   return candidates;
+}
+
+/** Select the next question for the current difficulty. */
+export function selectQuestion(
+  difficulty: Difficulty,
+  prng: number,
+): { question: Question; prng: number } {
+  const tier = tierFor(difficulty);
+  return weightedSelector({
+    candidates: candidatesFor(difficulty),
+    prng,
+    weigh: (q) => tier.weight(q),
+  });
 }

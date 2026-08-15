@@ -1,5 +1,6 @@
 import { seedPrng } from './prng';
-import { allCandidates, uniformSelector } from './selection';
+import { pointsForCorrect } from './scoring';
+import { selectQuestion } from './selection';
 import {
   DEFAULT_TIMER_SECONDS,
   MAX_TIMER_SECONDS,
@@ -11,10 +12,11 @@ import type { GameConfig, GameEffect, GameEvent, GameState, UpdateResult } from 
 const MAX_ANSWER_DIGITS = 3; // 12 × 12 = 144
 
 export function initialState(config: GameConfig): GameState {
-  const selected = uniformSelector({ candidates: allCandidates(), prng: seedPrng(config.seed) });
+  const selected = selectQuestion('easy', seedPrng(config.seed));
   return {
     prng: selected.prng,
     phase: 'pre-round',
+    difficulty: 'easy',
     timerSeconds: DEFAULT_TIMER_SECONDS,
     now: 0,
     roundStartedAt: 0,
@@ -49,9 +51,14 @@ export function update(state: GameState, event: GameEvent): UpdateResult {
       return { state: { ...state, timerSeconds: seconds }, effects: [] };
     }
 
+    case 'DIFFICULTY_CHANGED': {
+      if (state.phase !== 'pre-round') return noop(state);
+      return { state: { ...state, difficulty: event.difficulty }, effects: [] };
+    }
+
     case 'ROUND_STARTED': {
       if (state.phase !== 'pre-round') return noop(state);
-      const selected = uniformSelector({ candidates: allCandidates(), prng: state.prng });
+      const selected = selectQuestion(state.difficulty, state.prng);
       return {
         state: {
           ...state,
@@ -91,10 +98,11 @@ export function update(state: GameState, event: GameEvent): UpdateResult {
       const correctAnswer = question.a * question.b;
       const correct = Number(state.answerBuffer) === correctAnswer;
 
-      const selected = uniformSelector({ candidates: allCandidates(), prng: state.prng });
+      const points = pointsForCorrect(state);
+      const selected = selectQuestion(state.difficulty, state.prng);
       const effects: GameEffect[] = [
         correct
-          ? { type: 'ANSWER_CORRECT', question, points: 1 }
+          ? { type: 'ANSWER_CORRECT', question, points }
           : { type: 'ANSWER_WRONG', question, correctAnswer },
         { type: 'QUESTION_ASKED', question: selected.question },
       ];
@@ -102,7 +110,7 @@ export function update(state: GameState, event: GameEvent): UpdateResult {
         state: {
           ...state,
           prng: selected.prng,
-          score: correct ? state.score + 1 : state.score,
+          score: correct ? state.score + points : state.score,
           question: selected.question,
           answerBuffer: '',
         },

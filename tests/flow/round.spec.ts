@@ -11,6 +11,16 @@ test('the timer is settable on the pre-round screen', async ({ page }) => {
   await expect(page.getByTestId('timer-display')).toContainText('2:00');
 });
 
+for (const difficulty of ['easy', 'medium', 'hard'] as const) {
+  test(`a Round can be started on ${difficulty}`, async ({ page }) => {
+    await openGame(page);
+    await page.getByTestId(`difficulty-${difficulty}`).click();
+    await startRound(page);
+    await expect(page.getByTestId('question')).toBeVisible();
+    await expect(page.getByTestId('countdown')).toBeVisible();
+  });
+}
+
 test('a complete Round: countdown, urgency pulse, Results, play again', async ({ page }) => {
   await openGame(page, '?testClock=1&seed=777');
   await startRound(page);
@@ -19,7 +29,7 @@ test('a complete Round: countdown, urgency pulse, Results, play again', async ({
 
   const answer = await readCorrectAnswer(page);
   await answerOnPad(page, answer);
-  await expect(page.getByTestId('score')).toContainText('1');
+  await expect(page.getByTestId('score')).toContainText('10');
 
   // Jump to the final ten seconds: the countdown turns urgent.
   await advanceClock(page, 110_000);
@@ -30,7 +40,7 @@ test('a complete Round: countdown, urgency pulse, Results, play again', async ({
   // instantly and the in-progress question scores nothing.
   await page.getByTestId('pad-9').click();
   await advanceClock(page, 10_001);
-  await expect(page.getByTestId('final-score')).toContainText('1');
+  await expect(page.getByTestId('final-score')).toContainText('10');
 
   await page.getByTestId('play-again').click();
   await expect(page.getByTestId('start-round')).toBeVisible();

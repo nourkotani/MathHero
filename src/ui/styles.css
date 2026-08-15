@@ -69,6 +69,22 @@ body {
   text-shadow: 0 3px 10px rgba(0, 0, 0, 0.6);
 }
 
+.difficulty-picker {
+  display: flex;
+  gap: 0.8rem;
+  pointer-events: auto;
+}
+
+.difficulty-button {
+  padding: 0 1.5rem;
+  font-size: 1.5rem;
+}
+
+.difficulty-selected {
+  background: #5ad65a;
+  color: #fff;
+}
+
 .timer-setting {
   display: flex;
   align-items: center;

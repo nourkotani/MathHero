@@ -100,14 +100,14 @@ describe('answer entry', () => {
 });
 
 describe('answer judging and scoring', () => {
-  it('a correct answer scores a point, clears the buffer, and asks a new question', () => {
+  it('a correct answer scores points, clears the buffer, and asks a new question', () => {
     const state = freshRound(7);
     const question = state.question;
     const result = answerCorrectly(state);
 
-    expect(result.state.score).toBe(1);
+    expect(result.state.score).toBe(10); // Easy base points
     expect(result.state.answerBuffer).toBe('');
-    expect(result.effects[0]).toEqual({ type: 'ANSWER_CORRECT', question, points: 1 });
+    expect(result.effects[0]).toEqual({ type: 'ANSWER_CORRECT', question, points: 10 });
     expect(result.effects[1]).toMatchObject({ type: 'QUESTION_ASKED' });
   });
 
@@ -130,7 +130,7 @@ describe('answer judging and scoring', () => {
     let state = freshRound(3);
     for (let i = 1; i <= 5; i++) {
       state = answerCorrectly(state).state;
-      expect(state.score).toBe(i);
+      expect(state.score).toBe(i * 10); // Easy base points
     }
   });
 

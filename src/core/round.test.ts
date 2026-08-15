@@ -92,8 +92,8 @@ describe('Round lifecycle', () => {
       { type: 'ANSWER_SUBMITTED' },
     ]);
     const result = update(state, { type: 'TICK', now: 999_999 });
-    expect(result.effects).toEqual([{ type: 'ROUND_ENDED', finalScore: 1 }]);
-    expect(result.state.score).toBe(1);
+    expect(result.effects).toEqual([{ type: 'ROUND_ENDED', finalScore: 10 }]);
+    expect(result.state.score).toBe(10);
   });
 
   it('play again returns to pre-round and keeps the timer setting', () => {

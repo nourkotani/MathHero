@@ -9,7 +9,7 @@ test('correct answer via the on-screen pad increases the score', async ({ page }
   const answer = await readCorrectAnswer(page);
   await answerOnPad(page, answer);
 
-  await expect(page.getByTestId('score')).toContainText('1');
+  await expect(page.getByTestId('score')).toContainText('10');
   // A new question appears with an empty answer slot.
   await expect(page.getByTestId('answer')).toHaveText('?');
 });
@@ -30,7 +30,7 @@ test('keyboard entry with backspace works and submits on Enter', async ({ page }
   }
   await page.keyboard.press('Enter');
 
-  await expect(page.getByTestId('score')).toContainText('1');
+  await expect(page.getByTestId('score')).toContainText('10');
 });
 
 test('a wrong answer scores nothing and advances to a new question', async ({ page }) => {

@@ -1,6 +1,8 @@
 // The Game Core's public vocabulary. Later tickets extend these unions —
 // they never add a second entry point (ADR 0003, docs/ARCHITECTURE.md).
 
+import type { Difficulty } from './difficulty';
+
 /** A multiplication question in the operand order it is displayed. */
 export interface Question {
   a: number;
@@ -18,6 +20,7 @@ export interface GameState {
   /** Injected PRNG state; advanced immutably by every random draw. */
   prng: number;
   phase: Phase;
+  difficulty: Difficulty;
   /** Round length setting in seconds; clamped to 30–600, default 120. */
   timerSeconds: number;
   /** Latest tick timestamp (ms) — the core's only notion of "now". */
@@ -33,6 +36,7 @@ export interface GameState {
 export type GameEvent =
   | { type: 'TICK'; now: number }
   | { type: 'TIMER_CHANGED'; seconds: number }
+  | { type: 'DIFFICULTY_CHANGED'; difficulty: Difficulty }
   | { type: 'ROUND_STARTED' }
   | { type: 'PLAY_AGAIN' }
   | { type: 'DIGIT_PRESSED'; digit: number }
