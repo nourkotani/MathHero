@@ -96,12 +96,19 @@ window.addEventListener('keydown', (e) => {
 
 // Animation loop. Game time enters the core only as TICK events stamped from
 // the injected clock; rendering time stays wall-clock so animations play even
-// under the manual test clock.
+// under the manual test clock. Ticks are throttled — the countdown only needs
+// a few updates a second, and re-rendering the UI every frame is pure waste.
+const TICK_INTERVAL_MS = 250;
 let lastFrame = performance.now();
+let lastTickAt = Number.NEGATIVE_INFINITY;
 function loop(now: number) {
   const dt = now - lastFrame;
   lastFrame = now;
-  store.dispatch({ type: 'TICK', now: clock.now() });
+  const gameNow = clock.now();
+  if (gameNow - lastTickAt >= TICK_INTERVAL_MS) {
+    lastTickAt = gameNow;
+    store.dispatch({ type: 'TICK', now: gameNow });
+  }
   renderer.frame(dt);
   requestAnimationFrame(loop);
 }

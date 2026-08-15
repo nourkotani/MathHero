@@ -7,8 +7,8 @@ export default defineConfig({
   testDir: 'tests/flow',
   fullyParallel: true,
   // Each test boots a full three.js scene on software WebGL; too many at
-  // once starves them and produces timeout flakes.
-  workers: 4,
+  // once starves the pages' main threads and produces timeout flakes.
+  workers: 2,
   projects: [
     {
       name: 'chromium',

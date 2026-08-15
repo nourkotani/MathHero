@@ -59,32 +59,73 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.setSize(window.innerWidth, window.innerHeight);
 
+  // A dusk wasteland arena — dramatic anime-battle light, not a sunny field.
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x88bbee);
-  scene.fog = new THREE.Fog(0x88bbee, 30, 70);
+  scene.background = new THREE.Color(0x1b1f3a);
+  scene.fog = new THREE.Fog(0x453156, 26, 68);
 
   const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 100);
   const cameraHome = new THREE.Vector3(0, 4.2, 10);
   camera.position.copy(cameraHome);
   camera.lookAt(0, 1.4, 0);
 
-  const hemi = new THREE.HemisphereLight(0xdfefff, 0x54402a, 1.1);
+  const hemi = new THREE.HemisphereLight(0x8fa3ff, 0x5a3b22, 0.85);
   scene.add(hemi);
-  const sun = new THREE.DirectionalLight(0xfff2cc, 1.6);
-  sun.position.set(5, 10, 6);
+  const sun = new THREE.DirectionalLight(0xffb26b, 2.0);
+  sun.position.set(6, 7, 5);
   scene.add(sun);
+  // Cool rim light from behind, so the figures pop against the dusk.
+  const rim = new THREE.DirectionalLight(0x3ac0ff, 0.7);
+  rim.position.set(-5, 6, -8);
+  scene.add(rim);
 
   const ground = new THREE.Mesh(
     new THREE.CircleGeometry(28, 48),
-    new THREE.MeshStandardMaterial({ color: 0x7bb661 }),
+    new THREE.MeshStandardMaterial({ color: 0x6d6242, roughness: 1 }),
   );
   ground.rotation.x = -Math.PI / 2;
   scene.add(ground);
 
-  const arenaMaterial = new THREE.MeshStandardMaterial({ color: 0xd9c9a3 });
+  // Tournament-style stone platform with a glowing energy rim.
+  const arenaMaterial = new THREE.MeshStandardMaterial({ color: 0xcfc8bd, roughness: 0.85 });
   const arena = new THREE.Mesh(new THREE.CylinderGeometry(7, 7.4, 0.3, 48), arenaMaterial);
   arena.position.y = 0.15;
   scene.add(arena);
+
+  const arenaRim = new THREE.Mesh(
+    new THREE.TorusGeometry(7.05, 0.07, 8, 64),
+    new THREE.MeshBasicMaterial({ color: 0xffd24d, transparent: true, opacity: 0.7 }),
+  );
+  arenaRim.rotation.x = Math.PI / 2;
+  arenaRim.position.y = 0.31;
+  scene.add(arenaRim);
+
+  // Jagged rock spires ring the battlefield.
+  const rockMaterial = new THREE.MeshStandardMaterial({ color: 0x5f5142, roughness: 1 });
+  for (let i = 0; i < 9; i++) {
+    const angle = (i / 9) * Math.PI * 2 + 0.4;
+    const distance = 13 + (i % 3) * 4;
+    const height = 2.5 + ((i * 7) % 5);
+    const rock = new THREE.Mesh(new THREE.ConeGeometry(1.1 + (i % 2) * 0.7, height, 5), rockMaterial);
+    rock.position.set(Math.cos(angle) * distance, height / 2, Math.sin(angle) * distance);
+    rock.rotation.y = i * 1.7;
+    scene.add(rock);
+  }
+
+  // Slow dusk clouds drifting high overhead.
+  const clouds: THREE.Mesh[] = [];
+  const cloudMaterial = new THREE.MeshBasicMaterial({
+    color: 0xb18fd9,
+    transparent: true,
+    opacity: 0.35,
+  });
+  for (let i = 0; i < 5; i++) {
+    const cloud = new THREE.Mesh(new THREE.SphereGeometry(2.4 + (i % 3), 10, 8), cloudMaterial);
+    cloud.scale.set(1.8, 0.35, 1);
+    cloud.position.set(-20 + i * 9, 12 + (i % 3) * 2.5, -18 - (i % 2) * 6);
+    scene.add(cloud);
+    clouds.push(cloud);
+  }
 
   const hero = buildHero();
   hero.group.position.set(HERO_X, 0.3, 0);
@@ -95,10 +136,15 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
   dummy.position.set(DUMMY_X, 0.3, 0);
   scene.add(dummy);
 
+  const ATTACK_DURATION = 0.45;
+  const STAGGER_DURATION = 0.6;
   const blasts: Blast[] = [];
   const particles: Particle[] = [];
   let elapsed = 0;
-  let punchTimer = 0; // hero strike animation
+  let punchTimer = 0; // hero attack animation
+  let attackKind = 0; // which attack plays: punch / flying kick / spin / uppercut
+  let attackCycle = 0;
+  let staggerTimer = 0; // wrong-answer recoil
   let dummyKick = 0; // small recoil
   let dummyLaunch = 0; // dramatic super-blast launch
   let shake = 0; // camera shake energy
@@ -176,10 +222,18 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       for (const effect of effects) {
         switch (effect.type) {
           case 'ANSWER_CORRECT':
-            punchTimer = 0.35;
-            dummyKick = 0.35;
+            // Cycle through different attacks so every strike feels fresh.
+            attackKind = attackCycle++ % 4;
+            punchTimer = ATTACK_DURATION;
+            staggerTimer = 0;
+            dummyKick = ATTACK_DURATION;
             // Any transformed hero throws visible energy with each strike.
             if (currentForm !== 'base') fireBlast(false);
+            break;
+          case 'ANSWER_WRONG':
+            staggerTimer = STAGGER_DURATION;
+            punchTimer = 0;
+            shake = Math.max(shake, 0.15);
             break;
           case 'TRANSFORMED':
             applyForm(effect.form);
@@ -210,20 +264,49 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       const dt = Math.min(dtMs, 100) / 1000;
       elapsed += dt;
 
-      // Idle bob; the aura spins and breathes.
-      hero.group.position.y = 0.3 + Math.sin(elapsed * 2.2) * 0.05;
+      // Idle bob; the aura spins and breathes. Attacks layer on top.
+      const bobY = 0.3 + Math.sin(elapsed * 2.2) * 0.05;
       hero.aura.rotation.y = elapsed * 1.5;
       hero.aura.scale.setScalar(1 + Math.sin(elapsed * 6) * 0.05);
+      hero.group.position.set(HERO_X, bobY, 0);
+      hero.group.rotation.set(0, Math.PI / 2, 0);
 
-      // Strike lunge toward the dummy on a correct answer.
-      if (punchTimer > 0) {
+      if (staggerTimer > 0) {
+        // Wrong answer: the hero staggers back with a red wince, then recovers.
+        staggerTimer = Math.max(0, staggerTimer - dt);
+        const recoil = Math.sin((staggerTimer / STAGGER_DURATION) * Math.PI);
+        hero.group.position.x = HERO_X - recoil * 0.6;
+        hero.group.rotation.z = recoil * 0.3;
+        if (staggerTimer > 0) {
+          hero.bodyMaterial.emissive.setHex(0xff3b3b);
+          hero.bodyMaterial.emissiveIntensity = recoil * 0.5;
+        } else {
+          applyForm(currentForm);
+        }
+      } else if (punchTimer > 0) {
         punchTimer = Math.max(0, punchTimer - dt);
-        const lunge = Math.sin((1 - punchTimer / 0.35) * Math.PI);
-        hero.group.position.x = HERO_X + lunge * 1.5;
-        hero.group.rotation.z = -lunge * 0.15;
-      } else {
-        hero.group.position.x = HERO_X;
-        hero.group.rotation.z = 0;
+        const t = 1 - punchTimer / ATTACK_DURATION;
+        const drive = Math.sin(t * Math.PI); // out and back
+        switch (attackKind) {
+          case 0: // dash punch
+            hero.group.position.x = HERO_X + drive * 1.6;
+            hero.group.rotation.z = -drive * 0.2;
+            break;
+          case 1: // flying kick
+            hero.group.position.x = HERO_X + drive * 1.9;
+            hero.group.position.y = bobY + drive * 0.9;
+            hero.group.rotation.z = -drive * 0.9;
+            break;
+          case 2: // spin strike
+            hero.group.position.x = HERO_X + drive * 1.4;
+            hero.group.rotation.y = Math.PI / 2 + t * Math.PI * 2;
+            break;
+          default: // rising uppercut
+            hero.group.position.x = HERO_X + drive * 1.0;
+            hero.group.position.y = bobY + drive * 1.3;
+            hero.group.rotation.z = drive * 0.45;
+            break;
+        }
       }
 
       // Dummy reactions: small recoil on hits, dramatic launch on super blasts.
@@ -240,10 +323,20 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
         }
       } else if (dummyKick > 0) {
         dummyKick = Math.max(0, dummyKick - dt);
-        dummy.rotation.x = Math.sin((1 - dummyKick / 0.35) * Math.PI) * 0.35;
+        dummy.rotation.x = Math.sin((1 - dummyKick / ATTACK_DURATION) * Math.PI) * 0.35;
+      } else if (staggerTimer > 0) {
+        // The dummy does a cheeky little taunt wobble while the hero winces.
+        dummy.rotation.x = 0;
+        dummy.rotation.z = Math.sin(elapsed * 18) * 0.12;
       } else {
         dummy.rotation.x = 0;
         dummy.rotation.z = Math.sin(elapsed * 1.1) * 0.03;
+      }
+
+      // Dusk clouds drift slowly across the sky.
+      for (const cloud of clouds) {
+        cloud.position.x += dt * 0.4;
+        if (cloud.position.x > 26) cloud.position.x = -26;
       }
 
       // Energy blasts fly toward the dummy and burst on impact.
@@ -288,7 +381,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
         arenaMaterial.emissive.setHex(0xff3b3b);
         arenaMaterial.emissiveIntensity = 0.12 * pulse;
       } else {
-        hemi.color.setHex(0xdfefff);
+        hemi.color.setHex(0x8fa3ff);
         arenaMaterial.emissiveIntensity = 0;
       }
 
@@ -350,6 +443,12 @@ function buildHero(): HeroRig {
     arm.position.set(side * 0.58, 1.25, 0);
     arm.rotation.z = side * 0.35;
     group.add(arm);
+
+    // Martial-artist wristbands in the outfit's trim color.
+    const wristband = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.14, 10), trimMaterial);
+    wristband.position.set(side * 0.68, 1.02, 0);
+    wristband.rotation.z = side * 0.35;
+    group.add(wristband);
 
     const fist = new THREE.Mesh(new THREE.SphereGeometry(0.15, 10, 8), skinMaterial);
     fist.position.set(side * 0.72, 0.92, 0);
