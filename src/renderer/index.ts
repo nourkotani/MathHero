@@ -29,10 +29,12 @@ const FORM_LOOKS: Record<
   StreakForm,
   { hair: number | null; auraColor: number; auraOpacity: number; emissive: number }
 > = {
+  // Opacities are per shell; the aura's two nested shells overlap, so the
+  // perceived density is roughly double what's written here.
   base: { hair: null, auraColor: 0x000000, auraOpacity: 0, emissive: 0 },
-  aura: { hair: null, auraColor: 0x3ac0ff, auraOpacity: 0.45, emissive: 0.15 },
-  surge: { hair: 0xffe14d, auraColor: 0x8f5aff, auraOpacity: 0.6, emissive: 0.35 },
-  super: { hair: 0xffd700, auraColor: 0xffb300, auraOpacity: 0.8, emissive: 0.6 },
+  aura: { hair: null, auraColor: 0x3ac0ff, auraOpacity: 0.28, emissive: 0.15 },
+  surge: { hair: 0xffe14d, auraColor: 0x8f5aff, auraOpacity: 0.34, emissive: 0.35 },
+  super: { hair: 0xffd700, auraColor: 0xffb300, auraOpacity: 0.4, emissive: 0.6 },
 };
 
 const HERO_X = -2.4;
@@ -322,8 +324,16 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       // needs. Resetting first means an interrupted action can never leave
       // a limb stuck mid-swing.
       const bobY = 0.26 + Math.sin(elapsed * 2.2) * 0.04;
-      hero.aura.rotation.y = elapsed * 1.5;
-      hero.aura.scale.setScalar(1 + Math.sin(elapsed * 6) * 0.05);
+      // The flame churns: shells counter-rotate so the sculpted lobes slide
+      // past each other, while the whole teardrop licks taller and thinner.
+      hero.auraOuter.rotation.y = elapsed * 1.1;
+      hero.auraInner.rotation.y = -elapsed * 1.9;
+      const lick = 1 + Math.sin(elapsed * 9) * 0.05 + Math.sin(elapsed * 23) * 0.025;
+      hero.aura.scale.set(
+        1 + Math.sin(elapsed * 6) * 0.04,
+        lick,
+        1 + Math.cos(elapsed * 6) * 0.04,
+      );
       hero.group.position.set(HERO_X, bobY, 0);
       hero.group.rotation.set(0, previewing ? 0.35 : Math.PI / 2, 0);
 
@@ -579,7 +589,10 @@ interface HeroRig {
   hairMaterials: THREE.MeshStandardMaterial[];
   bodyMaterial: THREE.MeshStandardMaterial;
   trimMaterial: THREE.MeshStandardMaterial;
-  aura: THREE.Mesh;
+  /** Two counter-rotating flame shells; both share auraMaterial. */
+  aura: THREE.Group;
+  auraOuter: THREE.Mesh;
+  auraInner: THREE.Mesh;
   auraMaterial: THREE.MeshBasicMaterial;
   /** Milestone cosmetic meshes keyed by their table id; hidden until unlocked. */
   cosmetics: Map<string, THREE.Object3D>;
@@ -751,14 +764,24 @@ function buildHero(appearance: HeroAppearance): HeroRig {
     }
   }
 
+  // Front faces only: with two nested shells, double-sided rendering would
+  // stack four color layers and wall the hero off inside the flame.
   const auraMaterial = new THREE.MeshBasicMaterial({
     color: 0x3ac0ff,
     transparent: true,
     opacity: 0,
-    side: THREE.DoubleSide,
   });
-  const aura = new THREE.Mesh(new THREE.ConeGeometry(0.95, 2.8, 16, 1, true), auraMaterial);
-  aura.position.y = 1.4;
+  // The aura is a teardrop of flame wrapped around the fighter: two shells
+  // of the same lobed profile — the smaller inner one doubles up the color
+  // into a bright core, and counter-rotation makes the fire churn.
+  const auraGeometry = buildAuraGeometry();
+  const auraOuter = new THREE.Mesh(auraGeometry, auraMaterial);
+  const auraInner = new THREE.Mesh(auraGeometry, auraMaterial);
+  auraInner.scale.set(0.62, 0.82, 0.62);
+  const aura = new THREE.Group();
+  aura.add(auraOuter);
+  aura.add(auraInner);
+  aura.position.y = 0.02;
   group.add(aura);
 
   const cosmetics = buildCosmetics();
@@ -774,9 +797,43 @@ function buildHero(appearance: HeroAppearance): HeroRig {
     bodyMaterial,
     trimMaterial,
     aura,
+    auraOuter,
+    auraInner,
     auraMaterial,
     cosmetics,
   };
+}
+
+/**
+ * The aura's flame: a teardrop profile that follows the hero's silhouette —
+ * rounded at the boots, widest at the torso, tapering to a point above the
+ * hair — with radial lobes sculpted in so the rim licks like fire when the
+ * shells rotate.
+ */
+function buildAuraGeometry(): THREE.BufferGeometry {
+  const profile = [
+    new THREE.Vector2(0.18, 0),
+    new THREE.Vector2(0.62, 0.12),
+    new THREE.Vector2(0.82, 0.55),
+    new THREE.Vector2(0.88, 1.0),
+    new THREE.Vector2(0.78, 1.55),
+    new THREE.Vector2(0.6, 2.1),
+    new THREE.Vector2(0.4, 2.6),
+    new THREE.Vector2(0.2, 3.0),
+    new THREE.Vector2(0.0, 3.35),
+  ];
+  const geometry = new THREE.LatheGeometry(profile, 22);
+  const position = geometry.getAttribute('position');
+  for (let i = 0; i < position.count; i++) {
+    const x = position.getX(i);
+    const y = position.getY(i);
+    const z = position.getZ(i);
+    const theta = Math.atan2(z, x);
+    const lobe = 1 + 0.13 * Math.sin(theta * 3 + y * 2.2);
+    position.setX(i, x * lobe);
+    position.setZ(i, z * lobe);
+  }
+  return geometry;
 }
 
 type HairMat = () => THREE.MeshStandardMaterial;
