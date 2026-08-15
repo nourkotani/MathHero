@@ -2,6 +2,7 @@ import { createElement, render } from 'preact';
 import '../ui/styles.css';
 import { initialState } from '../core';
 import type { GameEvent } from '../core';
+import { loadSaveFile, localStorageAdapter, persistenceSubscriber } from '../persistence';
 import { createRenderer } from '../renderer';
 import { App } from '../ui/App';
 import { manualClock, realClock } from './clock';
@@ -27,7 +28,9 @@ const seedParam = params.get('seed');
 const seed = seedParam !== null ? Number(seedParam) : Date.now() >>> 0;
 
 const clock = testMode ? manualClock() : realClock();
-const store = createStore(initialState({ seed }));
+const persistence = localStorageAdapter();
+const store = createStore(initialState({ seed, save: loadSaveFile(persistence) }));
+store.subscribe(persistenceSubscriber(persistence));
 
 // Renderer subscribes for effects; its frame loop runs below.
 const canvas = document.getElementById('scene') as HTMLCanvasElement;
@@ -42,6 +45,7 @@ store.subscribe((state) => {
 
 // Keyboard is a second way to drive the same events as the on-screen pad.
 window.addEventListener('keydown', (e) => {
+  if (e.target instanceof HTMLInputElement) return; // typing a name, not an answer
   if (e.key >= '0' && e.key <= '9') {
     store.dispatch({ type: 'DIGIT_PRESSED', digit: Number(e.key) });
   } else if (e.key === 'Backspace') {

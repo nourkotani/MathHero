@@ -1,8 +1,9 @@
 import { expect, test } from '@playwright/test';
-import { advanceClock, answerOnPad, openGame, readCorrectAnswer, startRound } from './helpers';
+import { advanceClock, answerOnPad, createHero, openGame, readCorrectAnswer, startRound } from './helpers';
 
 test('the timer is settable on the pre-round screen', async ({ page }) => {
   await openGame(page);
+  await createHero(page);
 
   await expect(page.getByTestId('timer-display')).toContainText('2:00');
   await page.getByTestId('timer-decrease').click();
@@ -14,6 +15,7 @@ test('the timer is settable on the pre-round screen', async ({ page }) => {
 for (const difficulty of ['easy', 'medium', 'hard'] as const) {
   test(`a Round can be started on ${difficulty}`, async ({ page }) => {
     await openGame(page);
+    await createHero(page);
     await page.getByTestId(`difficulty-${difficulty}`).click();
     await startRound(page);
     await expect(page.getByTestId('question')).toBeVisible();
@@ -23,6 +25,7 @@ for (const difficulty of ['easy', 'medium', 'hard'] as const) {
 
 test('a complete Round: countdown, urgency pulse, Results, play again', async ({ page }) => {
   await openGame(page, '?testClock=1&seed=777');
+  await createHero(page);
   await startRound(page);
 
   await expect(page.getByTestId('countdown')).toContainText('2:00');

@@ -1,37 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { initialState, update } from './index';
-import type { GameEvent, GameState, UpdateResult } from './index';
-
-function dispatchAll(state: GameState, events: GameEvent[]): UpdateResult {
-  let result: UpdateResult = { state, effects: [] };
-  for (const event of events) {
-    result = update(result.state, event);
-  }
-  return result;
-}
-
-function typeDigits(value: number): GameEvent[] {
-  return String(value)
-    .split('')
-    .map((d) => ({ type: 'DIGIT_PRESSED', digit: Number(d) }) as GameEvent);
-}
-
-/** A fresh state already inside a running Round. */
-function freshRound(seed: number): GameState {
-  return update(initialState({ seed }), { type: 'ROUND_STARTED' }).state;
-}
-
-function answerCorrectly(state: GameState): UpdateResult {
-  const answer = state.question.a * state.question.b;
-  return dispatchAll(state, [...typeDigits(answer), { type: 'ANSWER_SUBMITTED' }]);
-}
+import type { GameEvent, UpdateResult } from './index';
+import { answerCorrectly, answerWrongly, dispatchAll, freshRound, typeDigits } from './test-helpers';
 
 describe('initialState', () => {
-  it('starts on the pre-round screen at score zero', () => {
+  it('starts on the Title screen at score zero', () => {
     const state = initialState({ seed: 1 });
-    expect(state.phase).toBe('pre-round');
+    expect(state.phase).toBe('title');
     expect(state.score).toBe(0);
     expect(state.answerBuffer).toBe('');
+    expect(state.players).toEqual([]);
   });
 
   it('asks questions with operands from 1–12', () => {
@@ -55,7 +33,7 @@ describe('answer entry', () => {
     const typed = dispatchAll(state, [
       { type: 'DIGIT_PRESSED', digit: 4 },
       { type: 'DIGIT_PRESSED', digit: 2 },
-    ]).state;
+    ]);
     expect(typed.answerBuffer).toBe('42');
 
     const erased = update(typed, { type: 'BACKSPACE_PRESSED' }).state;
@@ -63,11 +41,10 @@ describe('answer entry', () => {
   });
 
   it('ignores digits beyond three characters', () => {
-    const state = freshRound(1);
     const typed = dispatchAll(
-      state,
+      freshRound(1),
       [1, 4, 4, 9].map((digit) => ({ type: 'DIGIT_PRESSED', digit }) as GameEvent),
-    ).state;
+    );
     expect(typed.answerBuffer).toBe('144');
   });
 
@@ -86,14 +63,14 @@ describe('answer entry', () => {
   });
 
   it('answer events are ignored outside a Round', () => {
-    const preRound = initialState({ seed: 1 });
+    const title = initialState({ seed: 1 });
     for (const event of [
       { type: 'DIGIT_PRESSED', digit: 5 },
       { type: 'BACKSPACE_PRESSED' },
       { type: 'ANSWER_SUBMITTED' },
     ] as GameEvent[]) {
-      const result = update(preRound, event);
-      expect(result.state).toEqual(preRound);
+      const result = update(title, event);
+      expect(result.state).toEqual(title);
       expect(result.effects).toEqual([]);
     }
   });
@@ -108,14 +85,13 @@ describe('answer judging and scoring', () => {
     expect(result.state.score).toBe(10); // Easy base points
     expect(result.state.answerBuffer).toBe('');
     expect(result.effects[0]).toEqual({ type: 'ANSWER_CORRECT', question, points: 10 });
-    expect(result.effects[1]).toMatchObject({ type: 'QUESTION_ASKED' });
+    expect(result.effects.at(-1)).toMatchObject({ type: 'QUESTION_ASKED' });
   });
 
   it('a wrong answer scores nothing and reports the correct equation', () => {
     const state = freshRound(7);
     const question = state.question;
-    const wrongAnswer = question.a * question.b + 1;
-    const result = dispatchAll(state, [...typeDigits(wrongAnswer), { type: 'ANSWER_SUBMITTED' }]);
+    const result = answerWrongly(state);
 
     expect(result.state.score).toBe(0);
     expect(result.effects[0]).toEqual({
@@ -144,5 +120,16 @@ describe('answer judging and scoring', () => {
       return result.state;
     };
     expect(play()).toEqual(play());
+  });
+
+  it('typing digits still works after clearing with backspace mid-answer', () => {
+    const state = freshRound(2);
+    const answer = state.question.a * state.question.b;
+    const result = dispatchAll(state, [
+      { type: 'DIGIT_PRESSED', digit: 9 },
+      { type: 'BACKSPACE_PRESSED' },
+      ...typeDigits(answer),
+    ]);
+    expect(result.answerBuffer).toBe(String(answer));
   });
 });

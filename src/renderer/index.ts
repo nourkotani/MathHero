@@ -2,6 +2,7 @@
 // plus frame(dt) from the shell's animation loop. Scene internals are private.
 
 import * as THREE from 'three';
+import { HAIR_PRESETS, OUTFIT_PRESETS, presetHex } from '../core';
 import type { GameEffect, GameState, StreakForm } from '../core';
 
 export interface Renderer {
@@ -10,13 +11,14 @@ export interface Renderer {
 }
 
 // First-pass visual treatment per streak form; the polish ticket re-skins
-// these mappings without the core knowing.
+// these mappings without the core knowing. hair: null keeps the Player's own
+// hair color; surge/super override it with charged energy colors.
 const FORM_LOOKS: Record<
   StreakForm,
-  { hair: number; auraColor: number; auraOpacity: number; emissive: number }
+  { hair: number | null; auraColor: number; auraOpacity: number; emissive: number }
 > = {
-  base: { hair: 0x2b2b2b, auraColor: 0x000000, auraOpacity: 0, emissive: 0 },
-  aura: { hair: 0x2b2b2b, auraColor: 0x3ac0ff, auraOpacity: 0.45, emissive: 0.15 },
+  base: { hair: null, auraColor: 0x000000, auraOpacity: 0, emissive: 0 },
+  aura: { hair: null, auraColor: 0x3ac0ff, auraOpacity: 0.45, emissive: 0.15 },
   surge: { hair: 0xffe14d, auraColor: 0x8f5aff, auraOpacity: 0.6, emissive: 0.35 },
   super: { hair: 0xffd700, auraColor: 0xffb300, auraOpacity: 0.8, emissive: 0.6 },
 };
@@ -66,11 +68,15 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
   let elapsed = 0;
   let punchTimer = 0; // seconds remaining in the hero's strike animation
   let dummyKick = 0; // seconds remaining in the dummy's recoil
+  let currentForm: StreakForm = 'base';
+  let playerHair = 0x2b2b2b;
 
   function applyForm(form: StreakForm) {
+    currentForm = form;
     const look = FORM_LOOKS[form];
-    hero.hairMaterial.color.setHex(look.hair);
-    hero.hairMaterial.emissive.setHex(look.hair);
+    const hairHex = look.hair ?? playerHair;
+    hero.hairMaterial.color.setHex(hairHex);
+    hero.hairMaterial.emissive.setHex(hairHex);
     hero.hairMaterial.emissiveIntensity = look.emissive;
     hero.bodyMaterial.emissive.setHex(look.auraColor);
     hero.bodyMaterial.emissiveIntensity = look.emissive;
@@ -79,6 +85,15 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
   }
   applyForm('base');
 
+  function applyPlayerColors(state: GameState) {
+    const player = state.players.find((p) => p.id === state.activePlayerId);
+    if (!player) return;
+    playerHair = presetHex(HAIR_PRESETS, player.colors.hair);
+    hero.bodyMaterial.color.setHex(presetHex(OUTFIT_PRESETS, player.colors.outfitPrimary));
+    hero.trimMaterial.color.setHex(presetHex(OUTFIT_PRESETS, player.colors.outfitSecondary));
+    applyForm(currentForm);
+  }
+
   window.addEventListener('resize', () => {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
@@ -86,7 +101,8 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
   });
 
   return {
-    onStoreUpdate(_state, effects) {
+    onStoreUpdate(state, effects) {
+      applyPlayerColors(state);
       for (const effect of effects) {
         switch (effect.type) {
           case 'ANSWER_CORRECT':
@@ -160,6 +176,7 @@ interface HeroRig {
   group: THREE.Group;
   hairMaterial: THREE.MeshStandardMaterial;
   bodyMaterial: THREE.MeshStandardMaterial;
+  trimMaterial: THREE.MeshStandardMaterial;
   aura: THREE.Mesh;
   auraMaterial: THREE.MeshBasicMaterial;
 }
@@ -170,6 +187,11 @@ function buildPlaceholderHero(): HeroRig {
   const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.45, 1.0, 6, 12), bodyMaterial);
   body.position.y = 1.0;
   group.add(body);
+
+  const trimMaterial = new THREE.MeshStandardMaterial({ color: 0xff9f1c });
+  const belt = new THREE.Mesh(new THREE.CylinderGeometry(0.48, 0.48, 0.18, 16), trimMaterial);
+  belt.position.y = 0.85;
+  group.add(belt);
 
   const head = new THREE.Mesh(
     new THREE.SphereGeometry(0.35, 20, 16),
@@ -193,7 +215,7 @@ function buildPlaceholderHero(): HeroRig {
   aura.position.y = 1.4;
   group.add(aura);
 
-  return { group, hairMaterial, bodyMaterial, aura, auraMaterial };
+  return { group, hairMaterial, bodyMaterial, trimMaterial, aura, auraMaterial };
 }
 
 function buildTrainingDummy(): THREE.Group {

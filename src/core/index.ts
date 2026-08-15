@@ -6,6 +6,15 @@ export { DIFFICULTY_TIERS, tierFor } from './difficulty';
 export type { Difficulty, DifficultyTier } from './difficulty';
 export { STREAK_TIERS, tierForStreak } from './streak';
 export type { StreakForm, StreakTier } from './streak';
+export { HAIR_PRESETS, MAX_NAME_LENGTH, OUTFIT_PRESETS, presetHex } from './players';
+export type { ColorPreset, PlayerColors, PlayerRecord } from './players';
+export {
+  buildSaveFile,
+  parseSaveFile,
+  SAVE_FILE_VERSION,
+  serializeSaveFile,
+} from './savefile';
+export type { SaveFile } from './savefile';
 export {
   DEFAULT_TIMER_SECONDS,
   isFinalTenSeconds,

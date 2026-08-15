@@ -8,9 +8,20 @@ export function PreRoundScreen({ state, dispatch }: AppProps) {
   const change = (delta: number) =>
     dispatch({ type: 'TIMER_CHANGED', seconds: state.timerSeconds + delta });
 
+  const activePlayer = state.players.find((p) => p.id === state.activePlayerId);
+
   return (
     <div class="hud screen-center">
-      <h1 class="screen-title">Ready to train?</h1>
+      <button
+        class="corner-button"
+        data-testid="back-to-title"
+        onClick={() => dispatch({ type: 'TITLE_OPENED' })}
+      >
+        ← Heroes
+      </button>
+      <h1 class="screen-title" data-testid="active-player">
+        Ready, {activePlayer?.name ?? 'hero'}?
+      </h1>
       <div class="difficulty-picker">
         {DIFFICULTY_TIERS.map((tier) => (
           <button

@@ -1,17 +1,23 @@
 import type { GameEvent, GameState } from '../core';
+import { HeroCreationScreen } from './HeroCreationScreen';
 import { PreRoundScreen } from './PreRoundScreen';
 import { ResultsScreen } from './ResultsScreen';
 import { RoundScreen } from './RoundScreen';
+import { TitleScreen } from './TitleScreen';
 
 export interface AppProps {
   state: GameState;
   dispatch: (event: GameEvent) => void;
 }
 
-// Screens key off the core's phase field; future screens (Title, Hero
-// creation) are new phase values, not new wiring.
+// Screens key off the core's phase field; a future screen is a new phase
+// value, not new wiring.
 export function App({ state, dispatch }: AppProps) {
   switch (state.phase) {
+    case 'title':
+      return <TitleScreen state={state} dispatch={dispatch} />;
+    case 'hero-creation':
+      return <HeroCreationScreen state={state} dispatch={dispatch} />;
     case 'pre-round':
       return <PreRoundScreen state={state} dispatch={dispatch} />;
     case 'in-round':

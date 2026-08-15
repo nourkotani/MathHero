@@ -1,3 +1,4 @@
+import { MAX_NAME_LENGTH, validColors } from './players';
 import { seedPrng } from './prng';
 import { pointsForCorrect } from './scoring';
 import { selectQuestion } from './selection';
@@ -19,7 +20,10 @@ export function initialState(config: GameConfig): GameState {
   const selected = selectQuestion('easy', seedPrng(config.seed));
   return {
     prng: selected.prng,
-    phase: 'pre-round',
+    phase: 'title',
+    players: config.save?.players ?? [],
+    activePlayerId: null,
+    nextPlayerId: config.save?.nextPlayerId ?? 1,
     difficulty: 'easy',
     timerSeconds: DEFAULT_TIMER_SECONDS,
     now: 0,
@@ -42,10 +46,22 @@ export function update(state: GameState, event: GameEvent): UpdateResult {
       const ticked = { ...state, now: event.now };
       if (state.phase === 'in-round' && remainingMs(ticked) <= 0) {
         // The Round ends instantly: the in-progress question is voided and
-        // scores nothing — the typed buffer is simply discarded.
+        // scores nothing — the typed buffer is simply discarded. The outcome
+        // is attributed to the active Player.
         return {
-          state: { ...ticked, phase: 'results', answerBuffer: '', feedback: null },
-          effects: [{ type: 'ROUND_ENDED', finalScore: ticked.score }],
+          state: {
+            ...ticked,
+            phase: 'results',
+            answerBuffer: '',
+            feedback: null,
+            players: ticked.players.map((p) =>
+              p.id === ticked.activePlayerId ? { ...p, roundsPlayed: p.roundsPlayed + 1 } : p,
+            ),
+          },
+          effects: [
+            { type: 'ROUND_ENDED', finalScore: ticked.score },
+            { type: 'SAVE_FILE_CHANGED' },
+          ],
         };
       }
       if (
@@ -63,6 +79,72 @@ export function update(state: GameState, event: GameEvent): UpdateResult {
       return { state: ticked, effects: [] };
     }
 
+    case 'HERO_CREATION_OPENED': {
+      if (state.phase !== 'title') return noop(state);
+      return { state: { ...state, phase: 'hero-creation' }, effects: [] };
+    }
+
+    case 'CREATION_CANCELLED': {
+      if (state.phase !== 'hero-creation') return noop(state);
+      return { state: { ...state, phase: 'title' }, effects: [] };
+    }
+
+    case 'PLAYER_CREATED': {
+      if (state.phase !== 'hero-creation') return noop(state);
+      const name = event.name.trim().slice(0, MAX_NAME_LENGTH);
+      if (name === '' || !validColors(event.colors)) return noop(state);
+      const id = `p${state.nextPlayerId}`;
+      const player = { id, name, colors: event.colors, roundsPlayed: 0 };
+      return {
+        state: {
+          ...state,
+          players: [...state.players, player],
+          nextPlayerId: state.nextPlayerId + 1,
+          activePlayerId: id,
+          phase: 'pre-round',
+        },
+        effects: [{ type: 'SAVE_FILE_CHANGED' }],
+      };
+    }
+
+    case 'PLAYER_SELECTED': {
+      if (state.phase !== 'title') return noop(state);
+      if (!state.players.some((p) => p.id === event.id)) return noop(state);
+      return { state: { ...state, activePlayerId: event.id, phase: 'pre-round' }, effects: [] };
+    }
+
+    case 'PLAYER_RENAMED': {
+      const name = event.name.trim().slice(0, MAX_NAME_LENGTH);
+      if (name === '' || !state.players.some((p) => p.id === event.id)) return noop(state);
+      return {
+        state: {
+          ...state,
+          players: state.players.map((p) => (p.id === event.id ? { ...p, name } : p)),
+        },
+        effects: [{ type: 'SAVE_FILE_CHANGED' }],
+      };
+    }
+
+    case 'PLAYER_DELETED': {
+      if (!state.players.some((p) => p.id === event.id)) return noop(state);
+      const players = state.players.filter((p) => p.id !== event.id);
+      const wasActive = state.activePlayerId === event.id;
+      return {
+        state: {
+          ...state,
+          players,
+          activePlayerId: wasActive ? null : state.activePlayerId,
+          phase: wasActive ? 'title' : state.phase,
+        },
+        effects: [{ type: 'SAVE_FILE_CHANGED' }],
+      };
+    }
+
+    case 'TITLE_OPENED': {
+      if (state.phase !== 'pre-round' && state.phase !== 'results') return noop(state);
+      return { state: { ...state, phase: 'title' }, effects: [] };
+    }
+
     case 'TIMER_CHANGED': {
       if (state.phase !== 'pre-round') return noop(state);
       const seconds = Math.min(MAX_TIMER_SECONDS, Math.max(MIN_TIMER_SECONDS, event.seconds));
@@ -75,7 +157,7 @@ export function update(state: GameState, event: GameEvent): UpdateResult {
     }
 
     case 'ROUND_STARTED': {
-      if (state.phase !== 'pre-round') return noop(state);
+      if (state.phase !== 'pre-round' || state.activePlayerId === null) return noop(state);
       const selected = selectQuestion(state.difficulty, state.prng);
       return {
         state: {

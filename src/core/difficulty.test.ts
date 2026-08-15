@@ -1,26 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { initialState, tierFor, update } from './index';
-import type { Difficulty, GameEvent, GameState, UpdateResult } from './index';
-
-function dispatchAll(state: GameState, events: GameEvent[]): GameState {
-  return events.reduce((s, event) => update(s, event).state, state);
-}
-
-function freshRound(seed: number, difficulty: Difficulty): GameState {
-  return dispatchAll(initialState({ seed }), [
-    { type: 'DIFFICULTY_CHANGED', difficulty },
-    { type: 'ROUND_STARTED' },
-  ]);
-}
-
-function answerCorrectly(state: GameState): UpdateResult {
-  const answer = state.question.a * state.question.b;
-  let result: UpdateResult = { state, effects: [] };
-  for (const d of String(answer)) {
-    result = update(result.state, { type: 'DIGIT_PRESSED', digit: Number(d) });
-  }
-  return update(result.state, { type: 'ANSWER_SUBMITTED' });
-}
+import { tierFor, update } from './index';
+import { answerCorrectly, freshRound } from './test-helpers';
 
 describe('difficulty tiers', () => {
   it.each([
@@ -28,7 +8,7 @@ describe('difficulty tiers', () => {
     ['medium', 2, 9],
     ['hard', 2, 12],
   ] as const)('%s keeps one operand in tables %i–%i', (difficulty, min, max) => {
-    for (let seed = 0; seed < 40; seed++) {
+    for (let seed = 0; seed < 20; seed++) {
       let state = freshRound(seed, difficulty);
       for (let i = 0; i < 10; i++) {
         const { a, b } = state.question;

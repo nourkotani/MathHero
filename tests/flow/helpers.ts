@@ -15,6 +15,13 @@ export async function openGame(page: Page, query = ''): Promise<void> {
   await page.goto(pathToFileURL(BUILT_FILE).href + query);
 }
 
+/** Create a hero from the Title screen, landing on pre-round. */
+export async function createHero(page: Page, name = 'Testo'): Promise<void> {
+  await page.getByTestId('new-hero').click();
+  await page.getByTestId('hero-name').fill(name);
+  await page.getByTestId('create-hero').click();
+}
+
 /** Press GO! on the pre-round screen. */
 export async function startRound(page: Page): Promise<void> {
   await page.getByTestId('start-round').click();

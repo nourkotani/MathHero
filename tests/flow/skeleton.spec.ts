@@ -1,8 +1,16 @@
 import { expect, test } from '@playwright/test';
-import { answerOnPad, openGame, readCorrectAnswer, startRound } from './helpers';
+import {
+  advanceClock,
+  answerOnPad,
+  createHero,
+  openGame,
+  readCorrectAnswer,
+  startRound,
+} from './helpers';
 
 test('correct answer via the on-screen pad increases the score', async ({ page }) => {
   await openGame(page);
+  await createHero(page);
   await startRound(page);
 
   await expect(page.getByTestId('score')).toContainText('0');
@@ -16,6 +24,7 @@ test('correct answer via the on-screen pad increases the score', async ({ page }
 
 test('keyboard entry with backspace works and submits on Enter', async ({ page }) => {
   await openGame(page);
+  await createHero(page);
   await startRound(page);
 
   // Type a stray digit, erase it, then type the real answer.
@@ -34,16 +43,19 @@ test('keyboard entry with backspace works and submits on Enter', async ({ page }
 });
 
 test('a wrong answer scores nothing and moves on after the teaching moment', async ({ page }) => {
-  await openGame(page, '?seed=12345');
+  await openGame(page, '?testClock=1&seed=12345');
+  await createHero(page);
   await startRound(page);
 
   const answer = await readCorrectAnswer(page);
   await answerOnPad(page, answer + 1);
 
   await expect(page.getByTestId('score')).toContainText('0');
-  // The correct equation is shown briefly, then a fresh question appears.
+  // The correct equation is shown until the teaching moment expires,
+  // then a fresh question appears.
   await expect(page.getByTestId('feedback')).toContainText(`= ${answer}`);
-  await expect(page.getByTestId('question')).toBeVisible({ timeout: 10_000 });
+  await advanceClock(page, 2500);
+  await expect(page.getByTestId('question')).toBeVisible();
   await expect(page.getByTestId('answer')).toHaveText('?');
 });
 
@@ -64,6 +76,7 @@ test('the game makes no network requests', async ({ page }) => {
     if (!request.url().startsWith('file://')) remote.push(request.url());
   });
   await openGame(page);
+  await createHero(page);
   await startRound(page);
   const answer = await readCorrectAnswer(page);
   await answerOnPad(page, answer);

@@ -1,8 +1,9 @@
 import { expect, test } from '@playwright/test';
-import { advanceClock, answerOnPad, openGame, readCorrectAnswer, startRound } from './helpers';
+import { advanceClock, answerOnPad, createHero, openGame, readCorrectAnswer, startRound } from './helpers';
 
 test('the streak multiplier appears and a wrong answer teaches the equation', async ({ page }) => {
   await openGame(page, '?testClock=1&seed=4242');
+  await createHero(page);
   await startRound(page);
 
   // Three straight correct answers ignite the ×2 aura.

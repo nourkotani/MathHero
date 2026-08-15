@@ -2,6 +2,8 @@
 // they never add a second entry point (ADR 0003, docs/ARCHITECTURE.md).
 
 import type { Difficulty } from './difficulty';
+import type { PlayerColors, PlayerRecord } from './players';
+import type { SaveFile } from './savefile';
 import type { StreakForm } from './streak';
 
 /** A multiplication question in the operand order it is displayed. */
@@ -10,17 +12,24 @@ export interface Question {
   b: number;
 }
 
-export type Phase = 'pre-round' | 'in-round' | 'results';
+export type Phase = 'title' | 'hero-creation' | 'pre-round' | 'in-round' | 'results';
 
 export interface GameConfig {
   /** Seed for the injected PRNG — the core never calls Math.random. */
   seed: number;
+  /** A previously persisted Save File, already parsed and migrated. */
+  save?: SaveFile | null;
 }
 
 export interface GameState {
   /** Injected PRNG state; advanced immutably by every random draw. */
   prng: number;
   phase: Phase;
+  /** The family's heroes — the persisted heart of the Save File. */
+  players: PlayerRecord[];
+  activePlayerId: string | null;
+  /** Monotonic counter minting stable player ids. */
+  nextPlayerId: number;
   difficulty: Difficulty;
   /** Round length setting in seconds; clamped to 30–600, default 120. */
   timerSeconds: number;
@@ -40,6 +49,13 @@ export interface GameState {
 
 export type GameEvent =
   | { type: 'TICK'; now: number }
+  | { type: 'HERO_CREATION_OPENED' }
+  | { type: 'CREATION_CANCELLED' }
+  | { type: 'PLAYER_CREATED'; name: string; colors: PlayerColors }
+  | { type: 'PLAYER_SELECTED'; id: string }
+  | { type: 'PLAYER_RENAMED'; id: string; name: string }
+  | { type: 'PLAYER_DELETED'; id: string }
+  | { type: 'TITLE_OPENED' }
   | { type: 'TIMER_CHANGED'; seconds: number }
   | { type: 'DIFFICULTY_CHANGED'; difficulty: Difficulty }
   | { type: 'ROUND_STARTED' }
@@ -55,7 +71,9 @@ export type GameEffect =
   | { type: 'TRANSFORMED'; form: StreakForm; multiplier: number; streak: number }
   | { type: 'STREAK_BROKEN' }
   | { type: 'BLAST_FIRED' }
-  | { type: 'ROUND_ENDED'; finalScore: number };
+  | { type: 'ROUND_ENDED'; finalScore: number }
+  /** The persisted slice changed — the persistence subscriber must save. */
+  | { type: 'SAVE_FILE_CHANGED' };
 
 export interface UpdateResult {
   state: GameState;

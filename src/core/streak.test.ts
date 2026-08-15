@@ -1,35 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { FEEDBACK_MS, initialState, tierForStreak, update } from './index';
-import type { GameEvent, GameState, UpdateResult } from './index';
-
-function dispatchAll(state: GameState, events: GameEvent[]): GameState {
-  return events.reduce((s, event) => update(s, event).state, state);
-}
-
-function freshRound(seed: number): GameState {
-  return dispatchAll(initialState({ seed }), [
-    { type: 'TICK', now: 0 },
-    { type: 'ROUND_STARTED' },
-  ]);
-}
-
-function answerCorrectly(state: GameState): UpdateResult {
-  const answer = state.question.a * state.question.b;
-  let s = state;
-  for (const d of String(answer)) {
-    s = update(s, { type: 'DIGIT_PRESSED', digit: Number(d) }).state;
-  }
-  return update(s, { type: 'ANSWER_SUBMITTED' });
-}
-
-function answerWrongly(state: GameState): UpdateResult {
-  const wrong = state.question.a * state.question.b + 1;
-  let s = state;
-  for (const d of String(wrong)) {
-    s = update(s, { type: 'DIGIT_PRESSED', digit: Number(d) }).state;
-  }
-  return update(s, { type: 'ANSWER_SUBMITTED' });
-}
+import { FEEDBACK_MS, tierForStreak, update } from './index';
+import { answerCorrectly, answerWrongly, dispatchAll, freshRound } from './test-helpers';
 
 describe('the streak tier table', () => {
   it('maps streaks to multipliers at thresholds 0/3/6/10', () => {
