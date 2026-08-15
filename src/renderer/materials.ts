@@ -81,6 +81,11 @@ export function starSurface(color: number, size: number, opacity: number): THREE
   return new THREE.PointsMaterial({ color, size, transparent: true, opacity, fog: false });
 }
 
+/** The shared ink for outline hulls: unlit, back faces only. */
+export function inkSurface(color: number): THREE.MeshBasicMaterial {
+  return new THREE.MeshBasicMaterial({ color, side: THREE.BackSide });
+}
+
 /**
  * The layer the bloom pass reads. Marking is opt-in per mesh at its creation
  * site: auras, blasts, particles, cosmetic energy, the arena rim — the things

@@ -12,7 +12,7 @@ Three routes were considered:
 
 1. **Keep sprites** — zero risk, but the Super-mode aura never truly radiates.
 2. **three.js's own `UnrealBloomPass`** — no new dependency, but it is the notoriously heavy implementation; worst fit for the tablet.
-3. **The pmndrs `postprocessing` library** — a new dependency (+~76KB on a ~600KB bundle, pinned exact like every dependency), with a meaningfully faster, better-looking bloom built for exactly this situation.
+3. **The pmndrs `postprocessing` library** — a new dependency (+~76KB on a ~600KB bundle, pinned to an exact version like three itself), with a meaningfully faster, better-looking bloom built for exactly this situation.
 
 A second fork inside the bloom choice: *threshold* bloom cannot work here. The game deliberately runs `NoToneMapping` with bright cel bands, so any luminance threshold that catches the neon glows also catches white gi trim and pale arena stone — the whole frame hazes. *Selective* bloom sidesteps luminance entirely.
 

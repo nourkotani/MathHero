@@ -16,7 +16,6 @@ export interface Clip {
 export interface Channel {
   /** Start a clip, replacing whatever was playing. Optional label for queries. */
   play(clip: Clip, label?: string): void;
-  stop(): void;
   playing(): boolean;
   /** The label of the active clip, or null. */
   label(): string | null;
@@ -33,10 +32,6 @@ export function createChannel(): Channel {
       clip = next;
       clipLabel = label ?? null;
       time = 0;
-    },
-    stop() {
-      clip = null;
-      clipLabel = null;
     },
     playing: () => clip !== null,
     label: () => clipLabel,

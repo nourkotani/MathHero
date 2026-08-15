@@ -84,7 +84,8 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       dummy.launch();
       rig.addShake(0.4);
     } else {
-      dummy.hit();
+      // Small blasts only exist while transformed — always a strong hit.
+      dummy.hit(true);
     }
   });
 
@@ -104,6 +105,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
   let elapsed = 0;
   let urgent = false; // final ten seconds of the Round
   let previewing = false; // hero creation: face the camera, not the dummy
+  let inRound = false; // fps sampling only counts real play
 
   function applyLook(state: GameState) {
     // During hero creation the draft is previewed live on the 3D character.
@@ -140,6 +142,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       applyLook(state);
       urgent = isFinalTenSeconds(state);
       previewing = state.phase === 'hero-creation';
+      inRound = state.phase === 'in-round';
       reactions.handleEffects(effects);
     },
     frame(dtMs) {
@@ -156,13 +159,20 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       }
       elapsed += dt;
 
-      // Once a second, feed the averaged frame rate to the tier rule.
-      sampleFrames += 1;
-      sampleSeconds += rawDt;
-      if (sampleSeconds >= 1) {
-        const next = nextTier(tierState, sampleFrames / sampleSeconds);
-        if (next.tier !== tierState.tier) pipeline.setTier(next.tier);
-        tierState = next;
+      // Once a second of real play, feed the averaged frame rate to the
+      // tier rule. Menus and background tabs don't count: a throttled
+      // hidden tab must never degrade the session's look.
+      if (inRound && !document.hidden) {
+        sampleFrames += 1;
+        sampleSeconds += rawDt;
+        if (sampleSeconds >= 1) {
+          const next = nextTier(tierState, sampleFrames / sampleSeconds);
+          if (next.tier !== tierState.tier) pipeline.setTier(next.tier);
+          tierState = next;
+          sampleFrames = 0;
+          sampleSeconds = 0;
+        }
+      } else {
         sampleFrames = 0;
         sampleSeconds = 0;
       }

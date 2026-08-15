@@ -9,18 +9,32 @@ import { characterSurface, glowSurface, markBloom } from './materials';
 import type { Surface } from './materials';
 import { applyCelTreatment } from './cel';
 
-// Visual treatment per streak form, keyed by the core's form names.
+// Visual treatment per streak form, keyed by the core's form names — the ONE
+// place a form's look lives; no site may special-case a form by name.
 // hair: null keeps the Player's own hair color.
 export const FORM_LOOKS: Record<
   StreakForm,
-  { hair: number | null; auraColor: number; auraOpacity: number; emissive: number }
+  {
+    hair: number | null;
+    auraColor: number;
+    auraOpacity: number;
+    emissive: number;
+    /** What the gi radiates (base heroes carry only their level glow, in white). */
+    bodyEmissive: number;
+    /** Charge crackle and impact sparks. */
+    hitColor: number;
+    /** The rising aura motes. */
+    sparkColor: number;
+    /** Do this form's hits freeze the frame for a beat? */
+    hitstop: boolean;
+  }
 > = {
   // Opacities are per shell; the aura's two nested shells overlap, so the
   // perceived density is roughly double what's written here.
-  base: { hair: null, auraColor: 0x000000, auraOpacity: 0, emissive: 0 },
-  aura: { hair: null, auraColor: 0x3ac0ff, auraOpacity: 0.28, emissive: 0.15 },
-  surge: { hair: 0xffe14d, auraColor: 0x8f5aff, auraOpacity: 0.34, emissive: 0.35 },
-  super: { hair: 0xffd700, auraColor: 0xffb300, auraOpacity: 0.4, emissive: 0.6 },
+  base: { hair: null, auraColor: 0x000000, auraOpacity: 0, emissive: 0, bodyEmissive: 0xffffff, hitColor: 0xffffff, sparkColor: 0xffe9a3, hitstop: false },
+  aura: { hair: null, auraColor: 0x3ac0ff, auraOpacity: 0.28, emissive: 0.15, bodyEmissive: 0x3ac0ff, hitColor: 0x3ac0ff, sparkColor: 0x3ac0ff, hitstop: false },
+  surge: { hair: 0xffe14d, auraColor: 0x8f5aff, auraOpacity: 0.34, emissive: 0.35, bodyEmissive: 0x8f5aff, hitColor: 0x8f5aff, sparkColor: 0x8f5aff, hitstop: true },
+  super: { hair: 0xffd700, auraColor: 0xffb300, auraOpacity: 0.4, emissive: 0.6, bodyEmissive: 0xffb300, hitColor: 0xffb300, sparkColor: 0xffb300, hitstop: true },
 };
 
 /** Joint pivots the frame loop poses every frame. Limb meshes hang inside. */
@@ -66,7 +80,7 @@ export function applyFormToRig(
     spike.emissive.setHex(hairHex);
     spike.emissiveIntensity = Math.max(look.emissive, playerGlow * 0.5);
   }
-  rig.bodyMaterial.emissive.setHex(look.auraColor === 0 ? 0xffffff : look.auraColor);
+  rig.bodyMaterial.emissive.setHex(look.bodyEmissive);
   rig.bodyMaterial.emissiveIntensity = Math.max(look.emissive, playerGlow * 0.25);
   rig.auraMaterial.color.setHex(look.auraColor);
   rig.auraMaterial.opacity = Math.max(look.auraOpacity, playerGlow * 0.2);
@@ -326,6 +340,9 @@ function buildHair(head: THREE.Group, style: HairStyle, long: boolean, hairMat: 
     height = 0.55,
   ) => {
     const cone = new THREE.Mesh(new THREE.ConeGeometry(radius, height, 6), hairMat());
+    // Glowing hair is a Power Streak reward: dark at rest (under the bloom
+    // pass's luminance floor), radiant gold in surge and Super mode.
+    markBloom(cone);
     cone.position.set(x, y, z);
     cone.rotation.x = tiltX;
     cone.rotation.z = tiltZ;
@@ -333,6 +350,7 @@ function buildHair(head: THREE.Group, style: HairStyle, long: boolean, hairMat: 
   };
   const cap = (radiusScale: number, flatten: number, y: number) => {
     const mesh = new THREE.Mesh(new THREE.SphereGeometry(0.37 * radiusScale, 16, 12), hairMat());
+    markBloom(mesh);
     mesh.scale.set(1, flatten, 1);
     mesh.position.y = y;
     head.add(mesh);

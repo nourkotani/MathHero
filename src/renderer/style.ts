@@ -45,8 +45,12 @@ export const STYLE = {
     luminanceThreshold: 0.1,
   },
 
-  /** Motion feel: hitstop, camera punch, blast smear. */
+  /** Motion feel: action timings, hitstop, camera punch, blast smear. */
   juice: {
+    /** A strike: coiled anticipation, then the wind-up/release curve. */
+    attack: { duration: 0.55, anticipation: 0.12 },
+    /** The wrong-answer stumble. */
+    stagger: { duration: 0.6 },
     /** Render freeze on high-streak hits: duration and how frozen it is. */
     hitstop: { duration: 0.07, timeScale: 0.02 },
     /** Camera punch-in on Super-mode blasts. */

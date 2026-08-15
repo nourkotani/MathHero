@@ -5,19 +5,17 @@
 
 import * as THREE from 'three';
 import type { GameEffect, StreakForm } from '../core';
-import {
-  ANTICIPATION_DURATION,
-  ATTACK_DURATION,
-  DUMMY_X,
-  HERO_X,
-  STAGGER_DURATION,
-} from './constants';
+import { DUMMY_X, HERO_X } from './constants';
+import { STYLE } from './style';
 import { applyFormToRig, FORM_LOOKS } from './hero';
 import type { HeroRig } from './hero';
 import type { Dummy } from './dummy';
 import type { Fx } from './fx';
 import { createChannel } from './timeline';
 import type { Clip } from './timeline';
+
+/** The idle breathing bob — the attack clips build on the same baseline. */
+const heroBob = (elapsed: number) => 0.26 + Math.sin(elapsed * 2.2) * 0.04;
 
 /** The juice hooks reactions may pull: shake, render freeze, camera punch. */
 export interface Juice {
@@ -67,17 +65,18 @@ export function createReactions(opts: {
    */
   function attackClip(kind: number): Clip {
     let hitPending = true;
-    const total = ANTICIPATION_DURATION + ATTACK_DURATION;
+    const { duration, anticipation } = STYLE.juice.attack;
+    const total = anticipation + duration;
     return {
       duration: total,
       apply(tc, elapsed) {
         const hero = getHero();
         const j = hero.joints;
-        const bobY = 0.26 + Math.sin(elapsed * 2.2) * 0.04;
+        const bobY = heroBob(elapsed);
         const tAbs = tc * total;
-        if (tAbs < ANTICIPATION_DURATION) {
+        if (tAbs < anticipation) {
           // Anticipation: a coiled crouch, fists drawn, before the release.
-          const c = tAbs / ANTICIPATION_DURATION;
+          const c = tAbs / anticipation;
           hero.group.position.y = bobY - c * 0.16;
           j.torso.rotation.x = 0.06 + c * 0.3;
           j.legL.rotation.x = -0.22 - c * 0.5;
@@ -88,17 +87,18 @@ export function createReactions(opts: {
           j.armR.rotation.x = -0.55 - c * 0.4;
           return;
         }
-        const t = (tAbs - ANTICIPATION_DURATION) / ATTACK_DURATION;
+        const t = (tAbs - anticipation) / duration;
         const w = t < 0.3 ? t / 0.3 : Math.max(0, 1 - (t - 0.3) / 0.2);
         const s = t < 0.3 ? 0 : Math.sin(((t - 0.3) / 0.7) * Math.PI);
         // The exact moment the strike lands: impact sparks fly off the dummy.
         if (hitPending && t >= 0.62) {
           hitPending = false;
-          const hitColor = currentForm === 'base' ? 0xffffff : FORM_LOOKS[currentForm].auraColor;
-          fx.burst(hitColor, currentForm === 'base' ? 12 : 18, new THREE.Vector3(DUMMY_X - 0.55, 1.7, 0), 3.2);
-          juice.addShake(currentForm === 'base' ? 0.12 : 0.2);
+          const look = FORM_LOOKS[currentForm];
+          const transformed = currentForm !== 'base';
+          fx.burst(look.hitColor, transformed ? 18 : 12, new THREE.Vector3(DUMMY_X - 0.55, 1.7, 0), 3.2);
+          juice.addShake(transformed ? 0.2 : 0.12);
           // High-streak hits freeze the frame for a beat — weight, not lag.
-          if (currentForm === 'surge' || currentForm === 'super') juice.hitstop();
+          if (look.hitstop) juice.hitstop();
         }
         switch (kind) {
           case 0: // dash punch: coil back, lunge in with a straight right
@@ -152,7 +152,7 @@ export function createReactions(opts: {
    */
   function staggerClip(): Clip {
     return {
-      duration: STAGGER_DURATION,
+      duration: STYLE.juice.stagger.duration,
       apply(t, elapsed) {
         const hero = getHero();
         const j = hero.joints;
@@ -184,9 +184,9 @@ export function createReactions(opts: {
           case 'ANSWER_CORRECT':
             // Cycle through different attacks so every strike feels fresh.
             heroChannel.play(attackClip(attackCycle++ % 4), 'attack');
-            dummy.hit();
+            dummy.hit(currentForm !== 'base');
             // A crackle of charge energy as the hero coils to strike.
-            fx.burst(currentForm === 'base' ? 0xffffff : FORM_LOOKS[currentForm].auraColor, 6, new THREE.Vector3(HERO_X + 0.4, 1.5, 0), 1.2);
+            fx.burst(FORM_LOOKS[currentForm].hitColor, 6, new THREE.Vector3(HERO_X + 0.4, 1.5, 0), 1.2);
             // Any transformed hero throws visible energy with each strike.
             if (currentForm !== 'base') fx.fireBlast(false);
             break;
@@ -236,7 +236,7 @@ export function createReactions(opts: {
       // first, then whichever clip is running overrides the joints it
       // needs. Resetting first means an interrupted action can never leave
       // a limb stuck mid-swing.
-      const bobY = 0.26 + Math.sin(elapsed * 2.2) * 0.04;
+      const bobY = heroBob(elapsed);
       // The flame churns: shells counter-rotate so the sculpted lobes slide
       // past each other, while the whole teardrop licks taller and thinner.
       hero.auraOuter.rotation.y = elapsed * 1.1;
@@ -272,8 +272,7 @@ export function createReactions(opts: {
       if (currentForm !== 'base' || playerGlow > 0.3) {
         const rate = currentForm === 'super' ? 34 : currentForm === 'surge' ? 22 : 14;
         sparkAccum += dt * rate;
-        const look = FORM_LOOKS[currentForm];
-        const sparkColor = currentForm === 'base' ? 0xffe9a3 : look.auraColor;
+        const sparkColor = FORM_LOOKS[currentForm].sparkColor;
         while (sparkAccum >= 1) {
           sparkAccum -= 1;
           const y = 0.15 + Math.random() * 2.1;

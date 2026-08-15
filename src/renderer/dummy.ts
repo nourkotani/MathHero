@@ -13,6 +13,8 @@ import { createChannel } from './timeline';
 interface ReactionDef {
   label: string;
   duration: number;
+  /** Reserved for transformed heroes — plain hits never look this wild. */
+  strongOnly?: boolean;
   pose(group: THREE.Group, t: number, elapsed: number): void;
 }
 
@@ -36,6 +38,7 @@ const HIT_REACTIONS: ReactionDef[] = [
   {
     label: 'spin',
     duration: 0.6,
+    strongOnly: true,
     pose(group, t) {
       // One full yaw spin with a little tilt, ending square again.
       group.rotation.y = t * Math.PI * 2;
@@ -46,8 +49,9 @@ const HIT_REACTIONS: ReactionDef[] = [
 
 export interface Dummy {
   group: THREE.Group;
-  /** A hit lands: play the next reaction from the variety rotation. */
-  hit(): void;
+  /** A hit lands: next reaction from the variety rotation; transformed
+   *  heroes (strong) unlock the wilder entries. */
+  hit(strong: boolean): void;
   /** Dramatic super-blast launch: up, over, and a full flip. */
   launch(): void;
   update(dt: number, elapsed: number, heroStaggering: boolean): void;
@@ -68,8 +72,9 @@ export function createDummy(): Dummy {
 
   return {
     group,
-    hit() {
-      const reaction = HIT_REACTIONS[variety++ % HIT_REACTIONS.length];
+    hit(strong) {
+      const pool = HIT_REACTIONS.filter((r) => strong || !r.strongOnly);
+      const reaction = pool[variety++ % pool.length];
       if (!reaction) return;
       channel.play(
         {

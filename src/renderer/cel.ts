@@ -4,13 +4,11 @@
 // per-mesh bespoke code.
 
 import * as THREE from 'three';
+import { inkSurface } from './materials';
 import { STYLE } from './style';
 
 // All hulls share one material: one shader program, minimal state changes.
-const inkMaterial = new THREE.MeshBasicMaterial({
-  color: STYLE.outline.color,
-  side: THREE.BackSide,
-});
+const inkMaterial = inkSurface(STYLE.outline.color);
 
 /** A hull shares its parent's geometry — never dispose it independently. */
 export function isOutlineHull(mesh: THREE.Mesh): boolean {
