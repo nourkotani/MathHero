@@ -31,6 +31,7 @@ export function initialState(config: GameConfig): GameState {
     activePlayerId: null,
     nextPlayerId: config.save?.nextPlayerId ?? 1,
     lastExportAt: config.save?.lastExportAt ?? null,
+    muted: config.save?.muted ?? false,
     difficulty: 'easy',
     timerSeconds: DEFAULT_TIMER_SECONDS,
     now: 0,
@@ -202,6 +203,13 @@ export function update(state: GameState, event: GameEvent): UpdateResult {
       return { state: { ...state, phase: 'title' }, effects: [] };
     }
 
+    case 'MUTE_TOGGLED': {
+      return {
+        state: { ...state, muted: !state.muted },
+        effects: [{ type: 'SAVE_FILE_CHANGED' }],
+      };
+    }
+
     case 'SAVE_EXPORTED': {
       const next = { ...state, lastExportAt: state.now };
       return {
@@ -227,6 +235,7 @@ export function update(state: GameState, event: GameEvent): UpdateResult {
           players: save.players,
           nextPlayerId: save.nextPlayerId,
           lastExportAt: save.lastExportAt,
+          muted: save.muted,
           activePlayerId: null,
         },
         effects: [{ type: 'IMPORT_SUCCEEDED' }, { type: 'SAVE_FILE_CHANGED' }],

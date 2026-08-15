@@ -2,6 +2,7 @@ import { createElement, render } from 'preact';
 import '../ui/styles.css';
 import { initialState } from '../core';
 import type { GameEvent } from '../core';
+import { createAudio } from '../audio';
 import { loadSaveFile, localStorageAdapter, persistenceSubscriber } from '../persistence';
 import { createRenderer } from '../renderer';
 import { App } from '../ui/App';
@@ -51,6 +52,10 @@ store.subscribe((state, effects) => {
   if (state.phase !== 'results') newBest = null;
   render(createElement(App, { state, dispatch: store.dispatch, newBest }), uiRoot);
 });
+
+// Synthesized sound reacts to the same effects as everything else.
+const audio = createAudio();
+store.subscribe((state, effects) => audio.onStoreUpdate(state, effects));
 
 // The download adapter: hands the exported Save File to the parent as a file.
 store.subscribe((_state, effects) => {

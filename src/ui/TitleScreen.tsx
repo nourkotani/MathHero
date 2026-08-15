@@ -186,6 +186,14 @@ export function TitleScreen({ state, dispatch }: AppProps) {
       <div class="save-actions">
         <button
           class="pad-key save-button"
+          data-testid="mute-toggle"
+          aria-label={state.muted ? 'Unmute sounds' : 'Mute sounds'}
+          onClick={() => dispatch({ type: 'MUTE_TOGGLED' })}
+        >
+          {state.muted ? '🔇' : '🔊'}
+        </button>
+        <button
+          class="pad-key save-button"
           data-testid="export-save"
           onClick={() => dispatch({ type: 'SAVE_EXPORTED' })}
         >

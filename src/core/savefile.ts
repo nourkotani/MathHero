@@ -6,7 +6,7 @@ import { validColors } from './players';
 import type { PlayerRecord } from './players';
 import type { GameState } from './types';
 
-export const SAVE_FILE_VERSION = 5;
+export const SAVE_FILE_VERSION = 6;
 
 export interface SaveFile {
   version: number;
@@ -14,6 +14,8 @@ export interface SaveFile {
   nextPlayerId: number;
   /** Epoch ms of the last export (or first play, until one happens). */
   lastExportAt: number | null;
+  /** Family-wide mute toggle. */
+  muted: boolean;
 }
 
 /** The persisted slice of core state, byte-for-byte what export downloads. */
@@ -23,6 +25,7 @@ export function buildSaveFile(state: GameState): SaveFile {
     players: state.players,
     nextPlayerId: state.nextPlayerId,
     lastExportAt: state.lastExportAt,
+    muted: state.muted,
   };
 }
 
@@ -58,6 +61,8 @@ const MIGRATIONS: Array<(doc: Record<string, unknown>) => Record<string, unknown
   }),
   // v4 → v5: the document tracks when it was last exported.
   (doc) => ({ ...doc, version: 5, lastExportAt: null }),
+  // v5 → v6: the family-wide mute toggle persists.
+  (doc) => ({ ...doc, version: 6, muted: false }),
 ];
 
 /**
@@ -91,6 +96,7 @@ function validateCurrent(doc: Record<string, unknown>): SaveFile | null {
   if (!Array.isArray(doc.players)) return null;
   if (typeof doc.nextPlayerId !== 'number') return null;
   if (doc.lastExportAt !== null && typeof doc.lastExportAt !== 'number') return null;
+  if (typeof doc.muted !== 'boolean') return null;
 
   const players: PlayerRecord[] = [];
   for (const entry of doc.players) {
@@ -103,6 +109,7 @@ function validateCurrent(doc: Record<string, unknown>): SaveFile | null {
     players,
     nextPlayerId: doc.nextPlayerId,
     lastExportAt: doc.lastExportAt as number | null,
+    muted: doc.muted,
   };
 }
 

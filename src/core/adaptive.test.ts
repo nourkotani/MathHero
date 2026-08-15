@@ -77,8 +77,9 @@ describe('Adaptive Selection', () => {
 
   it('weights selection toward Facts the Player gets wrong', () => {
     const mkSave = (factStats: Record<string, FactAttempt[]>): SaveFile => ({
-      version: 5,
+      version: 6,
       lastExportAt: null,
+      muted: false,
       players: [
         {
           id: 'p1',
