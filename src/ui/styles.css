@@ -646,7 +646,10 @@ body {
 
 .skill-picker {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
   gap: 0.8rem;
+  max-width: 42rem;
   pointer-events: auto;
 }
 

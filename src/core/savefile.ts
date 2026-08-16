@@ -14,7 +14,7 @@ function validCount(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0;
 }
 
-export const SAVE_FILE_VERSION = 10;
+export const SAVE_FILE_VERSION = 11;
 
 export interface SaveFile {
   version: number;
@@ -121,6 +121,18 @@ const MIGRATIONS: Array<(doc: Record<string, unknown>) => Record<string, unknown
         ...p,
         bests: { ...(p.bests as Record<string, unknown>), machine: {} },
         factStats: { ...(p.factStats as Record<string, unknown>), machine: {} },
+      }),
+    ),
+  }),
+  // v10 → v11: the Pattern Skill arrives, fresh, everything else untouched.
+  (doc) => ({
+    ...doc,
+    version: 11,
+    players: (Array.isArray(doc.players) ? doc.players : []).map(
+      (p: Record<string, unknown>) => ({
+        ...p,
+        bests: { ...(p.bests as Record<string, unknown>), pattern: {} },
+        factStats: { ...(p.factStats as Record<string, unknown>), pattern: {} },
       }),
     ),
   }),

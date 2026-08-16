@@ -56,6 +56,12 @@ export async function readCorrectAnswer(page: Page): Promise<number> {
     const { a, b } = await readMachineRule(page);
     return a * Number(machine[1]) + b;
   }
+  const chain = text.match(/^(\d+),\s*(\d+),\s*(\d+),\s*(\d+),/);
+  if (chain) {
+    const [t1, t2, , t4] = chain.slice(1).map(Number) as [number, number, number, number];
+    // Additive chains continue by the common difference; geometric by the ratio.
+    return t2 - t1 === (t4 - t1) / 3 ? t4 + (t2 - t1) : t4 * (t2 / t1);
+  }
   throw new Error(`could not parse question from HUD: ${text}`);
 }
 

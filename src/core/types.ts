@@ -24,6 +24,12 @@ export interface Question {
    * Machine's dress, which always sets it on Machine Questions.
    */
   input?: number;
+  /**
+   * Pattern only: how the chain grows. 'add' skip-counts by b from a; the
+   * geometric twist 'x2'/'x3' multiplies the previous term (then a is the
+   * start and b is that multiplier). Undressed Questions read as 'add'.
+   */
+  wear?: 'add' | 'x2' | 'x3';
 }
 
 export type Phase = 'title' | 'hero-creation' | 'pre-round' | 'in-round' | 'results';

@@ -78,7 +78,8 @@ export function RoundScreen({ state, dispatch }: AppProps) {
               data-testid="question"
               key={`${state.question.a}x${state.question.b}`}
             >
-              {skill.display(state.question)} ={' '}
+              {skill.display(state.question)}
+              {skill.promptSeparator}
               <span class="answer" data-testid="answer" key={state.answerBuffer}>
                 {state.answerBuffer === '' ? '?' : state.answerBuffer}
               </span>
