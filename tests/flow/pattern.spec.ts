@@ -39,10 +39,10 @@ test('count-by-8s practice: every chain steps by 8', async ({ page }) => {
 
   await page.getByTestId('skill-pattern').click();
   await page.getByTestId('practice-8').click();
-  await expect(page.getByTestId('mode-hint')).toContainText('Only +8');
+  await expect(page.getByTestId('mode-hint')).toContainText('Only by 8s');
   await startRound(page);
 
-  await expect(page.getByTestId('practice-badge')).toContainText('+8 practice');
+  await expect(page.getByTestId('practice-badge')).toContainText('by 8s practice');
   for (let i = 0; i < 4; i++) {
     const [t1, t2] = await readChainTerms(page);
     expect(t2 - t1, 'the step is pinned to 8').toBe(8);

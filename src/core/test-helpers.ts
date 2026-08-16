@@ -44,14 +44,23 @@ export function typeDigits(value: number): GameEvent[] {
     .map((d) => ({ type: 'DIGIT_PRESSED', digit: Number(d) }) as GameEvent);
 }
 
+/** The current Question's correct entry: the computed answer, or the card number. */
+function correctEntry(state: GameState): number {
+  return state.question.cards
+    ? state.question.cards.correct
+    : skillFor(activeSkill(state)).answer(state.question);
+}
+
 export function answerCorrectly(state: GameState): UpdateResult {
-  const answer = skillFor(activeSkill(state)).answer(state.question);
-  const typed = dispatchAll(state, typeDigits(answer));
+  const typed = dispatchAll(state, typeDigits(correctEntry(state)));
   return update(typed, { type: 'ANSWER_SUBMITTED' });
 }
 
 export function answerWrongly(state: GameState): UpdateResult {
-  const wrong = skillFor(activeSkill(state)).answer(state.question) + 1;
+  // A wrong card is another card; a wrong number is off by one.
+  const wrong = state.question.cards
+    ? (correctEntry(state) % 3) + 1
+    : correctEntry(state) + 1;
   const typed = dispatchAll(state, typeDigits(wrong));
   return update(typed, { type: 'ANSWER_SUBMITTED' });
 }

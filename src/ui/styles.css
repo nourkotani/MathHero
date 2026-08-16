@@ -606,8 +606,25 @@ body {
 
 /* ---------- Pre-round: challenge picker ---------- */
 
+/* Four Skill cards with taglines make this the tallest screen — keep it
+   tight so GO! always fits the viewport, even at 720px. */
 .pre-round {
-  gap: 1.1rem;
+  gap: 0.7rem;
+  padding: 0.8rem 1.5rem;
+}
+
+.pre-round .screen-title {
+  font-size: 2.2rem;
+}
+
+.pre-round .big-button {
+  font-size: 1.9rem;
+  padding: 0.7rem 3.2rem;
+}
+
+.pre-round .timer-button {
+  height: 3rem;
+  font-size: 1.5rem;
 }
 
 .picker-section {
@@ -649,7 +666,6 @@ body {
   flex-wrap: wrap;
   justify-content: center;
   gap: 0.8rem;
-  max-width: 42rem;
   pointer-events: auto;
 }
 
@@ -657,7 +673,20 @@ body {
 .skill-card {
   flex-direction: row;
   gap: 0.6rem;
-  padding: 0.55rem 1.8rem;
+  padding: 0.45rem 1.2rem;
+}
+
+.skill-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.05rem;
+}
+
+.skill-tagline {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-dim);
 }
 
 .skill-symbol {

@@ -22,6 +22,8 @@ export interface SkillDef {
   id: Skill;
   /** Kid-facing name on the Pre-round picker. */
   label: string;
+  /** The one-line pitch under the name on the Pre-round picker card. */
+  tagline: string;
   /** The operation glyph — the single source for every screen. */
   symbol: string;
   /**
@@ -46,7 +48,11 @@ export interface SkillDef {
    * " = " for equations, ", " to continue a Pattern chain.
    */
   promptSeparator: string;
-  /** The one correct answer for a Question. */
+  /**
+   * The one correct answer for a compute Question. Name-the-Rule grading
+   * (the card number) is modality knowledge, not operation knowledge — it
+   * lives at the grading seam, so every row here stays pure computation.
+   */
   answer(question: Question): number;
   /** The teaching-moment line after a wrong answer — the full truth, kid-style. */
   reveal(question: Question): string;
@@ -186,6 +192,7 @@ export const SKILL_DEFS: readonly SkillDef[] = [
   {
     id: 'multiply',
     label: 'Multiply',
+    tagline: 'times tables, fast!',
     symbol: '✖️',
     basePointScale: 1,
     masteryWindowMs: FAST_MS,
@@ -200,6 +207,7 @@ export const SKILL_DEFS: readonly SkillDef[] = [
   {
     id: 'divide',
     label: 'Divide',
+    tagline: 'tables inside-out!',
     symbol: '➗',
     basePointScale: 1,
     masteryWindowMs: FAST_MS,
@@ -216,6 +224,7 @@ export const SKILL_DEFS: readonly SkillDef[] = [
   {
     id: 'machine',
     label: 'Machine',
+    tagline: 'crack the secret rule!',
     symbol: '⚙️',
     // A two-step Secret Rule takes real detective work — pay triple, and
     // judge fluency at a ~25-second pace instead of recall pace.
@@ -228,12 +237,12 @@ export const SKILL_DEFS: readonly SkillDef[] = [
     promptSeparator: ' → ',
     // dress always sets the jump input; ?? 1 degenerates an undressed
     // Question to its first example row, deterministically.
-    answer: (q) => (q.cards ? q.cards.correct : machineOutput(q, q.input ?? 1)),
+    answer: (q) => machineOutput(q, q.input ?? 1),
     reveal: (q) => {
       const input = q.input ?? 1;
       return `The rule was ${machineRule(q)}! So ${input} → ${machineOutput(q, input)}`;
     },
-    practiceLabel: (table) => `×${table}`,
+    practiceLabel: (table) => `×${table} machine`,
     exampleRows: (q) =>
       MACHINE_EXAMPLE_INPUTS.map((input) => ({ input, output: machineOutput(q, input) })),
     dress: (q, ctx, prng) => {
@@ -260,6 +269,7 @@ export const SKILL_DEFS: readonly SkillDef[] = [
   {
     id: 'pattern',
     label: 'Pattern',
+    tagline: 'what comes next?',
     symbol: '🔁',
     // A chain takes rhythm-finding, not raw recall — pay double, and judge
     // fluency at a ~15-second pace.
@@ -269,13 +279,13 @@ export const SKILL_DEFS: readonly SkillDef[] = [
     // undressed Questions too (grid tooltips) as the skip-count chain.
     display: (q) => patternTerms(q).join(', '),
     promptSeparator: ', ',
-    answer: (q) => (q.cards ? q.cards.correct : patternAnswer(q)),
+    answer: patternAnswer,
     reveal: (q) => {
       const m = patternMultiplier(q);
       const rule = m !== null ? `× ${m}` : `+ ${q.b}`;
       return `It was ${rule} each time — ${patternTerms(q).join(', ')}, ${patternAnswer(q)}!`;
     },
-    practiceLabel: (table) => `+${table}`,
+    practiceLabel: (table) => `by ${table}s`,
     dress: (q, ctx, prng) => {
       // Practice pins the step: "count by 8s" really steps by 8, and the
       // geometric twist never appears in Practice.

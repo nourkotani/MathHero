@@ -47,10 +47,10 @@ test('×8 machine practice: every Secret Rule multiplies by 8', async ({ page })
 
   await page.getByTestId('skill-machine').click();
   await page.getByTestId('practice-8').click();
-  await expect(page.getByTestId('mode-hint')).toContainText('Only ×8');
+  await expect(page.getByTestId('mode-hint')).toContainText('Only ×8 machine');
   await startRound(page);
 
-  await expect(page.getByTestId('practice-badge')).toContainText('×8 practice');
+  await expect(page.getByTestId('practice-badge')).toContainText('×8 machine practice');
   for (let i = 0; i < 4; i++) {
     const { a } = await readMachineRule(page);
     expect(a, 'the multiplier is pinned to the table').toBe(8);

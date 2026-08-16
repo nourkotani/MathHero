@@ -417,7 +417,11 @@ export function update(state: GameState, event: GameEvent): UpdateResult {
       if (state.phase !== 'in-round' || state.feedback !== null || state.answerBuffer === '')
         return noop(state);
       const { question } = state;
-      const correctAnswer = skillFor(activeSkill(state)).answer(question);
+      // A Name-the-Rule Question is graded by its card number — modality is
+      // Skill-independent, so it lives here, not in the Skill rows.
+      const correctAnswer = question.cards
+        ? question.cards.correct
+        : skillFor(activeSkill(state)).answer(question);
       const correct = Number(state.answerBuffer) === correctAnswer;
 
       const recorded = withAttemptRecorded(state, correct);

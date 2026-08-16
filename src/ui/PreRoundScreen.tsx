@@ -50,7 +50,10 @@ export function PreRoundScreen({ state, dispatch }: AppProps) {
               onClick={() => dispatch({ type: 'SKILL_CHANGED', skill: def.id })}
             >
               <span class="skill-symbol">{def.symbol}</span>
-              <span class="mode-name">{def.label}</span>
+              <span class="skill-text">
+                <span class="mode-name">{def.label}</span>
+                <span class="skill-tagline">{def.tagline}</span>
+              </span>
             </button>
           ))}
         </div>
