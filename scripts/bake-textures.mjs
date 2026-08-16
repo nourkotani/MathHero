@@ -471,6 +471,77 @@ function bakeSpark(size = 64) {
   return encodePng(size, size, pixels, 4);
 }
 
+/**
+ * Blast core: a roiling ball of energy, its rim licking differently every
+ * frame — played on a loop while the projectile flies. 6 frames.
+ */
+function bakeBlastCore(frames = 6, size = 128) {
+  const roil = makeNoise(1717, 16);
+  return bakeFlipbook(frames, size, (u, v, t) => {
+    const dx = u * 2 - 1;
+    const dy = v * 2 - 1;
+    const theta = Math.atan2(dy, dx);
+    // The rim boils: each frame samples a different slice of the noise.
+    const lick =
+      (fbm(roil, (theta / Math.PI + 1) * 8, t * 6.7, 3) - 0.5) * 0.34;
+    const r = Math.hypot(dx, dy);
+    const rim = 0.62 + lick;
+    const body = Math.max(0, Math.min(1, (rim - r) / 0.16));
+    const core = Math.max(0, 1 - r / 0.34);
+    const alpha = Math.min(1, body * 0.85 + core);
+    const heat = Math.min(1, core * 1.4);
+    return [255, 255 * (0.72 + heat * 0.28), 255 * (0.4 + heat * 0.6), 255 * alpha];
+  });
+}
+
+/**
+ * Charge-up ring: a bright band that tightens and flares as power gathers —
+ * the sprite's shrinking scale does the rushing-inward, the frames do the
+ * tightening and brightening. 6 frames.
+ */
+function bakeChargeRing(frames = 6, size = 128) {
+  return bakeFlipbook(frames, size, (u, v, t) => {
+    const r = Math.hypot(u * 2 - 1, v * 2 - 1);
+    const thickness = 0.2 - t * 0.12;
+    const band = Math.max(0, 1 - Math.abs(r - 0.72) / thickness);
+    const alpha = band * band * (0.5 + t * 0.5);
+    return [255, 255 * (0.85 + t * 0.15), 255 * 0.72, 255 * Math.min(1, alpha)];
+  });
+}
+
+/**
+ * Lightning arc: a jagged bolt re-striking on every frame — the same
+ * endpoints, a different seeded path. 6 frames.
+ */
+function bakeLightning(frames = 6, size = 128) {
+  return bakeFlipbook(frames, size, (u, v, t) => {
+    // A polyline from top to bottom, kinked at fixed heights by per-frame
+    // pseudo-random offsets; distance to the nearest segment lights it.
+    const kinks = 6;
+    const jag = (i, f) => {
+      let h = Math.imul((i + 1) * 374761393, Math.imul(f + 1, 668265263) | 1);
+      h = Math.imul(h ^ (h >>> 13), 1274126177);
+      return (((h ^ (h >>> 16)) >>> 0) / 4294967296 - 0.5) * 0.52;
+    };
+    const frame = Math.round(t * (frames - 1));
+    let a = 0;
+    for (let i = 0; i < kinks; i++) {
+      const y0 = i / kinks;
+      const y1 = (i + 1) / kinks;
+      const x0 = 0.5 + (i === 0 ? 0 : jag(i, frame));
+      const x1 = 0.5 + (i === kinks - 1 ? 0 : jag(i + 1, frame));
+      const dy = y1 - y0;
+      const s = Math.max(0, Math.min(1, (v - y0) / dy));
+      if (v < y0 - 0.02 || v > y1 + 0.02) continue;
+      const dist = Math.abs(u - (x0 + (x1 - x0) * s));
+      a = Math.max(a, Math.max(0, 1 - dist / 0.03));
+      // A soft glow sleeve around the hot core.
+      a = Math.max(a, Math.max(0, 1 - dist / 0.1) * 0.35);
+    }
+    return [235, 245, 255, 255 * Math.min(1, a)];
+  });
+}
+
 // ----------------------------------------------------------- face decals
 
 /**
@@ -623,6 +694,9 @@ const bakes = [
   ['spark.png', bakeSpark],
   ['shockwave.png', bakeShockwave],
   ['impact-star.png', bakeImpactStar],
+  ['blast-core.png', bakeBlastCore],
+  ['charge-ring.png', bakeChargeRing],
+  ['lightning.png', bakeLightning],
   ['face-boy.png', () => bakeFace(false)],
   ['face-girl.png', () => bakeFace(true)],
   ['cloth.png', bakeCloth],

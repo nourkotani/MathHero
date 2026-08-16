@@ -7,7 +7,10 @@ import { flipbookMaterial, glowSurface, markBloom, sparkSprite, warmFlipbook } f
 import { isOutlineHull } from './cel';
 import { DUMMY_X, HERO_X } from './constants';
 import { STYLE } from './style';
+import blastCoreUrl from './textures/blast-core.png';
+import chargeRingUrl from './textures/charge-ring.png';
 import impactStarUrl from './textures/impact-star.png';
+import lightningUrl from './textures/lightning.png';
 import shockwaveUrl from './textures/shockwave.png';
 
 interface Particle {
@@ -22,6 +25,9 @@ interface Particle {
 interface Blast {
   mesh: THREE.Mesh;
   big: boolean;
+  /** The roiling flipbook riding the projectile, stepped on a time loop. */
+  coreMap: THREE.Texture;
+  coreMaterial: THREE.Material;
 }
 
 /** One playing flipbook: steps its own texture window frame by frame. */
@@ -61,6 +67,10 @@ export interface Fx {
   shockwave(color: number, origin: THREE.Vector3, big: boolean, ground?: boolean): void;
   /** The classic anime four-point impact flash. */
   impactStar(color: number, origin: THREE.Vector3): void;
+  /** Power rushing inward: a collapsing ring while a transformation gathers. */
+  chargeRing(color: number, origin: THREE.Vector3, big: boolean): void;
+  /** A short crackling arc, re-striking every frame. */
+  lightning(color: number, origin: THREE.Vector3, size: number): void;
   fireBlast(big: boolean): void;
   update(dt: number, elapsed: number): void;
 }
@@ -73,6 +83,9 @@ export function createFx(scene: THREE.Scene, onBlastImpact: (big: boolean) => vo
   // Decode the sheets at startup — the first hit is always seconds away.
   warmFlipbook(shockwaveUrl);
   warmFlipbook(impactStarUrl);
+  warmFlipbook(blastCoreUrl);
+  warmFlipbook(chargeRingUrl);
+  warmFlipbook(lightningUrl);
 
   /** Start one flipbook instance; it owns its texture window until it dies. */
   function playFlip(
@@ -119,6 +132,24 @@ export function createFx(scene: THREE.Scene, onBlastImpact: (big: boolean) => vo
     playFlip(impactStarUrl, 6, color, origin, s.duration, s.from, s.to);
   }
 
+  function lightning(color: number, origin: THREE.Vector3, size: number) {
+    // The bolt re-strikes frame to frame; no growth, just a short crackle.
+    playFlip(lightningUrl, 6, color, origin, STYLE.impact.lightningDuration, size, size);
+  }
+
+  function chargeRing(color: number, origin: THREE.Vector3, big: boolean) {
+    const s = STYLE.impact.chargeRing;
+    playFlip(
+      chargeRingUrl,
+      6,
+      color,
+      origin,
+      big ? s.bigDuration : s.duration,
+      big ? s.bigFrom : s.from,
+      big ? s.bigTo : s.to,
+    );
+  }
+
   /** One soft glow mote: the baked spark puff, tinted, bloom-marked. */
   function mote(color: number, size: number, origin: THREE.Vector3): THREE.Sprite {
     const sprite = new THREE.Sprite(sparkSprite(color));
@@ -151,16 +182,24 @@ export function createFx(scene: THREE.Scene, onBlastImpact: (big: boolean) => vo
   }
 
   function fireBlast(big: boolean) {
+    const color = big ? 0xffe14d : 0x7ad7ff;
     const mesh = new THREE.Mesh(
       new THREE.SphereGeometry(big ? 0.42 : 0.24, 12, 10),
-      glowSurface(big ? 0xffe14d : 0x7ad7ff),
+      glowSurface(color),
     );
     markBloom(mesh);
     mesh.position.set(HERO_X + 0.8, 1.6, 0);
+    // The roiling energy ball around the bloom-hot center.
+    const { material, map } = flipbookMaterial(blastCoreUrl, 6, color, 'sprite');
+    const core = new THREE.Sprite(material as THREE.SpriteMaterial);
+    // Child scale rides the parent's smear, so the fireball stretches too.
+    core.scale.setScalar(big ? 1.5 : 0.9);
+    markBloom(core);
+    mesh.add(core);
     scene.add(mesh);
-    blasts.push({ mesh, big });
+    blasts.push({ mesh, big, coreMap: map, coreMaterial: material });
     // Muzzle flash at the hero's outstretched fist.
-    burst(big ? 0xffe14d : 0x7ad7ff, big ? 10 : 5, mesh.position.clone(), 1.6);
+    burst(color, big ? 10 : 5, mesh.position.clone(), 1.6);
   }
 
   return {
@@ -168,6 +207,8 @@ export function createFx(scene: THREE.Scene, onBlastImpact: (big: boolean) => vo
     spark,
     shockwave,
     impactStar,
+    chargeRing,
+    lightning,
     fireBlast,
     update(dt, elapsed) {
       // Flipbooks: step the frame window, grow, and die at the last frame.
@@ -193,6 +234,8 @@ export function createFx(scene: THREE.Scene, onBlastImpact: (big: boolean) => vo
         const blast = blasts[i];
         if (!blast) continue;
         blast.mesh.position.x += dt * (blast.big ? 16 : 20);
+        // The fireball roils on a time loop, independent of flight length.
+        blast.coreMap.offset.x = (Math.floor(elapsed * 20) % 6) / 6;
         // Smear: stretched along its flight, squashed across it, still
         // pulsing. The impact burst is the snap-back.
         const pulse = 1 + Math.sin(elapsed * 40) * 0.15;
@@ -227,6 +270,8 @@ export function createFx(scene: THREE.Scene, onBlastImpact: (big: boolean) => vo
           if (blast.big) shockwave(color, blast.mesh.position.clone(), true, true);
           scene.remove(blast.mesh);
           freeMesh(blast.mesh);
+          blast.coreMap.dispose();
+          blast.coreMaterial.dispose();
           blasts.splice(i, 1);
           onBlastImpact(blast.big);
         }

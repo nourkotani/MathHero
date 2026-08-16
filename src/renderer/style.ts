@@ -78,7 +78,14 @@ export const STYLE = {
   impact: {
     shockwave: { duration: 0.32, from: 0.7, to: 2.6, bigDuration: 0.5, bigFrom: 1.1, bigTo: 4.6 },
     star: { duration: 0.26, from: 1.0, to: 2.2 },
+    /** Power rushing inward on transformations; big = the Landmark scene. */
+    chargeRing: { duration: 0.45, from: 3.4, to: 0.7, bigDuration: 0.7, bigFrom: 5.2, bigTo: 1 },
+    /** One lightning crackle's lifetime. */
+    lightningDuration: 0.28,
   },
+
+  /** Lightning crackle rates (arcs per second). */
+  lightningRate: { surge: 3, super: 5, cosmetics: 2 },
 
   /** Motion feel: action timings, hitstop, camera punch, blast smear. */
   juice: {
