@@ -8,11 +8,15 @@ import {
   environmentSurface,
   glowSurface,
   markBloom,
+  maskedGlowSurface,
   paintedMap,
   starSurface,
 } from './materials';
 import { STYLE } from './style';
 import arenaTopUrl from './textures/arena-top.png';
+import groundUrl from './textures/ground.png';
+import rockUrl from './textures/rock.png';
+import sigilUrl from './textures/sigil.png';
 
 export interface Stage {
   update(dt: number, elapsed: number, urgent: boolean): void;
@@ -53,7 +57,11 @@ export function createStage(scene: THREE.Scene): Stage {
   }
 
   // The wasteland runs all the way to the dome; fog hazes the far distance.
-  const ground = new THREE.Mesh(new THREE.CircleGeometry(75, 48), environmentSurface(0x6d6242, 1));
+  // One painted wash covers the whole disc — scorched patches and all.
+  const ground = new THREE.Mesh(
+    new THREE.CircleGeometry(75, 48),
+    environmentSurface(0xffffff, 1, paintedMap(groundUrl)),
+  );
   ground.rotation.x = -Math.PI / 2;
   ground.receiveShadow = true;
   scene.add(ground);
@@ -81,8 +89,8 @@ export function createStage(scene: THREE.Scene): Stage {
   arenaRim.position.y = 0.31;
   scene.add(arenaRim);
 
-  // Jagged rock spires ring the battlefield.
-  const rockMaterial = environmentSurface(0x5f5142, 1);
+  // Jagged rock spires ring the battlefield, wearing the striated bake.
+  const rockMaterial = environmentSurface(0xffffff, 1, paintedMap(rockUrl));
   for (let i = 0; i < 9; i++) {
     const angle = (i / 9) * Math.PI * 2 + 0.4;
     const distance = 13 + (i % 3) * 4;
@@ -92,6 +100,64 @@ export function createStage(scene: THREE.Scene): Stage {
     rock.rotation.y = i * 1.7;
     scene.add(rock);
   }
+
+  // Broken tournament pillars: relics of epic battles, ringing the arena
+  // outside the play space. Plinth, weathered drum, and a tilted broken cap.
+  const pillarStone = environmentSurface(0xd8cfc0, 0.95, paintedMap(rockUrl));
+  for (const [angle, distance, height, tilt] of [
+    [0.9, 10.6, 2.6, 0.2],
+    [2.3, 11.4, 1.7, -0.28],
+    [4.1, 10.2, 3.1, 0.16],
+    [5.5, 11.8, 2.2, -0.2],
+  ] as const) {
+    const pillar = new THREE.Group();
+    const plinth = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.4, 1.3), pillarStone);
+    plinth.position.y = 0.2;
+    pillar.add(plinth);
+    const drum = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.5, height, 10), pillarStone);
+    drum.position.y = 0.4 + height / 2;
+    pillar.add(drum);
+    const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.46, 0.42, 0.35, 10), pillarStone);
+    cap.position.set(0.1, 0.55 + height, 0);
+    cap.rotation.z = tilt;
+    pillar.add(cap);
+    pillar.position.set(Math.cos(angle) * distance, 0, Math.sin(angle) * distance);
+    pillar.rotation.y = angle * 2.1;
+    scene.add(pillar);
+  }
+
+  // Floating debris: rock shards held aloft by residual energy, each with a
+  // glowing crystal heart. They bob and turn on render time — behind and
+  // beside the arena only, never between the camera and the fight.
+  const debris: Array<{ chunk: THREE.Group; baseY: number; phase: number; spin: number }> = [];
+  const crystalMaterial = glowSurface(0x9a7dff, 0.9);
+  for (const [angle, distance, size, baseY] of [
+    [2.7, 9.2, 0.42, 1.6],
+    [3.4, 10.8, 0.3, 2.4],
+    [4.6, 9.6, 0.5, 1.2],
+    [5.9, 10.4, 0.34, 2.0],
+    [0.35, 11.6, 0.26, 2.7],
+    [3.9, 12.4, 0.44, 1.8],
+  ] as const) {
+    const chunk = new THREE.Group();
+    const shard = new THREE.Mesh(new THREE.IcosahedronGeometry(size), rockMaterial);
+    chunk.add(shard);
+    const crystal = new THREE.Mesh(new THREE.OctahedronGeometry(size * 0.32), crystalMaterial);
+    crystal.position.y = -size * 0.75;
+    markBloom(crystal);
+    chunk.add(crystal);
+    chunk.position.set(Math.cos(angle) * distance, baseY, Math.sin(angle) * distance);
+    scene.add(chunk);
+    debris.push({ chunk, baseY, phase: angle * 3.1, spin: 0.25 + size * 0.4 });
+  }
+
+  // The arena's power sigil, glowing up from the center of the stone.
+  const sigilMaterial = maskedGlowSurface(0xffd24d, sigilUrl);
+  const sigil = new THREE.Mesh(new THREE.CircleGeometry(2.6, 48), sigilMaterial);
+  sigil.rotation.x = -Math.PI / 2;
+  sigil.position.y = 0.312;
+  markBloom(sigil);
+  scene.add(sigil);
 
   // Slow dusk clouds drifting high overhead.
   const clouds: THREE.Mesh[] = [];
@@ -111,6 +177,13 @@ export function createStage(scene: THREE.Scene): Stage {
         cloud.position.x += dt * 0.4;
         if (cloud.position.x > 26) cloud.position.x = -26;
       }
+
+      // Debris bobs and turns on residual energy; the sigil breathes.
+      for (const piece of debris) {
+        piece.chunk.position.y = piece.baseY + Math.sin(elapsed * 0.8 + piece.phase) * 0.18;
+        piece.chunk.rotation.y += dt * piece.spin;
+      }
+      sigilMaterial.opacity = 0.75 + Math.sin(elapsed * 1.3) * 0.15;
 
       // Final ten seconds: the whole arena feels the pressure.
       if (urgent) {

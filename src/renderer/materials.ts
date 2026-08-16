@@ -55,6 +55,21 @@ export function paintedMap(url: string): THREE.Texture {
   return texture;
 }
 
+/**
+ * Unlit glow shaped by a baked white-on-black mask (the sigil): the mask is
+ * alpha, the material supplies the color. Depth writes stay off so the
+ * decal never z-fights the surface it rests on.
+ */
+export function maskedGlowSurface(color: number, maskUrl: string): THREE.MeshBasicMaterial {
+  const mask = new THREE.TextureLoader().load(maskUrl);
+  return new THREE.MeshBasicMaterial({
+    color,
+    alphaMap: mask,
+    transparent: true,
+    depthWrite: false,
+  });
+}
+
 /** Lit surfaces on the arena, ground, and rocks. With a painted map, the
  * texture carries the palette — pass white so it isn't double-tinted. */
 export function environmentSurface(color: number, roughness: number, map?: THREE.Texture): Surface {
