@@ -101,6 +101,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
         hitstopTimer = Math.max(hitstopTimer, STYLE.juice.hitstop.duration);
       },
       punchCamera: () => rig.punch(),
+      speedLines: () => pipeline.flashSpeedLines(),
     },
   });
 

@@ -24,6 +24,8 @@ export interface Juice {
   hitstop(): void;
   /** Camera punch-in on Super-mode blasts. */
   punchCamera(): void;
+  /** Anime speed-lines flash on transformations and Super blasts. */
+  speedLines(): void;
 }
 
 export interface Reactions {
@@ -198,6 +200,7 @@ export function createReactions(opts: {
             applyForm(effect.form);
             fx.burst(FORM_LOOKS[effect.form].auraColor, 24, hero.group.position.clone().setY(1.5), 3.5);
             juice.addShake(0.25);
+            juice.speedLines();
             break;
           case 'STREAK_BROKEN':
           case 'ROUND_ENDED':
@@ -207,6 +210,7 @@ export function createReactions(opts: {
           case 'BLAST_FIRED':
             fx.fireBlast(true);
             juice.punchCamera();
+            juice.speedLines();
             break;
           case 'LEVEL_UP':
             fx.burst(0xffd700, 26, hero.group.position.clone().setY(1.2), 4);
@@ -247,6 +251,8 @@ export function createReactions(opts: {
         lick,
         1 + Math.cos(elapsed * 6) * 0.04,
       );
+      // The flame leans and rights itself, so the edge licks sideways too.
+      hero.aura.rotation.z = Math.sin(elapsed * 3.4) * 0.045;
       hero.group.position.set(HERO_X, bobY, 0);
       hero.group.rotation.set(0, previewing ? 0.35 : Math.PI / 2, 0);
 

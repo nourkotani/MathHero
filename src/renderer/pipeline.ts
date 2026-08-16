@@ -8,12 +8,15 @@ import * as THREE from 'three';
 import { EffectComposer, EffectPass, GodRaysEffect, RenderPass, SelectiveBloomEffect } from 'postprocessing';
 import { BLOOM_LAYER } from './materials';
 import type { VisualTier } from './qualityTier';
+import { SpeedLinesEffect } from './speedLines';
 import { STYLE } from './style';
 
 export interface Pipeline {
   render(dtSeconds: number): void;
   setTier(tier: VisualTier): void;
   setSize(width: number, height: number): void;
+  /** One anime speed-lines flash (full tier only; a no-op when shed). */
+  flashSpeedLines(): void;
 }
 
 export function createPipeline(
@@ -51,6 +54,11 @@ export function createPipeline(
   bloom.ignoreBackground = true;
   composer.addPass(new EffectPass(camera, bloom));
 
+  // Speed-lines flash last, over the bloomed frame — hits read arcade-crisp.
+  const speedLines = new SpeedLinesEffect();
+  const speedLinesPass = new EffectPass(camera, speedLines);
+  composer.addPass(speedLinesPass);
+
   return {
     render(dtSeconds) {
       if (tier === 'sprites') renderer.render(scene, camera);
@@ -59,10 +67,14 @@ export function createPipeline(
     setTier(next) {
       tier = next;
       raysPass.enabled = next === 'full';
+      speedLinesPass.enabled = next === 'full';
     },
     setSize(width, height) {
       renderer.setSize(width, height);
       composer.setSize(width, height);
+    },
+    flashSpeedLines() {
+      if (tier === 'full') speedLines.flash();
     },
   };
 }

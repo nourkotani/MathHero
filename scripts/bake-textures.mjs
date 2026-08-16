@@ -308,15 +308,18 @@ function bakeSigil(size = 512) {
  * horizon glow.
  */
 function bakeSky(width = 1024, height = 512) {
-  const wisp = makeNoise(909);
-  const band = makeNoise(1010);
+  // Coarse lattices: the noise period must divide the sampled u-span for a
+  // seamless wrap, and a small period keeps the drift slow and cloud-like
+  // instead of jittery.
+  const wisp = makeNoise(909, 16);
+  const band = makeNoise(1010, 8);
 
   const zenith = { r: 18, g: 21, b: 41 };
   const mid = { r: 58, g: 47, b: 82 };
   const horizon = { r: 154, g: 86, b: 54 };
   const nebulae = [
-    { center: 0.2, width: 0.05, r: 46, g: 111, b: 111 }, // teal drift
-    { center: 0.33, width: 0.06, r: 122, g: 58, b: 111 }, // magenta drift
+    { center: 0.2, width: 0.1, r: 46, g: 111, b: 111 }, // teal drift
+    { center: 0.36, width: 0.12, r: 122, g: 58, b: 111 }, // magenta drift
   ];
 
   const pixels = paintWide(width, height, 3, (u, v) => {
@@ -335,18 +338,19 @@ function bakeSky(width = 1024, height = 512) {
       b = mix(mid.b, horizon.b, t);
     }
 
-    // Nebula bands, edges wandering with the (u-periodic) noise.
+    // Nebula bands: broad drifts whose edges wander slowly around the dome.
     for (const neb of nebulae) {
-      const wander = (fbm(band, u * 64, v * 9 + neb.center * 40, 3) - 0.5) * 0.08;
+      const wander = (fbm(band, u * 8, v * 4 + neb.center * 40, 2) - 0.5) * 0.12;
       const dist = Math.abs(h - (neb.center + wander));
-      const strength = Math.max(0, 1 - dist / neb.width) * 0.4;
+      const closeness = Math.max(0, 1 - (dist / neb.width) ** 2);
+      const strength = closeness * closeness * 0.38;
       r = mix(r, neb.r, strength);
       g = mix(g, neb.g, strength);
       b = mix(b, neb.b, strength);
     }
 
     // Painted mottling so no band reads airbrushed.
-    const grain = (fbm(wisp, u * 64, v * 14, 3) - 0.5) * 0.12;
+    const grain = (fbm(wisp, u * 16, v * 8, 3) - 0.5) * 0.1;
     // The last light pooling on the horizon line.
     const glow = Math.max(0, (h - 0.82) / 0.18) * 0.35;
     return [r * (1 + grain) + 80 * glow, g * (1 + grain) + 40 * glow, b * (1 + grain) + 10 * glow];
@@ -380,6 +384,25 @@ function bakeCloud(size = 256) {
   return encodePng(size, size, pixels, 4);
 }
 
+// --------------------------------------------------------------- spark.png
+
+/**
+ * One soft energy mote with a real alpha channel: a hot white core inside a
+ * feathered glow halo, tinted per particle at scene level. Every burst,
+ * crackle, and aura mote wears this instead of a hard-edged polyhedron.
+ */
+function bakeSpark(size = 64) {
+  const pixels = paintWide(size, size, 4, (u, v) => {
+    const r = Math.hypot(u - 0.5, v - 0.5) * 2;
+    const halo = Math.max(0, 1 - r) ** 2.2;
+    const core = Math.max(0, 1 - r * 3.2) ** 1.5;
+    const alpha = Math.min(1, halo * 0.85 + core);
+    const white = 255 * Math.min(1, 0.55 + core);
+    return [white, white, white, 255 * alpha];
+  });
+  return encodePng(size, size, pixels, 4);
+}
+
 // --------------------------------------------------------------------- main
 
 mkdirSync(OUT_DIR, { recursive: true });
@@ -390,6 +413,7 @@ const bakes = [
   ['sigil.png', bakeSigil],
   ['sky.png', bakeSky],
   ['cloud.png', bakeCloud],
+  ['spark.png', bakeSpark],
 ];
 for (const [name, bake] of bakes) {
   const png = bake();

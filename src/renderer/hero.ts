@@ -58,11 +58,13 @@ export interface HeroRig {
   hairMaterials: Surface[];
   bodyMaterial: Surface;
   trimMaterial: Surface;
-  /** Two counter-rotating flame shells; both share auraMaterial. */
+  /** Two counter-rotating flame shells: the outer sheet and the hot core. */
   aura: THREE.Group;
   auraOuter: THREE.Mesh;
   auraInner: THREE.Mesh;
   auraMaterial: THREE.MeshBasicMaterial;
+  /** The inner shell's own material — the same hue driven toward white. */
+  auraCoreMaterial: THREE.MeshBasicMaterial;
   /** Milestone cosmetic meshes keyed by their table id; hidden until unlocked. */
   cosmetics: Map<string, THREE.Object3D>;
   /** Hero-Level presence: the orbiting mote ring (spun by the frame loop). */
@@ -89,6 +91,10 @@ export function applyFormToRig(
   rig.bodyMaterial.emissiveIntensity = Math.max(look.emissive, playerGlow * 0.25);
   rig.auraMaterial.color.setHex(look.auraColor);
   rig.auraMaterial.opacity = Math.max(look.auraOpacity, playerGlow * 0.2);
+  // The core burns the same hue, driven toward white and denser — the flame
+  // reads hottest against the hero's silhouette.
+  rig.auraCoreMaterial.color.setHex(look.auraColor).lerp(new THREE.Color(0xffffff), 0.45);
+  rig.auraCoreMaterial.opacity = Math.min(1, Math.max(look.auraOpacity * 1.7, playerGlow * 0.25));
 }
 
 /**
@@ -321,12 +327,13 @@ export function buildHero(appearance: HeroAppearance): HeroRig {
   // Front faces only: with two nested shells, double-sided rendering would
   // stack four color layers and wall the hero off inside the flame.
   const auraMaterial = glowSurface(0x3ac0ff, 0);
+  const auraCoreMaterial = glowSurface(0x9adfff, 0);
   // The aura is a teardrop of flame wrapped around the fighter: two shells
-  // of the same lobed profile — the smaller inner one doubles up the color
-  // into a bright core, and counter-rotation makes the fire churn.
+  // of the same lobed profile — the smaller inner one is the hot core,
+  // whiter and denser, and counter-rotation makes the fire churn.
   const auraGeometry = buildAuraGeometry();
   const auraOuter = new THREE.Mesh(auraGeometry, auraMaterial);
-  const auraInner = new THREE.Mesh(auraGeometry, auraMaterial);
+  const auraInner = new THREE.Mesh(auraGeometry, auraCoreMaterial);
   markBloom(auraOuter);
   markBloom(auraInner);
   auraInner.scale.set(0.62, 0.82, 0.62);
@@ -373,6 +380,7 @@ export function buildHero(appearance: HeroAppearance): HeroRig {
     auraOuter,
     auraInner,
     auraMaterial,
+    auraCoreMaterial,
     cosmetics,
     powerMotes,
     moteMeshes,

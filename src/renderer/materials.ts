@@ -116,6 +116,28 @@ export function cloudSprite(url: string, tint: number, opacity: number): THREE.S
   return new THREE.SpriteMaterial({ map, color: tint, transparent: true, opacity, depthWrite: false });
 }
 
+let sharedSparkMap: THREE.Texture | null = null;
+
+/**
+ * A soft energy mote for bursts, crackle, and aura sparks: the baked
+ * hot-core glow puff, tinted per particle, additive so overlapping motes
+ * flare instead of muddying. One texture is shared by every particle;
+ * the material is per-particle (its opacity is the fade).
+ */
+export function sparkSprite(url: string, color: number): THREE.SpriteMaterial {
+  if (sharedSparkMap === null) {
+    sharedSparkMap = new THREE.TextureLoader().load(url);
+    sharedSparkMap.colorSpace = THREE.SRGBColorSpace;
+  }
+  return new THREE.SpriteMaterial({
+    map: sharedSparkMap,
+    color,
+    transparent: true,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+  });
+}
+
 /** The star field's point material — unlit, unfogged, softly transparent. */
 export function starSurface(color: number, size: number, opacity: number): THREE.PointsMaterial {
   return new THREE.PointsMaterial({ color, size, transparent: true, opacity, fog: false });

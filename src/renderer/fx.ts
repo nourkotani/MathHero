@@ -3,13 +3,14 @@
 // owns their GPU cleanup too.
 
 import * as THREE from 'three';
-import { glowSurface, markBloom } from './materials';
+import { glowSurface, markBloom, sparkSprite } from './materials';
 import { isOutlineHull } from './cel';
 import { DUMMY_X, HERO_X } from './constants';
 import { STYLE } from './style';
+import sparkUrl from './textures/spark.png';
 
 interface Particle {
-  mesh: THREE.Mesh;
+  sprite: THREE.Sprite;
   velocity: THREE.Vector3;
   life: number;
   maxLife: number;
@@ -49,16 +50,23 @@ export function createFx(scene: THREE.Scene, onBlastImpact: (big: boolean) => vo
   const blasts: Blast[] = [];
   const particles: Particle[] = [];
 
+  /** One soft glow mote: the baked spark puff, tinted, bloom-marked. */
+  function mote(color: number, size: number, origin: THREE.Vector3): THREE.Sprite {
+    const sprite = new THREE.Sprite(sparkSprite(sparkUrl, color));
+    sprite.scale.setScalar(size);
+    sprite.position.copy(origin);
+    markBloom(sprite);
+    scene.add(sprite);
+    return sprite;
+  }
+
   function burst(color: number, count: number, origin: THREE.Vector3, speed: number) {
     for (let i = 0; i < count; i++) {
-      const mesh = new THREE.Mesh(new THREE.OctahedronGeometry(0.09), glowSurface(color, 1));
-      markBloom(mesh);
-      mesh.position.copy(origin);
+      const sprite = mote(color, 0.34 + (i % 3) * 0.08, origin);
       const theta = (i / count) * Math.PI * 2;
       const up = 1.5 + (i % 3);
       const velocity = new THREE.Vector3(Math.cos(theta) * speed, up, Math.sin(theta) * speed);
-      scene.add(mesh);
-      particles.push({ mesh, velocity, life: 1, maxLife: 1, gravity: 9 });
+      particles.push({ sprite, velocity, life: 1, maxLife: 1, gravity: 9 });
     }
   }
 
@@ -69,12 +77,8 @@ export function createFx(scene: THREE.Scene, onBlastImpact: (big: boolean) => vo
     life: number,
     size = 0.06,
   ) {
-    const mesh = new THREE.Mesh(new THREE.TetrahedronGeometry(size), glowSurface(color, 1));
-    markBloom(mesh);
-    mesh.position.copy(origin);
-    mesh.rotation.set(Math.random() * 3, Math.random() * 3, 0);
-    scene.add(mesh);
-    particles.push({ mesh, velocity, life, maxLife: life, gravity: 0 });
+    const sprite = mote(color, size * 5, origin);
+    particles.push({ sprite, velocity, life, maxLife: life, gravity: 0 });
   }
 
   function fireBlast(big: boolean) {
@@ -133,17 +137,18 @@ export function createFx(scene: THREE.Scene, onBlastImpact: (big: boolean) => vo
         }
       }
 
-      // Particles: rise, fall, fade.
+      // Particles: rise, fall, fade. The shared spark texture is never
+      // disposed — only each mote's own tinted material.
       for (let i = particles.length - 1; i >= 0; i--) {
         const p = particles[i];
         if (!p) continue;
         p.life -= dt;
         p.velocity.y -= p.gravity * dt;
-        p.mesh.position.addScaledVector(p.velocity, dt);
-        (p.mesh.material as THREE.MeshBasicMaterial).opacity = Math.max(0, p.life / p.maxLife);
+        p.sprite.position.addScaledVector(p.velocity, dt);
+        p.sprite.material.opacity = Math.max(0, p.life / p.maxLife);
         if (p.life <= 0) {
-          scene.remove(p.mesh);
-          freeMesh(p.mesh);
+          scene.remove(p.sprite);
+          p.sprite.material.dispose();
           particles.splice(i, 1);
         }
       }
