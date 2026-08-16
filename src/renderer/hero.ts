@@ -143,6 +143,26 @@ export function buildHero(appearance: HeroAppearance): HeroRig {
   belt.scale.z = 0.78;
   group.add(belt);
 
+  // The martial-arts sash: a tied knot at the front with two hanging tails.
+  const knot = new THREE.Mesh(new THREE.SphereGeometry(0.08, 8, 6), trimMaterial);
+  knot.position.set(0, 1.0, girl ? 0.26 : 0.3);
+  knot.scale.set(1.2, 0.8, 0.7);
+  group.add(knot);
+  for (const side of [-1, 1]) {
+    const tail = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.2, 0.025), trimMaterial);
+    tail.position.set(side * 0.07, 0.88, girl ? 0.25 : 0.29);
+    tail.rotation.z = side * 0.18;
+    group.add(tail);
+  }
+
+  // The gi's lower flap over the trousers (armor wears a solid suit instead).
+  if (appearance.garment !== 'armor') {
+    const flap = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.24, 0.05), bodyMaterial);
+    flap.position.set(0, 0.84, girl ? 0.2 : 0.24);
+    flap.rotation.x = 0.14;
+    group.add(flap);
+  }
+
   // Torso pivot: leaning and twisting happen here; arms and head ride along.
   const torso = new THREE.Group();
   torso.position.y = 1.0;
@@ -161,6 +181,17 @@ export function buildHero(appearance: HeroAppearance): HeroRig {
     torso.add(contour);
   }
 
+  // The gi's crossed collar: two trim bands meeting in a V at the chest
+  // (battle armor's plate covers the same spot, so it goes without).
+  if (appearance.garment !== 'armor') {
+    for (const side of [-1, 1]) {
+      const lapel = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.055, 0.03), trimMaterial);
+      lapel.position.set(side * 0.1, 0.56, girl ? 0.24 : 0.29);
+      lapel.rotation.z = side * 0.55;
+      torso.add(lapel);
+    }
+  }
+
   const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.095, 0.11, 0.16, 10), skinMaterial);
   neck.position.y = 0.78;
   torso.add(neck);
@@ -174,14 +205,26 @@ export function buildHero(appearance: HeroAppearance): HeroRig {
   skull.position.y = 0.16;
   head.add(skull);
 
+  // The anime face: determined brows, bright eyes, a small steady mouth.
+  // Unlit like the eyes so the features read as clean ink at any light.
+  const faceInk = glowSurface(0x222222);
   for (const side of [-1, 1]) {
     const eye = new THREE.Mesh(
       new THREE.SphereGeometry(girl ? 0.055 : 0.045, 8, 6),
-      glowSurface(0x222222),
+      faceInk,
     );
     eye.position.set(side * 0.13, 0.22, 0.29);
     head.add(eye);
+
+    const brow = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.02, 0.02), faceInk);
+    brow.position.set(side * 0.13, 0.31, 0.3);
+    // Inner ends dip toward the nose: focused, never angry.
+    brow.rotation.z = side * -0.22;
+    head.add(brow);
   }
+  const mouth = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.016, 0.02), faceInk);
+  mouth.position.set(0, 0.06, 0.315);
+  head.add(mouth);
 
   // Anime hair from the chosen style; every strand shares the swappable
   // hair materials so streak forms and player colors recolor them all.
@@ -411,6 +454,11 @@ function buildHair(head: THREE.Group, style: HairStyle, long: boolean, hairMat: 
       spike(-0.1, 0.62, -0.18, 0.5, 0.25);
       spike(0.05, 0.64, 0.2, -0.45, -0.15);
       spike(-0.05, 0.64, 0.2, -0.45, 0.15);
+      // Temple spikes flaring past the ears widen the classic silhouette.
+      spike(0.28, 0.42, 0.03, 0.1, -1.05, 0.1, 0.42);
+      spike(-0.28, 0.42, 0.03, 0.1, 1.05, 0.1, 0.42);
+      spike(0.16, 0.52, 0.22, -0.55, -0.55, 0.09, 0.34);
+      spike(-0.16, 0.52, 0.22, -0.55, 0.55, 0.09, 0.34);
       if (long) {
         // A wild mane cascading down the back.
         spike(0.14, 0.12, -0.34, 2.7, -0.1, 0.13, 0.85);
@@ -420,20 +468,30 @@ function buildHair(head: THREE.Group, style: HairStyle, long: boolean, hairMat: 
       break;
     }
     case 'flame': {
-      // One big swept-back flame of hair.
+      // One big swept-back flame of hair, with a defiant front lick.
       spike(0, 0.67, -0.05, -0.55, 0, 0.24, long ? 1.1 : 0.75);
       spike(0.14, 0.57, -0.12, -0.7, -0.2, 0.18, long ? 0.9 : 0.6);
       spike(-0.14, 0.57, -0.12, -0.7, 0.2, 0.18, long ? 0.9 : 0.6);
+      spike(0.06, 0.56, 0.18, -1.0, -0.3, 0.1, 0.4);
+      spike(-0.1, 0.53, 0.16, -0.9, 0.35, 0.08, 0.32);
       break;
     }
     case 'ponytail': {
-      cap(1.02, 0.75, 0.27);
+      // High and flat enough that the hairline sits above the brows.
+      cap(1.0, 0.6, 0.34);
+      // Side bangs hug the temples — they frame the face, never cover it.
+      spike(0.3, 0.34, 0.1, -0.1, -1.15, 0.07, 0.3);
+      spike(-0.3, 0.34, 0.1, -0.1, 1.15, 0.07, 0.3);
       spike(0, 0.47, -0.3, 2.45, 0, 0.12, long ? 0.9 : 0.5);
       if (long) spike(0, -0.13, -0.42, 2.9, 0, 0.1, 0.7);
       break;
     }
     case 'buzz': {
       cap(long ? 1.06 : 1.0, long ? 0.75 : 0.6, long ? 0.3 : 0.34);
+      // A short widow's-peak fringe so the cut reads on purpose, not bald.
+      spike(0, 0.4, 0.3, -1.25, 0, 0.09, 0.22);
+      spike(0.12, 0.38, 0.27, -1.2, -0.3, 0.07, 0.18);
+      spike(-0.12, 0.38, 0.27, -1.2, 0.3, 0.07, 0.18);
       break;
     }
   }

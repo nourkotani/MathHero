@@ -8,8 +8,11 @@ export const STYLE = {
   /** Ink outlines on the characters (inverted hull). */
   outline: {
     color: 0x14101f,
-    /** Hull scale: how thick the ink line reads. */
-    scale: 1.05,
+    /** Absolute line width in world units — small meshes hull out further,
+     * so the ink reads one consistent weight at every camera distance. */
+    width: 0.016,
+    /** Cap on how far a tiny mesh may hull out (fraction of its size). */
+    maxScale: 1.3,
   },
 
   /** The dusk palette and light rig. */

@@ -31,8 +31,13 @@ export function applyCelTreatment(root: THREE.Object3D): void {
   });
   for (const mesh of targets) {
     mesh.castShadow = true;
+    // Absolute ink width: scale each hull by width relative to the mesh's
+    // own size, so a fist and a torso carry the same line weight.
+    mesh.geometry.computeBoundingSphere();
+    const radius = mesh.geometry.boundingSphere?.radius ?? 1;
+    const scale = Math.min(STYLE.outline.maxScale, 1 + STYLE.outline.width / Math.max(radius, 0.02));
     const hull = new THREE.Mesh(mesh.geometry, inkMaterial);
-    hull.scale.setScalar(STYLE.outline.scale);
+    hull.scale.setScalar(scale);
     hull.userData.outlineHull = true;
     mesh.add(hull);
   }

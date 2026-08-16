@@ -4,7 +4,7 @@
 // adding a new one is a new entry, not new animation machinery.
 
 import * as THREE from 'three';
-import { characterSurface } from './materials';
+import { characterSurface, glowSurface } from './materials';
 import { applyCelTreatment } from './cel';
 import { DUMMY_X } from './constants';
 import { createChannel } from './timeline';
@@ -133,6 +133,14 @@ function buildTrainingDummy(): THREE.Group {
   post.position.y = 0.9;
   group.add(post);
 
+  // Where the post plugs into the padded torso: a bolted collar joint.
+  const collar = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.22, 0.26, 0.14, 12),
+    characterSurface(0x6e5230),
+  );
+  collar.position.y = 1.42;
+  group.add(collar);
+
   const torso = new THREE.Mesh(
     new THREE.CapsuleGeometry(0.42, 0.6, 6, 12),
     characterSurface(0xc9584a),
@@ -140,12 +148,42 @@ function buildTrainingDummy(): THREE.Group {
   torso.position.y = 1.8;
   group.add(torso);
 
+  // Stitched panel seams across the padding — a built machine, not a blob.
+  const seamMaterial = characterSurface(0x9e4237);
+  for (const y of [1.62, 1.98]) {
+    const seam = new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.022, 6, 24), seamMaterial);
+    seam.position.y = y;
+    seam.rotation.x = Math.PI / 2;
+    group.add(seam);
+  }
+
+  // Rivets around the base plate.
+  const rivetMaterial = characterSurface(0x4a4a52);
+  for (let i = 0; i < 6; i++) {
+    const angle = (i / 6) * Math.PI * 2;
+    const rivet = new THREE.Mesh(new THREE.SphereGeometry(0.05, 6, 5), rivetMaterial);
+    rivet.position.set(Math.cos(angle) * 0.62, 0.3, Math.sin(angle) * 0.62);
+    group.add(rivet);
+  }
+
   const face = new THREE.Mesh(
     new THREE.SphereGeometry(0.3, 20, 16),
     characterSurface(0xd9d9d9),
   );
   face.position.y = 2.55;
   group.add(face);
+
+  // A cheeky bot face on the hero-facing side — it does taunt, after all.
+  const faceInk = glowSurface(0x222222);
+  for (const side of [-1, 1]) {
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.045, 8, 6), faceInk);
+    eye.position.set(-0.25, 2.63, side * 0.11);
+    group.add(eye);
+  }
+  const grin = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.02, 0.14), faceInk);
+  grin.position.set(-0.28, 2.47, 0);
+  grin.rotation.x = 0.15;
+  group.add(grin);
 
   const target = new THREE.Mesh(
     new THREE.TorusGeometry(0.18, 0.045, 8, 20),
