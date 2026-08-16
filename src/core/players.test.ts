@@ -7,7 +7,7 @@ import {
   serializeSaveFile,
   update,
 } from './index';
-import { dispatchAll, preRound, TEST_APPEARANCE, TEST_COLORS } from './test-helpers';
+import { dispatchAll, perSkill, preRound, TEST_APPEARANCE, TEST_COLORS } from './test-helpers';
 
 describe('hero creation', () => {
   it('creates a player with a stable id, makes them active, and heads to pre-round', () => {
@@ -17,7 +17,7 @@ describe('hero creation', () => {
 
     const result = update(opened, { type: 'PLAYER_CREATED', name: '  Zara  ', colors: TEST_COLORS, appearance: TEST_APPEARANCE });
     expect(result.state.players).toEqual([
-      { id: 'p1', name: 'Zara', colors: TEST_COLORS, appearance: TEST_APPEARANCE, roundsPlayed: 0, xp: 0, bests: { multiply: {}, divide: {} }, factStats: { multiply: {}, divide: {} } },
+      { id: 'p1', name: 'Zara', colors: TEST_COLORS, appearance: TEST_APPEARANCE, roundsPlayed: 0, xp: 0, bests: perSkill(), factStats: perSkill() },
     ]);
     expect(result.state.activePlayerId).toBe('p1');
     expect(result.state.phase).toBe('pre-round');

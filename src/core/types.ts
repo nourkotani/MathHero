@@ -10,13 +10,20 @@ import type { Skill } from './skills';
 import type { StreakForm } from './streak';
 
 /**
- * A Fact in the operand order it is displayed. The active Skill's definition
- * turns it into a prompt: Multiply shows "a × b"; Divide shows the same pair
- * inside-out as "(a·b) ÷ a" with the missing factor b as the answer.
+ * A Fact in the operand order it is displayed, dressed by the active Skill's
+ * definition into a full prompt: Multiply shows "a × b"; Divide shows the
+ * same pair inside-out as "(a·b) ÷ a" with the missing factor b as the
+ * answer; Machine wears it as the Secret Rule "(Input × a) + b".
+ * Skill-drawn presentation fields are session-only — never persisted.
  */
 export interface Question {
   a: number;
   b: number;
+  /**
+   * Machine only: the jump input (5–12) the prompt asks about. Drawn by
+   * Machine's dress, which always sets it on Machine Questions.
+   */
+  input?: number;
 }
 
 export type Phase = 'title' | 'hero-creation' | 'pre-round' | 'in-round' | 'results';

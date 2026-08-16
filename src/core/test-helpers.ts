@@ -1,11 +1,21 @@
 // Shared helpers for the headless core suites. Everything goes through the
 // public interface — initialState + update — never past it.
 
-import { activeSkill, DEFAULT_APPEARANCE, initialState, skillFor, update } from './index';
+import { activeSkill, DEFAULT_APPEARANCE, emptyPerSkill, initialState, skillFor, update } from './index';
 import type { Difficulty, GameEvent, GameState, Skill, UpdateResult } from './index';
 
 export const TEST_COLORS = { hair: 'midnight', outfitPrimary: 'blue', outfitSecondary: 'orange' };
 export const TEST_APPEARANCE = DEFAULT_APPEARANCE;
+
+/**
+ * A full per-Skill map — every Skill present, empty slices unless overridden.
+ * Fixtures and expectations built with this survive the Skill union growing.
+ */
+export function perSkill<T extends object>(
+  overrides: Partial<Record<Skill, T>> = {},
+): Record<Skill, T> {
+  return { ...emptyPerSkill(() => ({}) as T), ...overrides };
+}
 
 export function dispatchAll(state: GameState, events: GameEvent[]): GameState {
   return events.reduce((s, event) => update(s, event).state, state);

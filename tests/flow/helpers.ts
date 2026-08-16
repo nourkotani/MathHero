@@ -32,13 +32,30 @@ export async function advanceClock(page: Page, ms: number): Promise<void> {
   await page.evaluate((m) => window.__mathhero?.advance(m), ms);
 }
 
-/** Read the current question off the HUD and return its correct answer — both Skills. */
+/** The Machine's Secret Rule, cracked from its example rows: output = a·input + b. */
+export async function readMachineRule(page: Page): Promise<{ a: number; b: number }> {
+  const row = async (input: number) => {
+    const text = await page.getByTestId(`machine-row-${input}`).innerText();
+    const match = text.match(/→\s*(\d+)/);
+    if (!match) throw new Error(`could not parse machine row ${input}: ${text}`);
+    return Number(match[1]);
+  };
+  const [o1, o2] = [await row(1), await row(2)];
+  return { a: o2 - o1, b: o1 - (o2 - o1) };
+}
+
+/** Read the current question off the HUD and return its correct answer — every Skill. */
 export async function readCorrectAnswer(page: Page): Promise<number> {
   const text = await page.getByTestId('question').innerText();
   const multiply = text.match(/(\d+)\s*×\s*(\d+)/);
   if (multiply) return Number(multiply[1]) * Number(multiply[2]);
   const divide = text.match(/(\d+)\s*÷\s*(\d+)/);
   if (divide) return Number(divide[1]) / Number(divide[2]);
+  const machine = text.match(/(\d+)\s*→/);
+  if (machine) {
+    const { a, b } = await readMachineRule(page);
+    return a * Number(machine[1]) + b;
+  }
   throw new Error(`could not parse question from HUD: ${text}`);
 }
 

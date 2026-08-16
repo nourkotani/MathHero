@@ -6,7 +6,7 @@ import {
   remainingSeconds,
   update,
 } from './index';
-import { answerCorrectly, dispatchAll, freshRound, preRound } from './test-helpers';
+import { answerCorrectly, dispatchAll, freshRound, perSkill, preRound } from './test-helpers';
 
 describe('timer settings', () => {
   it('defaults to two minutes', () => {
@@ -86,7 +86,7 @@ describe('Round lifecycle', () => {
     const player = result.state.players[0];
     expect(player?.xp).toBe(0);
     expect(player?.roundsPlayed).toBe(0);
-    expect(player?.bests).toEqual({ multiply: {}, divide: {} });
+    expect(player?.bests).toEqual(perSkill());
 
     // Quit is only meaningful mid-Round.
     expect(update(result.state, { type: 'ROUND_QUIT' }).state).toEqual(result.state);

@@ -10,7 +10,7 @@ import {
   update,
 } from './index';
 import type { GameEffect } from './index';
-import { dispatchAll, preRound } from './test-helpers';
+import { dispatchAll, perSkill, preRound } from './test-helpers';
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -82,8 +82,8 @@ describe('cross-tab Save File reload', () => {
         },
         roundsPlayed: 0,
         xp: 0,
-        bests: { multiply: {}, divide: {} },
-        factStats: { multiply: {}, divide: {} },
+        bests: perSkill(),
+        factStats: perSkill(),
       })),
       nextPlayerId: names.length + 1,
       lastExportAt: 4321,
@@ -182,7 +182,7 @@ describe('the 7-day backup reminder', () => {
     // Also covers the previously untested v3→v4 and v4→v5 migrations.
     const save = parseSaveFile(v3);
     expect(save?.version).toBe(SAVE_FILE_VERSION);
-    expect(save?.players[0]?.factStats).toEqual({ multiply: {}, divide: {} });
+    expect(save?.players[0]?.factStats).toEqual(perSkill());
     expect(save?.lastExportAt).toBeNull();
 
     let state = dispatchAll(initialState({ seed: 76, save }), [
@@ -211,8 +211,8 @@ describe('Save File validation hardening', () => {
     },
     roundsPlayed: 1,
     xp: 100,
-    bests: { multiply: {}, divide: {} },
-    factStats: { multiply: {}, divide: {} },
+    bests: perSkill(),
+    factStats: perSkill(),
   };
   const doc = (overrides: object, player: object = validPlayer) =>
     JSON.stringify({
@@ -230,7 +230,7 @@ describe('Save File validation hardening', () => {
     expect(parseSaveFile(doc({ nextPlayerId: Number.POSITIVE_INFINITY }))).toBeNull();
     expect(
       parseSaveFile(
-        doc({}, { ...validPlayer, bests: { multiply: { easy: Number.NaN }, divide: {} } }),
+        doc({}, { ...validPlayer, bests: perSkill({ multiply: { easy: Number.NaN } }) }),
       ),
     ).toBeNull();
   });

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { factKey, FAST_MS, initialState, masteryOf, SAVE_FILE_VERSION, update } from './index';
 import type { FactAttempt, GameState, SaveFile } from './index';
-import { answerCorrectly, answerWrongly, dispatchAll, freshRound } from './test-helpers';
+import { answerCorrectly, answerWrongly, dispatchAll, freshRound, perSkill } from './test-helpers';
 
 const fast = (n: number): FactAttempt[] => Array.from({ length: n }, () => ({ correct: true, ms: 2000 }));
 const wrongs = (n: number): FactAttempt[] => Array.from({ length: n }, () => ({ correct: false, ms: 4000 }));
@@ -100,8 +100,8 @@ describe('Adaptive Selection', () => {
           },
           roundsPlayed: 0,
           xp: 0,
-          bests: { multiply: {}, divide: {} },
-          factStats: { multiply: factStats, divide: {} },
+          bests: perSkill(),
+          factStats: perSkill({ multiply: factStats }),
         },
       ],
       nextPlayerId: 2,

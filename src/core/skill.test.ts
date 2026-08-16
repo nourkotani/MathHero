@@ -9,7 +9,7 @@ import {
   update,
 } from './index';
 import type { FactAttempt, GameState, SaveFile } from './index';
-import { answerCorrectly, dispatchAll, freshRound, preRound } from './test-helpers';
+import { answerCorrectly, dispatchAll, freshRound, perSkill, preRound } from './test-helpers';
 
 // The Skill seam: picking Divide on the Pre-round screen, per-Skill
 // recording and adaptive weighting, per-Skill × Difficulty bests, and the
@@ -93,8 +93,8 @@ describe('Divide Rounds', () => {
           },
           roundsPlayed: 0,
           xp: 0,
-          bests: { multiply: {}, divide: {} },
-          factStats: { multiply, divide },
+          bests: perSkill(),
+          factStats: perSkill({ multiply, divide }),
         },
       ],
       nextPlayerId: 2,
@@ -124,7 +124,7 @@ describe('Divide Rounds', () => {
     state = answerCorrectly(state).state; // 10 points on Easy
     const result = update(state, { type: 'TICK', now: 999_999 });
     const player = result.state.players[0];
-    expect(player?.bests).toEqual({ multiply: {}, divide: { easy: 10 } });
+    expect(player?.bests).toEqual(perSkill({ divide: { easy: 10 } }));
     expect(result.effects).toContainEqual({
       type: 'NEW_PERSONAL_BEST',
       skill: 'divide',

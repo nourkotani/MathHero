@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { factKey, update } from './index';
 import type { GameEvent, GameState } from './index';
-import { answerCorrectly, dispatchAll, preRound } from './test-helpers';
+import { answerCorrectly, dispatchAll, perSkill, preRound } from './test-helpers';
 
 function practiceRound(seed: number, table: number): GameState {
   return dispatchAll(preRound(seed), [
@@ -91,7 +91,7 @@ describe('practice Rounds', () => {
     const player = result.state.players[0];
     expect(player?.xp).toBe(10);
     expect(player?.factStats.multiply[key]).toHaveLength(1);
-    expect(player?.bests).toEqual({ multiply: {}, divide: {} });
+    expect(player?.bests).toEqual(perSkill());
     expect(result.effects.some((e) => e.type === 'NEW_PERSONAL_BEST')).toBe(false);
   });
 

@@ -899,6 +899,68 @@ body {
   animation: question-in 0.2s ease-out;
 }
 
+/* The Machine: a glowing sci-fi training pod readout. Original design —
+   gravity-chamber *inspired*, nothing licensed. */
+.machine-panel {
+  margin-top: 0.5rem;
+  padding: 0.6rem 1.6rem 0.8rem;
+  background: var(--panel);
+  border: 2px solid var(--ki-blue);
+  border-radius: 1.2rem;
+  box-shadow:
+    0 0 22px rgba(58, 192, 255, 0.35),
+    inset 0 0 30px rgba(58, 192, 255, 0.08);
+  animation: question-in 0.2s ease-out;
+}
+
+.machine-title {
+  font-size: 1.1rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ki-blue);
+  text-shadow: 0 0 10px rgba(58, 192, 255, 0.5);
+  margin-bottom: 0.3rem;
+}
+
+.machine-row {
+  display: flex;
+  justify-content: center;
+  align-items: baseline;
+  gap: 0.7rem;
+  font-size: 1.9rem;
+  font-weight: 800;
+  color: var(--text-dim);
+}
+
+.machine-row .machine-in {
+  min-width: 2ch;
+  text-align: right;
+}
+
+.machine-row .machine-out {
+  min-width: 3ch;
+  text-align: left;
+}
+
+.machine-arrow {
+  color: var(--ki-blue);
+}
+
+.machine-query {
+  color: var(--text);
+  border-top: 1px solid var(--panel-border);
+  margin-top: 0.35rem;
+  padding-top: 0.35rem;
+}
+
+/* The query row is the Question — same size, inside the pod. */
+.machine-panel .machine-query.question {
+  margin-top: 0.35rem;
+  font-size: 2.6rem;
+  animation: none;
+}
+
 @keyframes question-in {
   from {
     opacity: 0;

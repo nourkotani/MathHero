@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { familyLeaderboard, parseSaveFile, SAVE_FILE_VERSION, update } from './index';
+import { emptyPerSkill, familyLeaderboard, parseSaveFile, SAVE_FILE_VERSION, update } from './index';
 import type { GameState, PlayerRecord } from './index';
-import { answerCorrectly, freshRound } from './test-helpers';
+import { answerCorrectly, freshRound, perSkill } from './test-helpers';
+
+/** Leaderboard expectation: zero for every Skill unless overridden. */
+const zeroPerSkill = (overrides: Record<string, number>) => ({ ...emptyPerSkill(() => 0), ...overrides });
 
 /** Play a round scoring `corrects` correct answers, then end it. */
 function playRound(state: GameState, corrects: number, endNow: number): ReturnType<typeof update> {
@@ -17,7 +20,7 @@ function nextRound(state: GameState): GameState {
 describe('Personal Bests', () => {
   it('records the first scoring Round as the best for that difficulty', () => {
     const result = playRound(freshRound(31), 2, 999_999); // 20 points on Easy
-    expect(result.state.players[0]?.bests).toEqual({ multiply: { easy: 20 }, divide: {} });
+    expect(result.state.players[0]?.bests).toEqual(perSkill({ multiply: { easy: 20 } }));
     expect(result.effects.map((e) => e.type)).toEqual([
       'ROUND_ENDED',
       'NEW_PERSONAL_BEST',
@@ -27,7 +30,7 @@ describe('Personal Bests', () => {
 
   it('a zero-point Round records no best and no celebration', () => {
     const result = playRound(freshRound(32), 0, 999_999);
-    expect(result.state.players[0]?.bests).toEqual({ multiply: {}, divide: {} });
+    expect(result.state.players[0]?.bests).toEqual(perSkill());
     expect(result.effects.some((e) => e.type === 'NEW_PERSONAL_BEST')).toBe(false);
   });
 
@@ -36,7 +39,7 @@ describe('Personal Bests', () => {
     let state = playRound(freshRound(33), 5, 999_999).state;
     // Round 2 on Easy: 2 corrects = 20 points → no new best.
     const worse = playRound(nextRound(state), 2, 9_999_999);
-    expect(worse.state.players[0]?.bests).toEqual({ multiply: { easy: 80 }, divide: {} });
+    expect(worse.state.players[0]?.bests).toEqual(perSkill({ multiply: { easy: 80 } }));
     expect(worse.effects.some((e) => e.type === 'NEW_PERSONAL_BEST')).toBe(false);
 
     // Round 3 on Medium: 2 corrects = 40 points → separate best.
@@ -44,10 +47,7 @@ describe('Personal Bests', () => {
     state = update(state, { type: 'DIFFICULTY_CHANGED', difficulty: 'medium' }).state;
     state = update(state, { type: 'ROUND_STARTED' }).state;
     const medium = playRound(state, 2, 99_999_999);
-    expect(medium.state.players[0]?.bests).toEqual({
-      multiply: { easy: 80, medium: 40 },
-      divide: {},
-    });
+    expect(medium.state.players[0]?.bests).toEqual(perSkill({ multiply: { easy: 80, medium: 40 } }));
   });
 
   it('NEW_PERSONAL_BEST is ordered after LEVEL_UP effects', () => {
@@ -65,16 +65,16 @@ describe('Personal Bests', () => {
 describe('Family Leaderboard', () => {
   it('is derived from player bests, per Skill, and ranked across every Skill', () => {
     const players: PlayerRecord[] = [
-      { id: 'p1', name: 'Zara', colors: { hair: 'gold', outfitPrimary: 'blue', outfitSecondary: 'teal' }, appearance: { body: 'boy', hairStyle: 'spiky', hairLength: 'short', garment: 'gi', skinTone: 'tan' }, roundsPlayed: 1, xp: 100, bests: { multiply: { easy: 100 }, divide: { medium: 400 } }, factStats: { multiply: {}, divide: {} } },
-      { id: 'p2', name: 'Milo', colors: { hair: 'sky', outfitPrimary: 'red', outfitSecondary: 'white' }, appearance: { body: 'boy', hairStyle: 'spiky', hairLength: 'short', garment: 'gi', skinTone: 'tan' }, roundsPlayed: 2, xp: 400, bests: { multiply: { easy: 80, hard: 300 }, divide: {} }, factStats: { multiply: {}, divide: {} } },
-      { id: 'p3', name: 'Ana', colors: { hair: 'rose', outfitPrimary: 'green', outfitSecondary: 'blue' }, appearance: { body: 'boy', hairStyle: 'spiky', hairLength: 'short', garment: 'gi', skinTone: 'tan' }, roundsPlayed: 0, xp: 0, bests: { multiply: {}, divide: {} }, factStats: { multiply: {}, divide: {} } },
+      { id: 'p1', name: 'Zara', colors: { hair: 'gold', outfitPrimary: 'blue', outfitSecondary: 'teal' }, appearance: { body: 'boy', hairStyle: 'spiky', hairLength: 'short', garment: 'gi', skinTone: 'tan' }, roundsPlayed: 1, xp: 100, bests: perSkill({ multiply: { easy: 100 }, divide: { medium: 400 } }), factStats: perSkill() },
+      { id: 'p2', name: 'Milo', colors: { hair: 'sky', outfitPrimary: 'red', outfitSecondary: 'white' }, appearance: { body: 'boy', hairStyle: 'spiky', hairLength: 'short', garment: 'gi', skinTone: 'tan' }, roundsPlayed: 2, xp: 400, bests: perSkill({ multiply: { easy: 80, hard: 300 } }), factStats: perSkill() },
+      { id: 'p3', name: 'Ana', colors: { hair: 'rose', outfitPrimary: 'green', outfitSecondary: 'blue' }, appearance: { body: 'boy', hairStyle: 'spiky', hairLength: 'short', garment: 'gi', skinTone: 'tan' }, roundsPlayed: 0, xp: 0, bests: perSkill(), factStats: perSkill() },
     ];
     const board = familyLeaderboard(players);
     // Zara's Divide 400 outranks Milo's Multiply 300: one honest sort.
     expect(board.map((e) => e.id)).toEqual(['p1', 'p2', 'p3']);
-    expect(board[0]?.bestPerSkill).toEqual({ multiply: 100, divide: 400 });
+    expect(board[0]?.bestPerSkill).toEqual(zeroPerSkill({ multiply: 100, divide: 400 }));
     expect(board[0]?.topScore).toBe(400);
-    expect(board[1]?.bestPerSkill).toEqual({ multiply: 300, divide: 0 });
+    expect(board[1]?.bestPerSkill).toEqual(zeroPerSkill({ multiply: 300 }));
     expect(board[2]?.topScore).toBe(0);
   });
 
@@ -94,6 +94,6 @@ describe('Family Leaderboard', () => {
     });
     const migrated = parseSaveFile(v2);
     expect(migrated?.version).toBe(SAVE_FILE_VERSION);
-    expect(migrated?.players[0]).toMatchObject({ xp: 250, bests: { multiply: {}, divide: {} } });
+    expect(migrated?.players[0]).toMatchObject({ xp: 250, bests: perSkill() });
   });
 });

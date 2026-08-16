@@ -14,7 +14,7 @@ function validCount(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0;
 }
 
-export const SAVE_FILE_VERSION = 9;
+export const SAVE_FILE_VERSION = 10;
 
 export interface SaveFile {
   version: number;
@@ -108,6 +108,19 @@ const MIGRATIONS: Array<(doc: Record<string, unknown>) => Record<string, unknown
         ...p,
         bests: { multiply: p.bests ?? {}, divide: {} },
         factStats: { multiply: p.factStats ?? {}, divide: {} },
+      }),
+    ),
+  }),
+  // v9 → v10: the Machine Skill arrives. Every hero keeps what they earned;
+  // Machine mastery and bests start fresh. Frozen literal on purpose.
+  (doc) => ({
+    ...doc,
+    version: 10,
+    players: (Array.isArray(doc.players) ? doc.players : []).map(
+      (p: Record<string, unknown>) => ({
+        ...p,
+        bests: { ...(p.bests as Record<string, unknown>), machine: {} },
+        factStats: { ...(p.factStats as Record<string, unknown>), machine: {} },
       }),
     ),
   }),
