@@ -37,22 +37,51 @@ let sharedRamp: THREE.DataTexture | null = null;
 /**
  * Lit surfaces on the hero and the Training Dummy: banded toon shading, so
  * the characters read as anime cels against the softer painted environment.
+ * An optional baked multiply-map adds fabric weave, hair strands, or worn
+ * padding — white where the player's chosen color must stay full; it can
+ * only darken, by design.
  */
-export function characterSurface(color: number): Surface {
+export function characterSurface(color: number, mapUrl?: string): Surface {
   sharedRamp ??= createToonRamp(STYLE.ramp);
-  const material = new THREE.MeshToonMaterial({ color, gradientMap: sharedRamp });
+  const material =
+    mapUrl === undefined
+      ? new THREE.MeshToonMaterial({ color, gradientMap: sharedRamp })
+      : new THREE.MeshToonMaterial({ color, gradientMap: sharedRamp, map: paintedMap(mapUrl) });
   material.userData.role = 'character';
   return material;
 }
 
 /**
+ * The hero's painted anime face, worn as a transparent decal on a sphere
+ * segment floating just off the skull. Deliberately NOT a character-role
+ * surface: it must never grow an ink hull or cast a shadow, and depth
+ * writes stay off so it cannot z-fight the skull beneath it.
+ */
+export function faceDecal(url: string): THREE.MeshBasicMaterial {
+  return new THREE.MeshBasicMaterial({
+    map: paintedMap(url),
+    transparent: true,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+  });
+}
+
+const paintedMaps = new Map<string, THREE.Texture>();
+
+/**
  * A painted texture baked by scripts/bake-textures.mjs, inlined into the
  * single file by the build. Color maps only — hence the sRGB color space.
+ * Cached per url: hero rebuilds re-request the same maps forever, and the
+ * cache means they share one texture instead of leaking one per rebuild.
  */
 export function paintedMap(url: string): THREE.Texture {
-  const texture = new THREE.TextureLoader().load(url);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  texture.anisotropy = 4;
+  let texture = paintedMaps.get(url);
+  if (texture === undefined) {
+    texture = new THREE.TextureLoader().load(url);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.anisotropy = 4;
+    paintedMaps.set(url, texture);
+  }
   return texture;
 }
 
@@ -85,9 +114,12 @@ export function environmentSurface(color: number, roughness: number, map?: THREE
  * Pass an opacity to get a transparent glow; omit it for a solid one.
  */
 export function glowSurface(color: number, opacity?: number): THREE.MeshBasicMaterial {
+  // Transparent glows must never write depth: an invisible aura shell that
+  // stamps the z-buffer silently occludes every transparent thing drawn
+  // after it — which is exactly how the hero's face decal once vanished.
   return opacity === undefined
     ? new THREE.MeshBasicMaterial({ color })
-    : new THREE.MeshBasicMaterial({ color, transparent: true, opacity });
+    : new THREE.MeshBasicMaterial({ color, transparent: true, opacity, depthWrite: false });
 }
 
 /**

@@ -5,10 +5,14 @@
 import * as THREE from 'three';
 import { presetHex, SKIN_PRESETS } from '../core';
 import type { HairStyle, HeroAppearance, StreakForm } from '../core';
-import { characterSurface, glowSurface, markBloom } from './materials';
+import { characterSurface, faceDecal, glowSurface, markBloom } from './materials';
 import { STYLE } from './style';
 import type { Surface } from './materials';
 import { applyCelTreatment } from './cel';
+import clothUrl from './textures/cloth.png';
+import faceBoyUrl from './textures/face-boy.png';
+import faceGirlUrl from './textures/face-girl.png';
+import hairStrandsUrl from './textures/hair-strands.png';
 
 // Visual treatment per streak form, keyed by the core's form names — the ONE
 // place a form's look lives; no site may special-case a form by name.
@@ -131,8 +135,8 @@ export function buildHero(appearance: HeroAppearance): HeroRig {
   const group = new THREE.Group();
   const girl = appearance.body === 'girl';
 
-  const bodyMaterial = characterSurface(0x3a6fd8);
-  const trimMaterial = characterSurface(0xff9f1c);
+  const bodyMaterial = characterSurface(0x3a6fd8, clothUrl);
+  const trimMaterial = characterSurface(0xff9f1c, clothUrl);
   const skinMaterial = characterSurface(presetHex(SKIN_PRESETS, appearance.skinTone));
 
   // Pelvis: the gi's trousers. Girls get wider hips, boys a blockier seat.
@@ -211,32 +215,22 @@ export function buildHero(appearance: HeroAppearance): HeroRig {
   skull.position.y = 0.16;
   head.add(skull);
 
-  // The anime face: determined brows, bright eyes, a small steady mouth.
-  // Unlit like the eyes so the features read as clean ink at any light.
-  const faceInk = glowSurface(0x222222);
-  for (const side of [-1, 1]) {
-    const eye = new THREE.Mesh(
-      new THREE.SphereGeometry(girl ? 0.055 : 0.045, 8, 6),
-      faceInk,
-    );
-    eye.position.set(side * 0.13, 0.22, 0.29);
-    head.add(eye);
-
-    const brow = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.02, 0.02), faceInk);
-    brow.position.set(side * 0.13, 0.31, 0.3);
-    // Inner ends dip toward the nose: focused, never angry.
-    brow.rotation.z = side * -0.22;
-    head.add(brow);
-  }
-  const mouth = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.016, 0.02), faceInk);
-  mouth.position.set(0, 0.06, 0.315);
-  head.add(mouth);
+  // The painted anime face: a transparent decal on a sphere segment just
+  // off the skull, so every skin tone shows through around the features.
+  // The girl's variant carries the larger eyes and the lash flicks.
+  const face = new THREE.Mesh(
+    new THREE.SphereGeometry(0.35, 24, 16, Math.PI / 2 - 0.95, 1.9, 0.85, 1.45),
+    faceDecal(girl ? faceGirlUrl : faceBoyUrl),
+  );
+  face.position.y = 0.16;
+  face.renderOrder = 1;
+  head.add(face);
 
   // Anime hair from the chosen style; every strand shares the swappable
   // hair materials so streak forms and player colors recolor them all.
   const hairMaterials: Surface[] = [];
   const hairMat = () => {
-    const material = characterSurface(0x2b2b2b);
+    const material = characterSurface(0x2b2b2b, hairStrandsUrl);
     hairMaterials.push(material);
     return material;
   };

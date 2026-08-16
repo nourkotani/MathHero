@@ -517,9 +517,9 @@ function bakeFace(girl) {
 
     for (const side of [-1, 1]) {
       const cx = 0.5 + side * 0.175;
-      // Determined brows: inner ends dip toward the nose.
+      // Determined brows: inner ends dip toward the nose, outer ends lift.
       put(
-        stroke(u, v, cx - side * 0.085, 0.255, cx + side * 0.075, 0.29, 0.018),
+        stroke(u, v, cx - side * 0.085, 0.295, cx + side * 0.075, 0.26, 0.018),
         32, 24, 20,
       );
       // Sclera, just off-white so it never reads as glow at dusk.
@@ -530,11 +530,13 @@ function bakeFace(girl) {
       put(iris, 62, 44, 34);
       put(Math.min(iris, ellipse(u, v, cx, eyeCy + 0.05, eyeRx * 0.4, eyeRy * 0.36)), 38, 26, 20);
       // Upper lash line hugging the sclera's top rim, thicker for the girl.
-      const lash = Math.min(
-        ellipse(u, v, cx, eyeCy, eyeRx * 1.12, eyeRy * 1.12) -
-          ellipse(u, v, cx, eyeCy + (girl ? 0.045 : 0.035), eyeRx, eyeRy),
-        v < eyeCy ? 1 : 0,
-      );
+      // The band fades out smoothly below the eye's midline — a hard cutoff
+      // would draw a seam straight across the iris.
+      const upper = Math.max(0, Math.min(1, (eyeCy - v) / 0.03));
+      const lash =
+        (ellipse(u, v, cx, eyeCy, eyeRx * 1.12, eyeRy * 1.12) -
+          ellipse(u, v, cx, eyeCy + (girl ? 0.045 : 0.035), eyeRx, eyeRy)) *
+        upper;
       put(Math.max(0, lash), 26, 20, 18);
       if (girl) {
         // The lash flick at the outer corner.

@@ -6,6 +6,7 @@
 import * as THREE from 'three';
 import { characterSurface, glowSurface } from './materials';
 import { applyCelTreatment } from './cel';
+import paddingUrl from './textures/padding.png';
 import { DUMMY_X } from './constants';
 import { createChannel } from './timeline';
 
@@ -121,7 +122,7 @@ function buildTrainingDummy(): THREE.Group {
   const group = new THREE.Group();
   const base = new THREE.Mesh(
     new THREE.CylinderGeometry(0.55, 0.7, 0.35, 20),
-    characterSurface(0x8a6642),
+    characterSurface(0x8a6642, paddingUrl),
   );
   base.position.y = 0.18;
   group.add(base);
@@ -143,7 +144,7 @@ function buildTrainingDummy(): THREE.Group {
 
   const torso = new THREE.Mesh(
     new THREE.CapsuleGeometry(0.42, 0.6, 6, 12),
-    characterSurface(0xc9584a),
+    characterSurface(0xc9584a, paddingUrl),
   );
   torso.position.y = 1.8;
   group.add(torso);
