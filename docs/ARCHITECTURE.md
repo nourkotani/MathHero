@@ -62,8 +62,8 @@ Violations only surface in the built artifact, which is why the flow-test suite 
 ## Rendering & performance
 
 - Budget: **60fps on integrated graphics** — this runs on a family machine, not a gaming rig.
-- The hero, arena, Training Dummy, and all effects are procedural (geometry, materials, shaders, particles). No asset files.
-- Transformation glow is real selective bloom via the pmndrs `postprocessing` composer, with the additive sprites kept as an automatic fallback tier on weak devices ([ADR 0004](./adr/0004-composer-bloom-with-sprite-fallback.md)).
+- The hero, arena, Training Dummy, and all effects are procedural (geometry, materials, shaders, particles). Painted textures are **baked, not authored**: `scripts/bake-textures.mjs` generates them deterministically (seeded noise, no external art) into `src/renderer/textures/`, and the build inlines them into the single file ([ADR 0005](./adr/0005-baked-painted-textures-and-tier-ladder.md)). No downloaded or hand-drawn asset files.
+- Transformation glow is real selective bloom via the pmndrs `postprocessing` composer; the strongest tier adds sun shafts and speed-lines, and sustained low fps sheds one tier at a time down to the additive-sprite fallback ([ADR 0004](./adr/0004-composer-bloom-with-sprite-fallback.md), amended by [ADR 0005](./adr/0005-baked-painted-textures-and-tier-ladder.md)).
 - All readable text (questions, score, menus, HUD) lives in the Preact DOM overlay, never rendered inside the canvas.
 
 ## Audio

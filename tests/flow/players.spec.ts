@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { createHero, openGame } from './helpers';
+import { advanceClock, answerOnPad, createHero, openGame, readCorrectAnswer, startRound } from './helpers';
 
 test('creating a hero persists across a browser restart', async ({ page }) => {
   await openGame(page);
@@ -88,6 +88,56 @@ test('a veteran hero above level 30 keeps their level when the save migrates', a
   });
   await page.reload();
   await expect(page.getByTestId('player-p1')).toContainText('Lv 35');
+});
+
+test('crossing a Landmark Level plays the transformation ceremony with its tier name', async ({
+  page,
+}) => {
+  await openGame(page, '?testClock=1&seed=77');
+  // A hero 40 XP shy of Landmark Level 25 — one short Round crosses it.
+  await page.evaluate(() => {
+    localStorage.setItem(
+      'mathhero-save',
+      JSON.stringify({
+        version: 12,
+        players: [
+          {
+            id: 'p1',
+            name: 'Kai',
+            colors: { hair: 'gold', outfitPrimary: 'blue', outfitSecondary: 'teal' },
+            appearance: {
+              body: 'girl',
+              hairStyle: 'ponytail',
+              hairLength: 'short',
+              garment: 'gi',
+              skinTone: 'tan',
+            },
+            roundsPlayed: 50,
+            xp: 12_460,
+            bests: { multiply: {}, divide: {}, machine: {}, pattern: {} },
+            factStats: { multiply: {}, divide: {}, machine: {}, pattern: {} },
+          },
+        ],
+        nextPlayerId: 2,
+        lastExportAt: null,
+        muted: false,
+      }),
+    );
+  });
+  await page.reload();
+  await page.getByTestId('player-p1').click();
+  await advanceClock(page, 50);
+  await startRound(page);
+  for (let i = 0; i < 4; i++) {
+    await answerOnPad(page, await readCorrectAnswer(page));
+  }
+  await advanceClock(page, 600_000);
+
+  // The ceremony names the level and the Landmark tier — and nothing about
+  // the transformation scene blocks the Results screen under the test clock.
+  await expect(page.getByTestId('level-up')).toContainText('Level 25');
+  await expect(page.getByTestId('landmark')).toContainText('TRANSFORMATION! Comet trail!');
+  await expect(page.getByTestId('play-again')).toBeVisible();
 });
 
 test('two heroes can take turns', async ({ page }) => {

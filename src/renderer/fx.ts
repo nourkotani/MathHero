@@ -7,7 +7,6 @@ import { glowSurface, markBloom, sparkSprite } from './materials';
 import { isOutlineHull } from './cel';
 import { DUMMY_X, HERO_X } from './constants';
 import { STYLE } from './style';
-import sparkUrl from './textures/spark.png';
 
 interface Particle {
   sprite: THREE.Sprite;
@@ -52,7 +51,7 @@ export function createFx(scene: THREE.Scene, onBlastImpact: (big: boolean) => vo
 
   /** One soft glow mote: the baked spark puff, tinted, bloom-marked. */
   function mote(color: number, size: number, origin: THREE.Vector3): THREE.Sprite {
-    const sprite = new THREE.Sprite(sparkSprite(sparkUrl, color));
+    const sprite = new THREE.Sprite(sparkSprite(color));
     sprite.scale.setScalar(size);
     sprite.position.copy(origin);
     markBloom(sprite);

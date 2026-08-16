@@ -6,6 +6,7 @@
 
 import * as THREE from 'three';
 import { STYLE } from './style';
+import sparkUrl from './textures/spark.png';
 
 /** The lit-material interface rig and reaction code may rely on. */
 export type Surface = THREE.Material & {
@@ -121,12 +122,13 @@ let sharedSparkMap: THREE.Texture | null = null;
 /**
  * A soft energy mote for bursts, crackle, and aura sparks: the baked
  * hot-core glow puff, tinted per particle, additive so overlapping motes
- * flare instead of muddying. One texture is shared by every particle;
- * the material is per-particle (its opacity is the fade).
+ * flare instead of muddying. The one spark texture lives here and is
+ * shared by every particle; the material is per-particle (its opacity is
+ * the fade).
  */
-export function sparkSprite(url: string, color: number): THREE.SpriteMaterial {
+export function sparkSprite(color: number): THREE.SpriteMaterial {
   if (sharedSparkMap === null) {
-    sharedSparkMap = new THREE.TextureLoader().load(url);
+    sharedSparkMap = new THREE.TextureLoader().load(sparkUrl);
     sharedSparkMap.colorSpace = THREE.SRGBColorSpace;
   }
   return new THREE.SpriteMaterial({

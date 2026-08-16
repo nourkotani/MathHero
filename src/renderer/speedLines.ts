@@ -4,6 +4,7 @@
 
 import { Uniform } from 'three';
 import { Effect } from 'postprocessing';
+import { STYLE } from './style';
 
 const fragmentShader = /* glsl */ `
   uniform float intensity;
@@ -16,14 +17,14 @@ const fragmentShader = /* glsl */ `
     d.x *= 1.6; // keep the ring roughly round on a widescreen frame
     float r = length(d);
     float turn = atan(d.y, d.x) / 6.28318 + 0.5;
-    float slot = floor(turn * 44.0);
-    float f = fract(turn * 44.0);
+    float slot = floor(turn * SLOTS);
+    float f = fract(turn * SLOTS);
     // A thin streak in the middle of each angular slot, with a random
     // per-slot (and per-flash, via seed) starting radius.
     float line = smoothstep(0.38, 0.5, f) * smoothstep(0.62, 0.5, f);
     float start = 0.26 + hash(slot + seed) * 0.24;
     float reach = smoothstep(start, start + 0.16, r);
-    float a = intensity * line * reach * 0.75;
+    float a = intensity * line * reach * STRENGTH;
     outputColor = vec4(mix(inputColor.rgb, vec3(1.0), a), inputColor.a);
   }
 `;
@@ -31,6 +32,10 @@ const fragmentShader = /* glsl */ `
 export class SpeedLinesEffect extends Effect {
   constructor() {
     super('SpeedLinesEffect', fragmentShader, {
+      defines: new Map<string, string>([
+        ['SLOTS', STYLE.speedLines.slots.toFixed(1)],
+        ['STRENGTH', STYLE.speedLines.strength.toFixed(3)],
+      ]),
       uniforms: new Map<string, Uniform>([
         ['intensity', new Uniform(0)],
         ['seed', new Uniform(0)],
@@ -46,6 +51,6 @@ export class SpeedLinesEffect extends Effect {
 
   override update(_renderer: unknown, _inputBuffer: unknown, deltaTime = 0): void {
     const intensity = this.uniforms.get('intensity')!;
-    intensity.value = Math.max(0, (intensity.value as number) - deltaTime * 3.2);
+    intensity.value = Math.max(0, (intensity.value as number) - deltaTime * STYLE.speedLines.decay);
   }
 }

@@ -23,6 +23,15 @@ export const STYLE = {
   sunDisc: { color: 0xffc07a, position: [30, 9, -64] as const, radius: 4.5 },
   /** Light shafts raking from the low sun (the full tier's extra pass). */
   sunShafts: { density: 0.85, decay: 0.91, weight: 0.16, samples: 32 },
+  /** Anime speed-lines on big hits (the full tier's other extra pass). */
+  speedLines: {
+    /** Radial streak slots around the ring. */
+    slots: 44,
+    /** Peak whiteness of a streak at full flash. */
+    strength: 0.75,
+    /** Full flash → gone in 1/decay seconds. */
+    decay: 3.2,
+  },
   stars: { count: 140, color: 0xcfd8ff, size: 1.1, opacity: 0.75 },
   ridges: { color: 0x3b2f52 },
   /** Two parallax layers of drifting cloud sprites. */
