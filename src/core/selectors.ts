@@ -5,8 +5,9 @@ import type { Skill } from './skills';
 import type { GameState } from './types';
 
 /**
- * The Skill the session is training — the single seam every per-Skill read
- * and write goes through.
+ * The Skill the session is training — the seam the core's per-Skill stat
+ * and best reads/writes go through. (Screens read state.skill directly for
+ * display; the seam guards the record-keeping, not presentation.)
  */
 export function activeSkill(state: GameState): Skill {
   return state.skill;

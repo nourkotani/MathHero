@@ -63,14 +63,18 @@ export function candidatesFor(difficulty: Difficulty): Question[] {
 }
 
 export interface SelectionContext {
+  /**
+   * The Skill in play. Required: only Practice orientation depends on it,
+   * but an omitting caller would silently break "the ÷8 table must divide
+   * by 8" the day it gains a practice context.
+   */
+  skill: Skill;
   /** The active Player's per-Fact attempt history, for adaptive weighting. */
   factStats?: FactStats;
   /** Fact to exclude — the same question never appears twice in a row. */
   excludeKey?: string;
   /** Practice mode: only this table, no difficulty weighting. */
   practiceTable?: number | null;
-  /** The Skill in play — only Practice orientation depends on it. */
-  skill?: Skill;
 }
 
 /** Practice candidates: the chosen table against 1–12, as canonical Facts. */
@@ -89,7 +93,7 @@ export function practiceCandidates(table: number): Question[] {
 export function selectQuestion(
   difficulty: Difficulty,
   prng: number,
-  context: SelectionContext = {},
+  context: SelectionContext,
 ): { question: Question; prng: number } {
   const practice = context.practiceTable ?? null;
   const tier = tierFor(difficulty);
@@ -111,8 +115,6 @@ export function selectQuestion(
   const flipped = flip.value < 0.5 && a !== b ? { a: b, b: a } : selected.question;
   // Practice may pin the orientation — the ÷8 table must divide by 8.
   const question =
-    practice !== null && context.skill !== undefined
-      ? skillFor(context.skill).orientPractice(flipped, practice)
-      : flipped;
+    practice !== null ? skillFor(context.skill).orientPractice(flipped, practice) : flipped;
   return { question, prng: flip.state };
 }

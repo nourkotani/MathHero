@@ -20,6 +20,10 @@ test('the Mastery Grid opens per player and reflects attempts', async ({ page })
   const practiced = page.locator('.mastery-learning, .mastery-mastered, .mastery-struggling');
   expect(await practiced.count()).toBeGreaterThan(0);
 
+  // A multiply-only hero's Divide view is honestly all-unseen.
+  await page.getByTestId('grid-skill-divide').click();
+  expect(await practiced.count()).toBe(0);
+
   await page.getByTestId('close-grid').click();
   await expect(page.getByTestId('mastery-grid')).not.toBeVisible();
 });

@@ -26,7 +26,9 @@ const MAX_ANSWER_DIGITS = 3; // 12 × 12 = 144
 export const FEEDBACK_MS = 2500;
 
 export function initialState(config: GameConfig): GameState {
-  const selected = selectQuestion('easy', seedPrng(config.seed));
+  // The fresh-load defaults: a Multiply session on Easy.
+  const skill = 'multiply';
+  const selected = selectQuestion('easy', seedPrng(config.seed), { skill });
   return {
     prng: selected.prng,
     questionAskedAt: 0,
@@ -38,7 +40,7 @@ export function initialState(config: GameConfig): GameState {
     nextPlayerId: config.save?.nextPlayerId ?? 1,
     lastExportAt: config.save?.lastExportAt ?? null,
     muted: config.save?.muted ?? false,
-    skill: 'multiply',
+    skill,
     difficulty: 'easy',
     timerSeconds: DEFAULT_TIMER_SECONDS,
     now: 0,

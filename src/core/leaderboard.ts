@@ -1,7 +1,6 @@
 // The Family Leaderboard is derived from the players' stored bests —
 // never a second stored structure, so it can never fall out of sync.
 
-import type { Difficulty } from './difficulty';
 import type { PlayerRecord } from './players';
 import { SKILLS } from './skills';
 import type { Skill } from './skills';
@@ -9,7 +8,6 @@ import type { Skill } from './skills';
 export interface LeaderboardEntry {
   id: string;
   name: string;
-  bests: Record<Skill, Partial<Record<Difficulty, number>>>;
   /** The player's highest best per Skill, across all difficulties. */
   bestPerSkill: Record<Skill, number>;
   /** The player's highest best across every Skill × Difficulty. */
@@ -25,7 +23,6 @@ export function familyLeaderboard(players: readonly PlayerRecord[]): Leaderboard
       return {
         id: p.id,
         name: p.name,
-        bests: p.bests,
         bestPerSkill,
         topScore: Math.max(0, ...Object.values(bestPerSkill)),
       };

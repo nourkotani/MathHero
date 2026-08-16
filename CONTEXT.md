@@ -47,7 +47,7 @@ Question picking is weighted random: Facts the Player answers wrongly or slowly 
 An alternative to Difficulty on the Pre-round screen: the Round asks only one chosen table (1–12) of the active Skill — "8×" when Multiplying, "÷8" when Dividing. Difficulty tiers and weights don't apply; scoring uses Easy base points. One table picker serves every Skill.
 
 ### Mastery Grid
-A per-Player 12×12 times-table chart on the Title screen, coloring each Fact green/yellow/red by mastery state — a progress report for the parent, driven by the same data Adaptive Selection uses. A Skill toggle (defaulting to the last-played Skill) switches which Skill's mastery it shows.
+A per-Player 12×12 times-table chart on the Title screen, coloring each Fact green/yellow/red by mastery state — a progress report for the parent, driven by the same data Adaptive Selection uses. A Skill toggle (defaulting to the session's active Skill) switches which Skill's mastery it shows.
 
 ### Training Dummy
 A cosmetic opponent in the arena. Every correct answer zaps/knocks it back; super-mode blasts launch it dramatically. It has no health bar and no effect on scoring — the score is purely about math.

@@ -61,7 +61,7 @@ function MasteryGrid({
                   key={`${r}-${c}`}
                   class={`mastery-cell mastery-${masteryOf(player.factStats[viewed][factKey(r, c)])}`}
                   data-testid={`cell-${r}-${c}`}
-                  title={`${def.display({ a: r, b: c })} = ${def.answer({ a: r, b: c })}`}
+                  title={def.display({ a: r, b: c })}
                 />
               ))}
             </>

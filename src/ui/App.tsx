@@ -1,15 +1,22 @@
-import type { GameEvent, GameState, Skill } from '../core';
+import type { Difficulty, GameEvent, GameState, Skill } from '../core';
 import { HeroCreationScreen } from './HeroCreationScreen';
 import { PreRoundScreen } from './PreRoundScreen';
 import { ResultsScreen } from './ResultsScreen';
 import { RoundScreen } from './RoundScreen';
 import { TitleScreen } from './TitleScreen';
 
+/** The NEW_PERSONAL_BEST payload the shell hands the Results screen. */
+export interface BestCelebration {
+  skill: Skill;
+  difficulty: Difficulty;
+  score: number;
+}
+
 export interface AppProps {
   state: GameState;
   dispatch: (event: GameEvent) => void;
   /** Set by the shell when a NEW_PERSONAL_BEST effect fires; cleared on leaving Results. */
-  newBest?: { skill: Skill; difficulty: string; score: number } | null;
+  newBest?: BestCelebration | null;
   /** LEVEL_UP effects captured by the shell for this Results screen, in order. */
   levelUps?: Array<{ level: number; cosmeticLabel?: string }>;
 }

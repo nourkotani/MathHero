@@ -75,7 +75,7 @@ export function PreRoundScreen({ state, dispatch }: AppProps) {
           ))}
         </div>
         <div class="picker-hint" data-testid="mode-hint">
-          {practicing && state.practiceTable !== null
+          {state.practiceTable !== null
             ? `Only ${skill.practiceLabel(state.practiceTable)} questions — go master that table! (+${PRACTICE_BASE_POINTS} pts each)`
             : 'One number comes from those tables — the other can be anything up to 12!'}
         </div>

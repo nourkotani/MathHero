@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { factKey, initialState, SAVE_FILE_VERSION, skillFor, update } from './index';
+import {
+  buildSaveFile,
+  factKey,
+  initialState,
+  SAVE_FILE_VERSION,
+  serializeSaveFile,
+  skillFor,
+  update,
+} from './index';
 import type { FactAttempt, GameState, SaveFile } from './index';
 import { answerCorrectly, dispatchAll, freshRound, preRound } from './test-helpers';
 
@@ -32,6 +40,15 @@ describe('the Skill picker', () => {
     state = update(state, { type: 'TICK', now: 999_999 }).state; // Round ends
     state = update(state, { type: 'PLAY_AGAIN' }).state;
     expect(state.skill).toBe('divide');
+  });
+
+  it('is session-only: the Save File never carries it, so a fresh load is Multiply', () => {
+    let state = freshRound(208, undefined, 'divide');
+    state = update(state, { type: 'TICK', now: 999_999 }).state; // Round ends, save fires
+    const save = buildSaveFile(state);
+    expect('skill' in save).toBe(false);
+    expect(serializeSaveFile(save)).not.toContain('"skill"');
+    expect(initialState({ seed: 1, save }).skill).toBe('multiply');
   });
 });
 

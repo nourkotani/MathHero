@@ -1,11 +1,12 @@
 import { createElement, render } from 'preact';
 import '../ui/styles.css';
 import { initialState } from '../core';
-import type { GameEvent, Skill } from '../core';
+import type { GameEvent } from '../core';
 import { createAudio } from '../audio';
 import { loadSaveFile, localStorageAdapter, persistenceSubscriber, STORAGE_KEY } from '../persistence';
 import { createRenderer } from '../renderer';
 import { App } from '../ui/App';
+import type { BestCelebration } from '../ui/App';
 import { manualClock, realClock } from './clock';
 import type { ManualClock } from './clock';
 import { createStore } from './store';
@@ -42,7 +43,7 @@ store.subscribe((state, effects) => renderer.onStoreUpdate(state, effects));
 // The Results ceremonies are effect-driven: banners show while the Results
 // screen that earned them is up, never inferred by diffing state (ADR 0003).
 const uiRoot = document.getElementById('ui') as HTMLElement;
-let newBest: { skill: Skill; difficulty: string; score: number } | null = null;
+let newBest: BestCelebration | null = null;
 let levelUps: Array<{ level: number; cosmeticLabel?: string }> = [];
 store.subscribe((state, effects) => {
   for (const effect of effects) {
