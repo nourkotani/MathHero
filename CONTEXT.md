@@ -52,7 +52,10 @@ Consecutive correct answers *within one Round*. The score multiplier and the vis
 A wrong answer drops the character back to base form and ×1. Resets at the start of every Round; never persisted.
 
 ### XP / Hero Level
-XP equals total points scored: every Round's final score is added to the Player's lifetime XP. Hero Level N requires `N × 500` cumulative XP. Levels never reset. Every level slightly intensifies the character's permanent glow/particles; every 5th level automatically unlocks a major cosmetic tier (new aura color, energy crown, lightning wisps, energy wings, …). There is no shop or currency — unlocks are automatic.
+XP equals total points scored: every Round's final score is added to the Player's lifetime XP. Levels 1–30 cost 500 XP each; above 30 every level costs 25 XP more than the one before it, so the climb steepens toward the cap. **Level 100 is the cap** — XP keeps accumulating past it, but the level stays 100. Levels never reset. Every level slightly intensifies the character's permanent glow/particles; every 5th level automatically unlocks a cosmetic tier. Early tiers add new pieces (aura ring, energy crown, lightning wisps, energy wings, comet trail, twin halo); from level 35 on, each tier **evolves** one of those pieces into a grander form instead of stacking another on, so a veteran hero reads sharper, never cluttered. There is no shop or currency — unlocks are automatic.
+
+### Landmark Level
+Hero Levels 25, 50, 75, and 100 — level-ups that transform the hero's whole presence rather than upgrading a single piece, celebrated with a full transformation scene in the Results ceremony (regular level-ups keep the quicker celebration). Level 100 is the **Legend** state: the hero's final, permanently radiant form.
 
 ### Adaptive Selection
 Question picking is weighted random: Facts the Player answers wrongly or slowly appear more often until mastered. Runs on the active Skill's own attempt data. The same question never appears twice in a row. A Fact is **mastered** when its last 3 answers were all correct and each beat the Skill's **mastery window** — the pace that counts as fluent for that Skill: ~6 seconds for Multiply/Divide, ~15 for Pattern, ~25 for Machine. A wrong answer un-masters it.

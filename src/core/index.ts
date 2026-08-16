@@ -17,11 +17,13 @@ export {
   cosmeticUnlockedAt,
   glowIntensityForLevel,
   levelForXp,
+  MAX_LEVEL,
   unlockedCosmetics,
+  wornCosmetics,
   XP_PER_LEVEL,
   xpForLevel,
 } from './level';
-export type { CosmeticTier } from './level';
+export type { CosmeticSlot, CosmeticTier } from './level';
 export {
   BODY_OPTIONS,
   DEFAULT_APPEARANCE,

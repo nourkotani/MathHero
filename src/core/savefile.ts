@@ -14,7 +14,7 @@ function validCount(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0;
 }
 
-export const SAVE_FILE_VERSION = 11;
+export const SAVE_FILE_VERSION = 12;
 
 export interface SaveFile {
   version: number;
@@ -134,6 +134,25 @@ const MIGRATIONS: Array<(doc: Record<string, unknown>) => Record<string, unknown
         bests: { ...(p.bests as Record<string, unknown>), pattern: {} },
         factStats: { ...(p.factStats as Record<string, unknown>), pattern: {} },
       }),
+    ),
+  }),
+  // v11 → v12: the Hero Level curve steepened above level 30 (each level
+  // costs 25 XP more than the last) and capped at 100. Whatever level
+  // floor(xp / 500) gave a hero under the old flat rule, their XP is raised
+  // to at least that level's price under the new curve, so no hero's level
+  // ever drops. Frozen on purpose: the v12 curve is inlined here as
+  // literals — never the live level module, which may steepen again someday.
+  (doc) => ({
+    ...doc,
+    version: 12,
+    players: (Array.isArray(doc.players) ? doc.players : []).map(
+      (p: Record<string, unknown>) => {
+        const xp = typeof p.xp === 'number' && Number.isFinite(p.xp) ? p.xp : 0;
+        const oldLevel = Math.min(100, Math.floor(xp / 500));
+        const steep = Math.max(0, oldLevel - 30);
+        const newFloor = oldLevel * 500 + (25 * steep * (steep + 1)) / 2;
+        return { ...p, xp: Math.max(xp, newFloor) };
+      },
     ),
   }),
 ];

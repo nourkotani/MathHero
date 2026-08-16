@@ -53,6 +53,43 @@ test('deleting a hero needs the scary confirmation', async ({ page }) => {
   await expect(page.getByTestId('new-hero')).toBeVisible();
 });
 
+test('a veteran hero above level 30 keeps their level when the save migrates', async ({ page }) => {
+  await openGame(page);
+  // A v11 document from before the curve steepened: 17,500 XP was level 35
+  // under the flat 500-per-level rule. Migration must not demote the hero.
+  await page.evaluate(() => {
+    localStorage.setItem(
+      'mathhero-save',
+      JSON.stringify({
+        version: 11,
+        players: [
+          {
+            id: 'p1',
+            name: 'Zara',
+            colors: { hair: 'gold', outfitPrimary: 'blue', outfitSecondary: 'teal' },
+            appearance: {
+              body: 'boy',
+              hairStyle: 'spiky',
+              hairLength: 'short',
+              garment: 'gi',
+              skinTone: 'tan',
+            },
+            roundsPlayed: 40,
+            xp: 17_500,
+            bests: { multiply: {}, divide: {}, machine: {}, pattern: {} },
+            factStats: { multiply: {}, divide: {}, machine: {}, pattern: {} },
+          },
+        ],
+        nextPlayerId: 2,
+        lastExportAt: null,
+        muted: false,
+      }),
+    );
+  });
+  await page.reload();
+  await expect(page.getByTestId('player-p1')).toContainText('Lv 35');
+});
+
 test('two heroes can take turns', async ({ page }) => {
   await openGame(page);
   await createHero(page, 'Zara');

@@ -64,6 +64,30 @@ describe('historical migrations reach the current per-Skill shapes', () => {
     );
   });
 
+  it('v11 heroes above level 30 keep their level exactly under the steepened v12 curve', () => {
+    // 17,500 XP was level 35 under the flat 500-per-level rule. The steepened
+    // curve prices level 35 at 17,875 XP — migration raises the XP to match.
+    const v11Player = {
+      ...v8Player,
+      xp: 17_500,
+      bests: perSkill({ multiply: { easy: 120 } }),
+      factStats: perSkill({ multiply: EARNED_STATS }),
+    };
+    const player = parseSaveFile(docOf(11, v11Player))?.players[0];
+    expect(player?.xp).toBe(17_875);
+  });
+
+  it('v11 heroes at or below level 30 migrate with their XP untouched', () => {
+    const v11Player = {
+      ...v8Player,
+      xp: 14_999, // level 29 — below the steepened region
+      bests: perSkill(),
+      factStats: perSkill(),
+    };
+    const player = parseSaveFile(docOf(11, v11Player))?.players[0];
+    expect(player?.xp).toBe(14_999);
+  });
+
   it('carries the oldest documents all the way to per-Skill shapes', () => {
     const v1 = JSON.stringify({
       version: 1,
