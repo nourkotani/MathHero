@@ -63,15 +63,18 @@ describe('Personal Bests', () => {
 });
 
 describe('Family Leaderboard', () => {
-  it('is derived from player bests and ordered by top score', () => {
+  it('is derived from player bests, per Skill, and ranked across every Skill', () => {
     const players: PlayerRecord[] = [
-      { id: 'p1', name: 'Zara', colors: { hair: 'gold', outfitPrimary: 'blue', outfitSecondary: 'teal' }, appearance: { body: 'boy', hairStyle: 'spiky', hairLength: 'short', garment: 'gi', skinTone: 'tan' }, roundsPlayed: 1, xp: 100, bests: { multiply: { easy: 100 }, divide: {} }, factStats: { multiply: {}, divide: {} } },
+      { id: 'p1', name: 'Zara', colors: { hair: 'gold', outfitPrimary: 'blue', outfitSecondary: 'teal' }, appearance: { body: 'boy', hairStyle: 'spiky', hairLength: 'short', garment: 'gi', skinTone: 'tan' }, roundsPlayed: 1, xp: 100, bests: { multiply: { easy: 100 }, divide: { medium: 400 } }, factStats: { multiply: {}, divide: {} } },
       { id: 'p2', name: 'Milo', colors: { hair: 'sky', outfitPrimary: 'red', outfitSecondary: 'white' }, appearance: { body: 'boy', hairStyle: 'spiky', hairLength: 'short', garment: 'gi', skinTone: 'tan' }, roundsPlayed: 2, xp: 400, bests: { multiply: { easy: 80, hard: 300 }, divide: {} }, factStats: { multiply: {}, divide: {} } },
       { id: 'p3', name: 'Ana', colors: { hair: 'rose', outfitPrimary: 'green', outfitSecondary: 'blue' }, appearance: { body: 'boy', hairStyle: 'spiky', hairLength: 'short', garment: 'gi', skinTone: 'tan' }, roundsPlayed: 0, xp: 0, bests: { multiply: {}, divide: {} }, factStats: { multiply: {}, divide: {} } },
     ];
     const board = familyLeaderboard(players);
-    expect(board.map((e) => e.id)).toEqual(['p2', 'p1', 'p3']);
-    expect(board[0]?.topScore).toBe(300);
+    // Zara's Divide 400 outranks Milo's Multiply 300: one honest sort.
+    expect(board.map((e) => e.id)).toEqual(['p1', 'p2', 'p3']);
+    expect(board[0]?.bestPerSkill).toEqual({ multiply: 100, divide: 400 });
+    expect(board[0]?.topScore).toBe(400);
+    expect(board[1]?.bestPerSkill).toEqual({ multiply: 300, divide: 0 });
     expect(board[2]?.topScore).toBe(0);
   });
 

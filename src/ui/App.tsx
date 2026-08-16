@@ -1,4 +1,4 @@
-import type { GameEvent, GameState } from '../core';
+import type { GameEvent, GameState, Skill } from '../core';
 import { HeroCreationScreen } from './HeroCreationScreen';
 import { PreRoundScreen } from './PreRoundScreen';
 import { ResultsScreen } from './ResultsScreen';
@@ -9,7 +9,7 @@ export interface AppProps {
   state: GameState;
   dispatch: (event: GameEvent) => void;
   /** Set by the shell when a NEW_PERSONAL_BEST effect fires; cleared on leaving Results. */
-  newBest?: { difficulty: string; score: number } | null;
+  newBest?: { skill: Skill; difficulty: string; score: number } | null;
   /** LEVEL_UP effects captured by the shell for this Results screen, in order. */
   levelUps?: Array<{ level: number; cosmeticLabel?: string }>;
 }

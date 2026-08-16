@@ -6,20 +6,46 @@ import {
   levelForXp,
   masteryOf,
   parseSaveFile,
-  tierFor,
+  SKILL_DEFS,
+  skillFor,
 } from '../core';
-import type { PlayerRecord } from '../core';
+import type { PlayerRecord, Skill } from '../core';
 import type { AppProps } from './App';
 
 const TABLE_RANGE = Array.from({ length: 12 }, (_, i) => i + 1);
 
-function MasteryGrid({ player, onClose }: { player: PlayerRecord; onClose: () => void }) {
+function MasteryGrid({
+  player,
+  initialSkill,
+  onClose,
+}: {
+  player: PlayerRecord;
+  /** The session's last-played Skill — where the parent most likely wants to look first. */
+  initialSkill: Skill;
+  onClose: () => void;
+}) {
+  // UI-local on purpose: flipping the parent's view must never change what
+  // the child's next Round trains.
+  const [viewed, setViewed] = useState<Skill>(initialSkill);
+  const def = skillFor(viewed);
   return (
     <div class="confirm-overlay" data-testid="mastery-grid">
       <div class="grid-box">
-        <div class="grid-title">{player.name}'s times tables</div>
+        <div class="grid-title">{player.name}'s facts</div>
+        <div class="grid-skill-toggle">
+          {SKILL_DEFS.map((d) => (
+            <button
+              key={d.id}
+              class={`practice-chip grid-skill-chip${viewed === d.id ? ' mode-selected' : ''}`}
+              data-testid={`grid-skill-${d.id}`}
+              onClick={() => setViewed(d.id)}
+            >
+              {d.symbol} {d.label}
+            </button>
+          ))}
+        </div>
         <div class="mastery-table">
-          <div class="mastery-corner">×</div>
+          <div class="mastery-corner">{def.symbol}</div>
           {TABLE_RANGE.map((c) => (
             <div class="mastery-header" key={`h${c}`}>
               {c}
@@ -33,9 +59,9 @@ function MasteryGrid({ player, onClose }: { player: PlayerRecord; onClose: () =>
               {TABLE_RANGE.map((c) => (
                 <div
                   key={`${r}-${c}`}
-                  class={`mastery-cell mastery-${masteryOf(player.factStats.multiply[factKey(r, c)])}`}
+                  class={`mastery-cell mastery-${masteryOf(player.factStats[viewed][factKey(r, c)])}`}
                   data-testid={`cell-${r}-${c}`}
-                  title={`${r} × ${c}`}
+                  title={`${def.display({ a: r, b: c })} = ${def.answer({ a: r, b: c })}`}
                 />
               ))}
             </>
@@ -67,9 +93,14 @@ function Leaderboard({ state }: Pick<AppProps, 'state'>) {
             {rank === 0 ? '👑 ' : ''}
             {entry.name}
           </span>
-          {(['easy', 'medium', 'hard'] as const).map((d) => (
-            <span class="leaderboard-best" key={d}>
-              {tierFor(d).label}: {entry.bests[d] ?? '—'}
+          {SKILL_DEFS.map((def) => (
+            <span
+              class="leaderboard-best"
+              key={def.id}
+              data-testid={`leaderboard-${entry.id}-${def.id}`}
+              title={def.label}
+            >
+              {def.symbol} {entry.bestPerSkill[def.id] > 0 ? entry.bestPerSkill[def.id] : '—'}
             </span>
           ))}
         </div>
@@ -257,7 +288,9 @@ export function TitleScreen({ state, dispatch }: AppProps) {
         </div>
       )}
 
-      {gridPlayer && <MasteryGrid player={gridPlayer} onClose={() => setGridId(null)} />}
+      {gridPlayer && (
+        <MasteryGrid player={gridPlayer} initialSkill={state.skill} onClose={() => setGridId(null)} />
+      )}
       {deleting && (
         <div class="confirm-overlay" data-testid="delete-confirm">
           <div class="confirm-box">

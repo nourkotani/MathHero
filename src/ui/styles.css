@@ -662,6 +662,25 @@ body {
   filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.45));
 }
 
+.results-skill {
+  font-size: 1.6rem;
+  vertical-align: middle;
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.45));
+}
+
+.grid-skill-toggle {
+  display: flex;
+  gap: 0.6rem;
+  justify-content: center;
+  margin-bottom: 0.6rem;
+}
+
+.grid-skill-chip {
+  height: 2.6rem;
+  padding: 0 1.1rem;
+  font-size: 1rem;
+}
+
 .mode-card {
   display: flex;
   flex-direction: column;
@@ -735,6 +754,16 @@ body {
 
 .practice-chip:hover {
   border-color: var(--ki-blue);
+}
+
+/* Chips declare border/background after .mode-selected in source order, so
+   the selected state needs the more specific pairing to win. */
+.practice-chip.mode-selected {
+  border-color: var(--ki-gold);
+  background: rgba(255, 210, 77, 0.12);
+  box-shadow:
+    0 3px 0 rgba(0, 0, 0, 0.5),
+    0 0 18px rgba(255, 210, 77, 0.6);
 }
 
 .timer-setting {

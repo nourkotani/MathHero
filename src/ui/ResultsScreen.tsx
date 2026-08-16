@@ -1,16 +1,20 @@
-import { levelForXp } from '../core';
+import { levelForXp, skillFor } from '../core';
 import type { AppProps } from './App';
 
 export function ResultsScreen({ state, dispatch, newBest, levelUps = [] }: AppProps) {
   const player = state.players.find((p) => p.id === state.activePlayerId);
   const level = levelForXp(player?.xp ?? 0);
   const reachedLevel = levelUps.at(-1)?.level;
+  const skill = skillFor(state.skill);
 
   return (
     <div class="hud screen-center">
       <h1 class="screen-title">Time's up!</h1>
       <div class="final-score" data-testid="final-score">
-        <span class="power-orb" /> {state.score} points
+        <span class="power-orb" /> {state.score} points{' '}
+        <span class="results-skill" data-testid="results-skill" title={skill.label}>
+          {skill.symbol}
+        </span>
       </div>
       <div class="results-row">
         <div class="xp-gain" data-testid="xp-gain">
@@ -22,7 +26,7 @@ export function ResultsScreen({ state, dispatch, newBest, levelUps = [] }: AppPr
       </div>
       {newBest && (
         <div class="best-banner" data-testid="personal-best">
-          🏆 NEW PERSONAL BEST!
+          🏆 NEW {skillFor(newBest.skill).symbol} PERSONAL BEST!
         </div>
       )}
       {reachedLevel !== undefined && (

@@ -10,13 +10,18 @@ test('a scoring Round celebrates a Personal Best and fills the leaderboard', asy
   await answerOnPad(page, answer);
   await advanceClock(page, 200_000);
 
-  // First scoring Round on this difficulty → celebration on Results.
-  await expect(page.getByTestId('personal-best')).toContainText('NEW PERSONAL BEST');
+  // First scoring Round on this difficulty → celebration on Results,
+  // visibly stamped with the Skill that earned it.
+  await expect(page.getByTestId('personal-best')).toContainText('PERSONAL BEST');
+  await expect(page.getByTestId('personal-best')).toContainText('✖');
 
   // The Title screen's Family Leaderboard compares the family's bests.
   await page.getByTestId('play-again').click();
   await page.getByTestId('back-to-title').click();
   await expect(page.getByTestId('leaderboard')).toBeVisible();
   await expect(page.getByTestId('leaderboard-p1')).toContainText('Zara');
-  await expect(page.getByTestId('leaderboard-p1')).toContainText('Easy: 10');
+  // Bests read per Skill, side by side: the Multiply column holds the score,
+  // the never-played Divide column stays honestly empty.
+  await expect(page.getByTestId('leaderboard-p1-multiply')).toContainText('10');
+  await expect(page.getByTestId('leaderboard-p1-divide')).toContainText('—');
 });
