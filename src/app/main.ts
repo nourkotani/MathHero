@@ -108,6 +108,10 @@ window.addEventListener('keydown', (e) => {
   if (e.target instanceof HTMLInputElement) return; // typing a name, not an answer
   if (e.key >= '0' && e.key <= '9') {
     store.dispatch({ type: 'DIGIT_PRESSED', digit: Number(e.key) });
+    // On a Name-the-Rule Question the key IS the card tap: submit at once.
+    if (store.getState().question.cards) {
+      store.dispatch({ type: 'ANSWER_SUBMITTED' });
+    }
   } else if (e.key === 'Backspace') {
     store.dispatch({ type: 'BACKSPACE_PRESSED' });
   } else if (e.key === 'Enter') {

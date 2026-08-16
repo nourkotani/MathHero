@@ -50,7 +50,7 @@ export function RoundScreen({ state, dispatch }: AppProps) {
           {skill.exampleRows ? (
             // The Machine: a glowing training pod shows what it did to the
             // example inputs; the kid cracks the Secret Rule and answers for
-            // the jump input.
+            // the jump input — or names the rule itself.
             <div
               class="machine-panel"
               data-testid="machine-panel"
@@ -64,13 +64,15 @@ export function RoundScreen({ state, dispatch }: AppProps) {
                   <span class="machine-out">{row.output}</span>
                 </div>
               ))}
-              <div class="machine-row machine-query question" data-testid="question">
-                <span class="machine-in">{state.question.input}</span>
-                <span class="machine-arrow">→</span>
-                <span class="answer" data-testid="answer" key={state.answerBuffer}>
-                  {state.answerBuffer === '' ? '?' : state.answerBuffer}
-                </span>
-              </div>
+              {!state.question.cards && (
+                <div class="machine-row machine-query question" data-testid="question">
+                  <span class="machine-in">{state.question.input}</span>
+                  <span class="machine-arrow">→</span>
+                  <span class="answer" data-testid="answer" key={state.answerBuffer}>
+                    {state.answerBuffer === '' ? '?' : state.answerBuffer}
+                  </span>
+                </div>
+              )}
             </div>
           ) : (
             <div
@@ -79,14 +81,56 @@ export function RoundScreen({ state, dispatch }: AppProps) {
               key={`${state.question.a}x${state.question.b}`}
             >
               {skill.display(state.question)}
-              {skill.promptSeparator}
-              <span class="answer" data-testid="answer" key={state.answerBuffer}>
-                {state.answerBuffer === '' ? '?' : state.answerBuffer}
-              </span>
+              {!state.question.cards && (
+                <>
+                  {skill.promptSeparator}
+                  <span class="answer" data-testid="answer" key={state.answerBuffer}>
+                    {state.answerBuffer === '' ? '?' : state.answerBuffer}
+                  </span>
+                </>
+              )}
             </div>
           )}
-          <NumberPad dispatch={dispatch} armed={state.answerBuffer !== ''} />
+          {state.question.cards ? (
+            // Name-the-Rule: three big cards replace the pad; the tap fires
+            // the blast (keys 1–3 work too).
+            <div class="rule-cards" data-testid="rule-cards">
+              <div class="rule-cards-title">Name the secret rule!</div>
+              {state.question.cards.labels.map((label, i) => (
+                <button
+                  key={label}
+                  class="big-button rule-card"
+                  data-testid={`rule-card-${i + 1}`}
+                  onClick={() => {
+                    dispatch({ type: 'DIGIT_PRESSED', digit: i + 1 });
+                    dispatch({ type: 'ANSWER_SUBMITTED' });
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <NumberPad dispatch={dispatch} armed={state.answerBuffer !== ''} />
+          )}
         </>
+      ) : state.feedback.question.cards ? (
+        <div class="feedback" data-testid="feedback">
+          <div class="feedback-title">Almost! The rule was:</div>
+          <div class="rule-cards">
+            {state.feedback.question.cards.labels.map((label, i) => (
+              <div
+                key={label}
+                class={`big-button rule-card${
+                  i + 1 === state.feedback?.question.cards?.correct ? ' rule-card-correct' : ''
+                }`}
+                data-testid={`rule-reveal-${i + 1}`}
+              >
+                {label}
+              </div>
+            ))}
+          </div>
+        </div>
       ) : (
         <div class="feedback" data-testid="feedback">
           <div class="feedback-title">Almost! Remember:</div>

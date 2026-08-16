@@ -2,8 +2,11 @@ import { expect, test } from '@playwright/test';
 import {
   advanceClock,
   answerOnPad,
+  answerQuestion,
+  cardsShowing,
   createHero,
   openGame,
+  readChainTerms,
   readCorrectAnswer,
   startRound,
 } from './helpers';
@@ -19,15 +22,12 @@ test('a Pattern Round end-to-end: pick 🔁, continue chains, double points clim
   await startRound(page);
 
   for (let i = 0; i < 3; i++) {
-    const text = await page.getByTestId('question').innerText();
-    const match = text.match(/^(\d+),\s*(\d+),\s*(\d+),\s*(\d+),/);
-    expect(match, `a 4-term chain, got: ${text}`).not.toBeNull();
-    const [t1, t2, t3, t4] = match!.slice(1).map(Number) as [number, number, number, number];
+    const [t1, t2, t3, t4] = await readChainTerms(page);
     // Every chain obeys one rule: equal steps, or one constant ratio.
     const additive = t2 - t1 === t3 - t2 && t3 - t2 === t4 - t3;
     const geometric = t2 % t1 === 0 && t2 / t1 === t3 / t2 && t3 / t2 === t4 / t3;
-    expect(additive || geometric, `chain must follow a rule: ${text}`).toBe(true);
-    await answerOnPad(page, await readCorrectAnswer(page));
+    expect(additive || geometric, `chain must follow a rule: ${t1},${t2},${t3},${t4}`).toBe(true);
+    await answerQuestion(page);
   }
   // Easy base ×2 with the Power Streak igniting on the 3rd: 20 + 20 + 40.
   await expect(page.getByTestId('score')).toContainText('80');
@@ -44,11 +44,9 @@ test('count-by-8s practice: every chain steps by 8', async ({ page }) => {
 
   await expect(page.getByTestId('practice-badge')).toContainText('+8 practice');
   for (let i = 0; i < 4; i++) {
-    const text = await page.getByTestId('question').innerText();
-    const match = text.match(/^(\d+),\s*(\d+),/);
-    expect(match, `chain prompt, got: ${text}`).not.toBeNull();
-    expect(Number(match![2]) - Number(match![1]), 'the step is pinned to 8').toBe(8);
-    await answerOnPad(page, await readCorrectAnswer(page));
+    const [t1, t2] = await readChainTerms(page);
+    expect(t2 - t1, 'the step is pinned to 8').toBe(8);
+    await answerQuestion(page);
   }
 });
 
@@ -58,7 +56,7 @@ test('a Pattern best celebrates per Skill and lands on leaderboard and grid', as
   await page.getByTestId('skill-pattern').click();
   await startRound(page);
 
-  await answerOnPad(page, await readCorrectAnswer(page));
+  await answerQuestion(page);
   await advanceClock(page, 200_000);
 
   await expect(page.getByTestId('results-skill')).toContainText('🔁');
@@ -82,6 +80,8 @@ test('a wrong Pattern answer teaches the chain rule', async ({ page }) => {
   await page.getByTestId('skill-pattern').click();
   await startRound(page);
 
+  // Skip past any Name-the-Rule surprises to a compute Question.
+  for (let i = 0; i < 12 && (await cardsShowing(page)); i++) await answerQuestion(page);
   const answer = await readCorrectAnswer(page);
   await answerOnPad(page, answer + 1);
   await expect(page.getByTestId('feedback')).toContainText('each time');

@@ -72,3 +72,37 @@ export async function answerOnPad(page: Page, answer: number): Promise<void> {
   }
   await page.getByTestId('pad-submit').click();
 }
+
+/** Whether the current Question is a Name-the-Rule card Question. */
+export async function cardsShowing(page: Page): Promise<boolean> {
+  return (await page.getByTestId('rule-cards').count()) > 0;
+}
+
+/** The 4 shown terms of the current Pattern chain. */
+export async function readChainTerms(page: Page): Promise<[number, number, number, number]> {
+  const text = await page.getByTestId('question').innerText();
+  const match = text.match(/^(\d+),\s*(\d+),\s*(\d+),\s*(\d+)/);
+  if (!match) throw new Error(`could not parse chain from HUD: ${text}`);
+  return match.slice(1).map(Number) as [number, number, number, number];
+}
+
+/** The true Secret Rule of the current Question, worked out from the HUD alone. */
+export async function readTruthRuleLabel(page: Page): Promise<string> {
+  if ((await page.getByTestId('machine-panel').count()) > 0) {
+    const { a, b } = await readMachineRule(page);
+    return a === 1 ? `just + ${b}` : `× ${a} then + ${b}`;
+  }
+  const [t1, t2, , t4] = await readChainTerms(page);
+  const additive = t2 - t1 === (t4 - t1) / 3;
+  return additive ? `+ ${t2 - t1} each time` : `× ${t2 / t1} each time`;
+}
+
+/** Answer the current Question correctly, whatever its Skill and modality. */
+export async function answerQuestion(page: Page): Promise<void> {
+  if (await cardsShowing(page)) {
+    const truth = await readTruthRuleLabel(page);
+    await page.getByRole('button', { name: truth }).click();
+  } else {
+    await answerOnPad(page, await readCorrectAnswer(page));
+  }
+}

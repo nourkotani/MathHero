@@ -397,6 +397,10 @@ export function update(state: GameState, event: GameEvent): UpdateResult {
     case 'DIGIT_PRESSED': {
       if (state.phase !== 'in-round' || state.feedback !== null) return noop(state);
       if (state.answerBuffer.length >= MAX_ANSWER_DIGITS) return noop(state);
+      // A Name-the-Rule Question answers with one card number — any other
+      // digit (or a second one) can never reach the grader.
+      if (state.question.cards && (event.digit < 1 || event.digit > 3 || state.answerBuffer !== ''))
+        return noop(state);
       return {
         state: { ...state, answerBuffer: state.answerBuffer + String(event.digit) },
         effects: [],

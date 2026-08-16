@@ -964,6 +964,39 @@ body {
   animation: none;
 }
 
+/* Name-the-Rule: three capsule cards replace the pad; the tap is the blast. */
+.rule-cards {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 0.8rem;
+  pointer-events: auto;
+}
+
+.rule-cards-title {
+  font-size: 1.3rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ki-gold);
+  text-shadow: 0 0 10px rgba(255, 210, 77, 0.45);
+}
+
+.rule-card {
+  min-width: 16rem;
+  font-size: 1.5rem;
+  animation: question-in 0.2s ease-out;
+}
+
+.rule-card-correct {
+  border-color: var(--good);
+  color: var(--good);
+  box-shadow:
+    0 3px 0 rgba(0, 0, 0, 0.5),
+    0 0 18px rgba(90, 214, 90, 0.6);
+}
+
 @keyframes question-in {
   from {
     opacity: 0;

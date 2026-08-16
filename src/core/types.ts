@@ -30,6 +30,12 @@ export interface Question {
    * start and b is that multiplier). Undressed Questions read as 'add'.
    */
   wear?: 'add' | 'x2' | 'x3';
+  /**
+   * A Name-the-Rule Question (detective Skills only, ~1 in 3): instead of
+   * typing a number, the child picks the Secret Rule from these 3 cards.
+   * The correct card's number (1–3) is the Question's answer.
+   */
+  cards?: { labels: [string, string, string]; correct: 1 | 2 | 3 };
 }
 
 export type Phase = 'title' | 'hero-creation' | 'pre-round' | 'in-round' | 'results';

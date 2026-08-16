@@ -2,6 +2,8 @@ import { expect, test } from '@playwright/test';
 import {
   advanceClock,
   answerOnPad,
+  answerQuestion,
+  cardsShowing,
   createHero,
   openGame,
   readCorrectAnswer,
@@ -26,12 +28,14 @@ test('a Machine Round end-to-end: pick ⚙️, crack rules, triple points climb'
     const outputs = rows.map((r) => Number(r.match(/→\s*(\d+)/)?.[1]));
     // ...and they obey one linear Secret Rule (a genuine two-step machine).
     expect(outputs[1]! - outputs[0]!).toBe(outputs[2]! - outputs[1]!);
-    // The query is a jump input, never one of the examples.
-    const query = await page.getByTestId('question').innerText();
-    const input = Number(query.match(/(\d+)\s*→/)?.[1]);
-    expect(input).toBeGreaterThanOrEqual(5);
-    expect(input).toBeLessThanOrEqual(12);
-    await answerOnPad(page, await readCorrectAnswer(page));
+    if (!(await cardsShowing(page))) {
+      // The query is a jump input, never one of the examples.
+      const query = await page.getByTestId('question').innerText();
+      const input = Number(query.match(/(\d+)\s*→/)?.[1]);
+      expect(input).toBeGreaterThanOrEqual(5);
+      expect(input).toBeLessThanOrEqual(12);
+    }
+    await answerQuestion(page);
   }
   // Easy base ×3 with the Power Streak igniting on the 3rd: 30 + 30 + 60.
   await expect(page.getByTestId('score')).toContainText('120');
@@ -50,7 +54,7 @@ test('×8 machine practice: every Secret Rule multiplies by 8', async ({ page })
   for (let i = 0; i < 4; i++) {
     const { a } = await readMachineRule(page);
     expect(a, 'the multiplier is pinned to the table').toBe(8);
-    await answerOnPad(page, await readCorrectAnswer(page));
+    await answerQuestion(page);
   }
 });
 
@@ -60,7 +64,7 @@ test('a Machine best celebrates per Skill and lands on leaderboard and grid', as
   await page.getByTestId('skill-machine').click();
   await startRound(page);
 
-  await answerOnPad(page, await readCorrectAnswer(page));
+  await answerQuestion(page);
   await advanceClock(page, 200_000);
 
   // Results names the Skill; the celebration is visibly the ⚙️ record.
@@ -86,6 +90,8 @@ test('a wrong Machine answer teaches the Secret Rule', async ({ page }) => {
   await page.getByTestId('skill-machine').click();
   await startRound(page);
 
+  // Skip past any Name-the-Rule surprises to a compute Question.
+  for (let i = 0; i < 12 && (await cardsShowing(page)); i++) await answerQuestion(page);
   const answer = await readCorrectAnswer(page);
   await answerOnPad(page, answer + 1);
   await expect(page.getByTestId('feedback')).toContainText('The rule was ×');
