@@ -94,7 +94,7 @@ export function PreRoundScreen({ state, dispatch }: AppProps) {
               data-testid={`practice-${table}`}
               onClick={() => dispatch({ type: 'PRACTICE_TABLE_CHANGED', table })}
             >
-              {skill.practiceLabel(table)}
+              {skill.practiceChip(table)}
             </button>
           ))}
         </div>

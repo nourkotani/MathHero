@@ -56,8 +56,10 @@ export interface SkillDef {
   answer(question: Question): number;
   /** The teaching-moment line after a wrong answer — the full truth, kid-style. */
   reveal(question: Question): string;
-  /** The badge/chip text for practicing one table (e.g. "8×", "÷8"). */
+  /** The full practice phrase for badges and hints (e.g. "8×", "×8 machine"). */
   practiceLabel(table: number): string;
+  /** The compact form for the 12 table-picker chips (e.g. "8×", "×8"). */
+  practiceChip(table: number): string;
   /**
    * Machine-style Skills only: the example rows the prompt panel shows.
    * Absent for Skills whose whole prompt is the display line.
@@ -201,6 +203,7 @@ export const SKILL_DEFS: readonly SkillDef[] = [
     answer: (q) => q.a * q.b,
     reveal: (q) => `${multiplyDisplay(q)} = ${q.a * q.b}`,
     practiceLabel: (table) => `${table}×`,
+    practiceChip: (table) => `${table}×`,
     // Multiplication reads the same in either order — even in Practice.
     dress: (q, _ctx, prng) => ({ question: q, prng }),
   },
@@ -219,6 +222,7 @@ export const SKILL_DEFS: readonly SkillDef[] = [
     answer: (q) => q.b,
     reveal: (q) => `${divideDisplay(q)} = ${q.b}`,
     practiceLabel: (table) => `÷${table}`,
+    practiceChip: (table) => `÷${table}`,
     dress: (q, ctx, prng) => ({ question: pinFirst(q, ctx), prng }),
   },
   {
@@ -243,6 +247,7 @@ export const SKILL_DEFS: readonly SkillDef[] = [
       return `The rule was ${machineRule(q)}! So ${input} → ${machineOutput(q, input)}`;
     },
     practiceLabel: (table) => `×${table} machine`,
+    practiceChip: (table) => `×${table}`,
     exampleRows: (q) =>
       MACHINE_EXAMPLE_INPUTS.map((input) => ({ input, output: machineOutput(q, input) })),
     dress: (q, ctx, prng) => {
@@ -286,6 +291,7 @@ export const SKILL_DEFS: readonly SkillDef[] = [
       return `It was ${rule} each time — ${patternTerms(q).join(', ')}, ${patternAnswer(q)}!`;
     },
     practiceLabel: (table) => `by ${table}s`,
+    practiceChip: (table) => `by ${table}s`,
     dress: (q, ctx, prng) => {
       // Practice pins the step: "count by 8s" really steps by 8, and the
       // geometric twist never appears in Practice.

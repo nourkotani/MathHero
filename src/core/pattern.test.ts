@@ -184,6 +184,7 @@ describe('the Pattern definition row', () => {
     expect(pattern.answer({ a: 3, b: 2, wear: 'x2' })).toBe(48);
     expect(pattern.answer({ a: 12, b: 3, wear: 'x3' })).toBe(972);
     expect(pattern.practiceLabel(8)).toBe('by 8s');
+    expect(pattern.practiceChip(8)).toBe('by 8s');
     expect(pattern.basePointScale).toBe(2);
     expect(pattern.masteryWindowMs).toBe(15_000);
   });

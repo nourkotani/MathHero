@@ -157,6 +157,7 @@ describe('the Machine definition row', () => {
     expect(machine.display({ a: 7, b: 8 })).toBe('× 7 then + 8');
     expect(machine.answer({ a: 7, b: 8, input: 10 })).toBe(78);
     expect(machine.practiceLabel(8)).toBe('×8 machine');
+    expect(machine.practiceChip(8)).toBe('×8');
     expect(machine.basePointScale).toBe(3);
     expect(machine.masteryWindowMs).toBe(25_000);
     expect(machine.exampleRows?.({ a: 3, b: 2 })).toEqual([

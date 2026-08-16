@@ -764,15 +764,18 @@ body {
     0 0 18px rgba(255, 210, 77, 0.6);
 }
 
+/* Auto-sized columns: every Skill's chip text fits, from "8×" to "by 12s". */
 .practice-picker {
   display: grid;
-  grid-template-columns: repeat(6, 3.4rem);
+  grid-template-columns: repeat(6, minmax(3.4rem, auto));
   gap: 0.5rem;
   pointer-events: auto;
 }
 
 .practice-chip {
   height: 2.9rem;
+  white-space: nowrap;
+  padding: 0 0.8rem;
   font-size: 1.2rem;
   font-weight: 800;
   border: 3px solid var(--panel-border);
