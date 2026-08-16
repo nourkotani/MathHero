@@ -178,6 +178,52 @@ export function createReactions(opts: {
     };
   }
 
+  /**
+   * The Landmark transformation: a two-second power-up on the spot — coil
+   * low gathering light, then erupt skyward, arms thrown wide, gold energy
+   * pouring off in three staged waves as the new form ignites.
+   */
+  function landmarkClip(): Clip {
+    const waves = [0.15, 0.5, 0.8];
+    let nextWave = 0;
+    return {
+      duration: 2.0,
+      apply(t, elapsed) {
+        const hero = getHero();
+        const j = hero.joints;
+        if (nextWave < waves.length && t >= (waves[nextWave] ?? 1)) {
+          nextWave += 1;
+          const count = 14 + nextWave * 8;
+          fx.burst(nextWave === 3 ? 0xffffff : 0xffd700, count, hero.group.position.clone().setY(1.3), 2.6 + nextWave);
+          juice.addShake(0.18 + nextWave * 0.08);
+        }
+        if (t < 0.4) {
+          // Gathering: a deep coil, fists drawn to the sides.
+          const c = t / 0.4;
+          hero.group.position.y = heroBob(elapsed) - c * 0.2;
+          j.torso.rotation.x = 0.06 + c * 0.35;
+          j.kneeL.rotation.x = 0.38 + c * 0.9;
+          j.kneeR.rotation.x = 0.34 + c * 0.9;
+          j.armL.rotation.set(-0.2, 0, 0.75);
+          j.armR.rotation.set(-0.2, 0, -0.75);
+          return;
+        }
+        // Eruption: rise past standing, arch back, arms thrown wide to the
+        // sky, easing home over the tail of the clip.
+        const e = Math.min(1, (t - 0.4) / 0.25);
+        const settle = t > 0.8 ? (t - 0.8) / 0.2 : 0;
+        const lift = Math.sin(e * Math.PI * 0.5) * (1 - settle);
+        hero.group.position.y = heroBob(elapsed) + lift * 0.55;
+        j.torso.rotation.x = 0.06 - lift * 0.3;
+        j.head.rotation.x = -lift * 0.35;
+        j.armL.rotation.set(-2.6 * lift - 0.2, 0, 0.9 * lift + 0.3);
+        j.armR.rotation.set(-2.6 * lift - 0.2, 0, -0.9 * lift - 0.3);
+        j.elbowL.rotation.x = -0.3 * (1 - lift) - 1.55 * (1 - lift);
+        j.elbowR.rotation.x = -0.3 * (1 - lift) - 1.55 * (1 - lift);
+      },
+    };
+  }
+
   return {
     handleEffects(effects) {
       const hero = getHero();
@@ -213,8 +259,17 @@ export function createReactions(opts: {
             juice.speedLines();
             break;
           case 'LEVEL_UP':
-            fx.burst(0xffd700, 26, hero.group.position.clone().setY(1.2), 4);
-            juice.addShake(0.3);
+            if (effect.cosmetic?.landmark) {
+              // A Landmark Level: the full transformation scene. The hero
+              // powers up live on the Results stage while the new form
+              // ignites — staged bursts, speed-lines, the camera punch.
+              heroChannel.play(landmarkClip(), 'landmark');
+              juice.punchCamera();
+              juice.speedLines();
+            } else {
+              fx.burst(0xffd700, 26, hero.group.position.clone().setY(1.2), 4);
+              juice.addShake(0.3);
+            }
             break;
           case 'NEW_PERSONAL_BEST':
             fx.burst(0x8f5aff, 20, new THREE.Vector3(0, 2.0, 0), 4.5);

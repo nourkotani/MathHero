@@ -12,7 +12,7 @@ import {
   levelForXp,
   OUTFIT_PRESETS,
   presetHex,
-  unlockedCosmetics,
+  wornCosmetics,
 } from '../core';
 import type { GameEffect, GameState, HeroAppearance } from '../core';
 import { createCameraRig } from './cameraRig';
@@ -128,9 +128,11 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     applyLevelToRig(hero, level);
     hero.bodyMaterial.color.setHex(presetHex(OUTFIT_PRESETS, colors.outfitPrimary));
     hero.trimMaterial.color.setHex(presetHex(OUTFIT_PRESETS, colors.outfitSecondary));
-    const unlockedIds = new Set(unlockedCosmetics(level).map((c) => c.id));
+    // Evolution, not accumulation: only the highest unlocked tier per slot
+    // is worn, so a veteran hero reads grander, never more cluttered.
+    const wornIds = new Set(wornCosmetics(level).map((c) => c.id));
     for (const [id, mesh] of hero.cosmetics) {
-      mesh.visible = unlockedIds.has(id);
+      mesh.visible = wornIds.has(id);
     }
     reactions.refreshForm();
   }

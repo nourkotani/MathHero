@@ -43,6 +43,16 @@ const PATCHES: Record<string, Tone[]> = {
     { at: 0.3, freq0: 784, freq1: 784, duration: 0.15, wave: 'triangle', gain: 0.18 },
     { at: 0.45, freq0: 1047, freq1: 1047, duration: 0.4, wave: 'triangle', gain: 0.2 },
   ],
+  // A Landmark Level: the fanfare grows a rising power-up sweep underneath
+  // and a triumphant held fifth on top.
+  'LEVEL_UP:landmark': [
+    { at: 0, freq0: 120, freq1: 480, duration: 0.7, wave: 'sawtooth', gain: 0.1 },
+    { at: 0.2, freq0: 523, freq1: 523, duration: 0.15, wave: 'triangle', gain: 0.18 },
+    { at: 0.35, freq0: 659, freq1: 659, duration: 0.15, wave: 'triangle', gain: 0.18 },
+    { at: 0.5, freq0: 784, freq1: 784, duration: 0.15, wave: 'triangle', gain: 0.18 },
+    { at: 0.65, freq0: 1047, freq1: 1047, duration: 0.5, wave: 'triangle', gain: 0.2 },
+    { at: 0.65, freq0: 1568, freq1: 1568, duration: 0.7, wave: 'sine', gain: 0.12 },
+  ],
   NEW_PERSONAL_BEST: [
     { at: 0, freq0: 784, freq1: 784, duration: 0.12, wave: 'square', gain: 0.12 },
     { at: 0.12, freq0: 988, freq1: 988, duration: 0.12, wave: 'square', gain: 0.12 },
@@ -53,6 +63,9 @@ const PATCHES: Record<string, Tone[]> = {
 function patchFor(effect: GameEffect): Tone[] | undefined {
   if (effect.type === 'TRANSFORMED') {
     return PATCHES[`TRANSFORMED:${effect.form as StreakForm}`];
+  }
+  if (effect.type === 'LEVEL_UP' && effect.cosmetic?.landmark) {
+    return PATCHES['LEVEL_UP:landmark'];
   }
   return PATCHES[effect.type];
 }

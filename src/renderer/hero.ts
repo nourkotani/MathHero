@@ -576,5 +576,205 @@ function buildCosmetics(): Map<string, THREE.Object3D> {
   }
   cosmetics.set('twin-halo', halo);
 
+  // ---- Evolved tiers (levels 35–95): each one replaces its slot's earlier
+  // piece with a grander form, in the same original design language. Small
+  // shared builders keep the fourteen shapes from becoming fourteen snowflakes.
+
+  const flatRing = (radius: number, tube: number, y: number, color: number) => {
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(radius, tube, 8, 32), glowMaterial(color));
+    ring.rotation.x = Math.PI / 2;
+    ring.position.y = y;
+    return ring;
+  };
+  const orbitBits = (
+    count: number,
+    radius: number,
+    y: number,
+    size: number,
+    colors: readonly number[],
+  ) => {
+    const group = new THREE.Group();
+    for (let i = 0; i < count; i++) {
+      const angle = (i / count) * Math.PI * 2;
+      const bit = new THREE.Mesh(
+        new THREE.OctahedronGeometry(size),
+        glowMaterial(colors[i % colors.length] ?? 0xffffff),
+      );
+      bit.position.set(Math.cos(angle) * radius, y + Math.sin(angle * 2) * 0.08, Math.sin(angle) * radius);
+      group.add(bit);
+    }
+    return group;
+  };
+  const wingFan = (colors: readonly [number, number, number], lengthScale: number) => {
+    const group = new THREE.Group();
+    const feathers: Array<[number, number, number, number]> = [
+      [0.32, 1.5, 2.45, 1.6],
+      [0.24, 1.15, 2.15, 1.42],
+      [0.17, 0.85, 1.85, 1.24],
+    ];
+    for (const side of [-1, 1]) {
+      feathers.forEach(([radius, length, tilt, y], i) => {
+        const scaled = length * lengthScale;
+        const feather = new THREE.Mesh(
+          new THREE.ConeGeometry(radius * lengthScale, scaled, 6),
+          glowMaterial(colors[i] ?? 0xffffff),
+        );
+        feather.position.set(side * (0.45 + scaled * 0.28), y, -0.4);
+        feather.rotation.z = side * tilt;
+        group.add(feather);
+      });
+    }
+    return group;
+  };
+  const cometTrail = (colors: readonly number[], spread: number) => {
+    const group = new THREE.Group();
+    colors.forEach((color, i) => {
+      const trail = new THREE.Mesh(new THREE.ConeGeometry(0.18, 1.2, 8), glowMaterial(color));
+      trail.position.set((i - (colors.length - 1) / 2) * spread, 1.0 + i * 0.18, -0.7);
+      trail.rotation.x = Math.PI / 2;
+      group.add(trail);
+    });
+    return group;
+  };
+
+  // wisps II — storm wisps: more spirits, brighter, riding higher.
+  cosmetics.set('storm-wisps', orbitBits(5, 0.75, 1.7, 0.11, [0xbfefff, 0x7ad7ff]));
+
+  // crown II — blazing crown: the ring catches fire.
+  const blazing = new THREE.Group();
+  blazing.add(flatRing(0.32, 0.05, 0, 0xffb02e));
+  for (let i = 0; i < 6; i++) {
+    const angle = (i / 6) * Math.PI * 2;
+    const flame = new THREE.Mesh(new THREE.ConeGeometry(0.055, 0.3, 6), glowMaterial(0xff7a2e));
+    flame.position.set(Math.cos(angle) * 0.32, 0.16, Math.sin(angle) * 0.32);
+    blazing.add(flame);
+  }
+  blazing.position.y = 2.85;
+  cosmetics.set('blazing-crown', blazing);
+
+  // wings II — phoenix wings: longer, burning warm.
+  cosmetics.set('phoenix-wings', wingFan([0xffb347, 0xffe14d, 0xff8f5a], 1.2));
+
+  // ring II (Landmark 50) — inferno ring: a double band wreathed in flame.
+  const inferno = new THREE.Group();
+  inferno.add(flatRing(0.9, 0.06, 0.15, 0xff5a2e));
+  inferno.add(flatRing(0.72, 0.045, 0.22, 0xffb02e));
+  for (let i = 0; i < 8; i++) {
+    const angle = (i / 8) * Math.PI * 2;
+    const tongue = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.34, 6), glowMaterial(0xff8f3a));
+    tongue.position.set(Math.cos(angle) * 0.9, 0.34, Math.sin(angle) * 0.9);
+    inferno.add(tongue);
+  }
+  cosmetics.set('inferno-ring', inferno);
+
+  // trail II — twin comet trail.
+  cosmetics.set('twin-comet-trail', cometTrail([0xffa94d, 0xffe14d], 0.34));
+
+  // halo II — radiant halo: one great ring with light spokes.
+  const radiant = new THREE.Group();
+  radiant.add(flatRing(0.55, 0.05, 0, 0xfff3b0));
+  for (let i = 0; i < 8; i++) {
+    const angle = (i / 8) * Math.PI * 2;
+    const spoke = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.025, 0.025), glowMaterial(0xfff8d9));
+    spoke.position.set(Math.cos(angle) * 0.55, 0, Math.sin(angle) * 0.55);
+    spoke.rotation.y = -angle;
+    radiant.add(spoke);
+  }
+  radiant.position.y = 3.05;
+  cosmetics.set('radiant-halo', radiant);
+
+  // wisps III — thunder spirits: the wisps learn lightning.
+  const thunder = new THREE.Group();
+  thunder.add(orbitBits(5, 0.8, 1.6, 0.12, [0x9be7ff, 0xd9f4ff]));
+  for (let i = 0; i < 3; i++) {
+    const angle = (i / 3) * Math.PI * 2 + 0.5;
+    const bolt = new THREE.Group();
+    const upper = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.22, 0.035), glowMaterial(0xeaffff));
+    upper.rotation.z = 0.5;
+    const lower = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.22, 0.035), glowMaterial(0xeaffff));
+    lower.position.y = -0.18;
+    lower.rotation.z = -0.5;
+    bolt.add(upper);
+    bolt.add(lower);
+    bolt.position.set(Math.cos(angle) * 0.85, 2.0, Math.sin(angle) * 0.85);
+    thunder.add(bolt);
+  }
+  cosmetics.set('thunder-spirits', thunder);
+
+  // wings III — galaxy wings: cosmic violet-cyan, grandest span.
+  cosmetics.set('galaxy-wings', wingFan([0x8f5aff, 0x3ac0ff, 0xd9b3ff], 1.4));
+
+  // crown III (Landmark 75) — celestial crown: stars ride the ring.
+  const celestial = new THREE.Group();
+  celestial.add(flatRing(0.36, 0.045, 0, 0xfff3ff));
+  for (let i = 0; i < 8; i++) {
+    const angle = (i / 8) * Math.PI * 2;
+    const star = new THREE.Mesh(new THREE.OctahedronGeometry(0.055), glowMaterial(0xd9e8ff));
+    star.position.set(Math.cos(angle) * 0.36, 0.1, Math.sin(angle) * 0.36);
+    celestial.add(star);
+  }
+  const crest = new THREE.Mesh(new THREE.OctahedronGeometry(0.11), glowMaterial(0xffffff));
+  crest.position.y = 0.38;
+  celestial.add(crest);
+  celestial.position.y = 2.9;
+  cosmetics.set('celestial-crown', celestial);
+
+  // trail III — starfall trail: the comet sheds falling stars.
+  const starfall = new THREE.Group();
+  starfall.add(cometTrail([0xffd24d], 0));
+  for (let i = 0; i < 4; i++) {
+    const fleck = new THREE.Mesh(new THREE.OctahedronGeometry(0.06), glowMaterial(0xfff3b0));
+    fleck.position.set((i % 2) * 0.3 - 0.15, 0.9 - i * 0.12, -1.1 - i * 0.25);
+    starfall.add(fleck);
+  }
+  cosmetics.set('starfall-trail', starfall);
+
+  // ring III — nova ring: three tilted bands like a newborn star system.
+  const nova = new THREE.Group();
+  const novaBands: Array<[number, number, number]> = [
+    [0.95, 0.28, 0xffd24d],
+    [0.8, -0.24, 0xff7a4d],
+    [0.65, 0.12, 0xfff3b0],
+  ];
+  for (const [radius, tilt, color] of novaBands) {
+    const band = flatRing(radius, 0.04, 0, color);
+    band.rotation.x = Math.PI / 2 + tilt;
+    band.position.y = 0.25;
+    nova.add(band);
+  }
+  cosmetics.set('nova-ring', nova);
+
+  // halo III — aurora halo: stacked dawn-colored rings.
+  const aurora = new THREE.Group();
+  const auroraRings: Array<[number, number]> = [
+    [0x7dffd0, 0],
+    [0xb18fff, 0.16],
+    [0xffe9a3, 0.32],
+  ];
+  for (const [color, dy] of auroraRings) {
+    aurora.add(flatRing(0.5 - dy * 0.35, 0.035, dy, color));
+  }
+  aurora.position.y = 3.0;
+  cosmetics.set('aurora-halo', aurora);
+
+  // wisps IV — spirit storm: two full rings of spirits.
+  const spiritStorm = new THREE.Group();
+  spiritStorm.add(orbitBits(5, 0.95, 1.15, 0.11, [0x7ad7ff, 0xd9b3ff]));
+  spiritStorm.add(orbitBits(4, 0.7, 2.0, 0.1, [0xd9b3ff, 0x7ad7ff]));
+  cosmetics.set('spirit-storm', spiritStorm);
+
+  // form (Landmark 100) — the Legend state: a permanent radiant mantle of
+  // light around the whole hero, crowned by a slow-burning star.
+  const legend = new THREE.Group();
+  const mantle = new THREE.Mesh(buildAuraGeometry(), glowSurface(0xfff0c9, 0.14));
+  mantle.scale.set(1.12, 0.92, 1.12);
+  legend.add(mantle);
+  legend.add(flatRing(0.62, 0.05, 3.2, 0xffffff));
+  legend.add(flatRing(0.42, 0.04, 3.38, 0xffe9a3));
+  const legendStar = new THREE.Mesh(new THREE.OctahedronGeometry(0.16), glowMaterial(0xffffff));
+  legendStar.position.y = 3.62;
+  legend.add(legendStar);
+  cosmetics.set('legend', legend);
+
   return cosmetics;
 }

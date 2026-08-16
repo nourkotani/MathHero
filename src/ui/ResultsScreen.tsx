@@ -30,17 +30,27 @@ export function ResultsScreen({ state, dispatch, newBest, levelUps = [] }: AppPr
         </div>
       )}
       {reachedLevel !== undefined && (
-        <div class="level-up-banner" data-testid="level-up">
+        <div
+          class={levelUps.some((up) => up.landmark) ? 'level-up-banner landmark' : 'level-up-banner'}
+          data-testid="level-up"
+        >
           🎉 LEVEL UP! You reached Level {reachedLevel}!
           {levelUps
             .filter((up) => up.cosmeticLabel !== undefined)
-            .map((up) => (
-              <div class="cosmetic-unlock" key={up.level}>
-                ✨ Unlocked: {up.cosmeticLabel}!
-              </div>
-            ))}
+            .map((up) =>
+              up.landmark ? (
+                <div class="cosmetic-unlock landmark-unlock" key={up.level} data-testid="landmark">
+                  🌟 TRANSFORMATION! {up.cosmeticLabel}!
+                </div>
+              ) : (
+                <div class="cosmetic-unlock" key={up.level}>
+                  ✨ Unlocked: {up.cosmeticLabel}!
+                </div>
+              ),
+            )}
         </div>
       )}
+      {levelUps.some((up) => up.landmark) && <div class="landmark-flash" />}
       <div class="hero-level" data-testid="hero-level">
         {player?.name} — Level {level}
       </div>
