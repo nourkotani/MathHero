@@ -101,3 +101,20 @@ test('the game makes no network requests', async ({ page }) => {
   await answerOnPad(page, answer);
   expect(remote).toEqual([]);
 });
+
+test('the built file is truly single: nothing is requested beyond the document', async ({
+  page,
+}) => {
+  // Baked textures and every other asset must be inlined — a sibling-file
+  // request would mean the game breaks the moment only MathHero.html is
+  // copied to a family device.
+  const extra: string[] = [];
+  page.on('request', (request) => {
+    const url = request.url();
+    if (!url.startsWith('data:') && !/MathHero\.html/.test(url)) extra.push(url);
+  });
+  await openGame(page);
+  await createHero(page);
+  await startRound(page);
+  expect(extra).toEqual([]);
+});

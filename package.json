@@ -6,6 +6,7 @@
   "description": "Self-contained offline 3D multiplication game for two kids.",
   "scripts": {
     "dev": "vite",
+    "bake:textures": "node scripts/bake-textures.mjs",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tests",
     "lint": "eslint .",
     "test:core": "vitest run",

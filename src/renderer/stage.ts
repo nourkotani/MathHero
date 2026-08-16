@@ -3,8 +3,16 @@
 // urgency treatment, since that plays on the arena and the ambient light.
 
 import * as THREE from 'three';
-import { backdropSurface, environmentSurface, glowSurface, markBloom, starSurface } from './materials';
+import {
+  backdropSurface,
+  environmentSurface,
+  glowSurface,
+  markBloom,
+  paintedMap,
+  starSurface,
+} from './materials';
 import { STYLE } from './style';
+import arenaTopUrl from './textures/arena-top.png';
 
 export interface Stage {
   update(dt: number, elapsed: number, urgent: boolean): void;
@@ -30,6 +38,7 @@ export function createStage(scene: THREE.Scene): Stage {
   sun.shadow.camera.near = 1;
   sun.shadow.camera.far = 30;
   sun.shadow.bias = -0.002;
+  sun.shadow.radius = STYLE.shadow.radius;
   scene.add(sun);
   // Cool rim light from behind, so the figures pop against the dusk.
   const rim = new THREE.DirectionalLight(STYLE.rim.color, STYLE.rim.intensity);
@@ -49,9 +58,16 @@ export function createStage(scene: THREE.Scene): Stage {
   ground.receiveShadow = true;
   scene.add(ground);
 
-  // Tournament-style stone platform with a glowing energy rim.
-  const arenaMaterial = environmentSurface(0xcfc8bd, 0.85);
-  const arena = new THREE.Mesh(new THREE.CylinderGeometry(7, 7.4, 0.3, 48), arenaMaterial);
+  // Tournament-style stone platform with a glowing energy rim. The top cap
+  // wears the baked tile-ring texture; the side keeps the plain stone tone.
+  const arenaTopMaterial = environmentSurface(0xffffff, 0.85, paintedMap(arenaTopUrl));
+  const arenaSideMaterial = environmentSurface(0xcfc8bd, 0.85);
+  const arenaMaterials = [arenaTopMaterial, arenaSideMaterial];
+  const arena = new THREE.Mesh(new THREE.CylinderGeometry(7, 7.4, 0.3, 48), [
+    arenaSideMaterial,
+    arenaTopMaterial,
+    arenaSideMaterial,
+  ]);
   arena.position.y = 0.15;
   arena.receiveShadow = true;
   scene.add(arena);
@@ -100,11 +116,15 @@ export function createStage(scene: THREE.Scene): Stage {
       if (urgent) {
         const pulse = 0.5 + Math.sin(elapsed * 8) * 0.5;
         hemi.color.setHSL(0.0, 0.35 * pulse, 0.85);
-        arenaMaterial.emissive.setHex(0xff3b3b);
-        arenaMaterial.emissiveIntensity = 0.12 * pulse;
+        for (const material of arenaMaterials) {
+          material.emissive.setHex(0xff3b3b);
+          material.emissiveIntensity = 0.12 * pulse;
+        }
       } else {
         hemi.color.setHex(0x8fa3ff);
-        arenaMaterial.emissiveIntensity = 0;
+        for (const material of arenaMaterials) {
+          material.emissiveIntensity = 0;
+        }
       }
     },
   };

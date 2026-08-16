@@ -79,8 +79,10 @@ export const STYLE = {
 
   /** One directional shadow grounds the characters. */
   shadow: {
-    mapSize: 1024,
+    mapSize: 2048,
     /** Half-extent of the sun's shadow frustum around the arena. */
     range: 12,
+    /** PCF blur radius: how soft the shadow edge reads. */
+    radius: 4,
   },
 } as const;

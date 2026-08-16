@@ -6,6 +6,13 @@ export default tseslint.config(
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
+    // Offline tooling (the texture baker) runs under Node, not the browser.
+    files: ['scripts/**'],
+    languageOptions: {
+      globals: { Buffer: 'readonly', console: 'readonly', process: 'readonly' },
+    },
+  },
+  {
     // Game Core purity (docs/ARCHITECTURE.md): clock and PRNG are injected.
     files: ['src/core/**'],
     rules: {

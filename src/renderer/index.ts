@@ -37,6 +37,8 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
   renderer.setSize(window.innerWidth, window.innerHeight);
   // One directional shadow grounds the characters (see stage.ts).
   renderer.shadowMap.enabled = true;
+  // PCF with a blur radius on the sun (stage.ts): three r185 deprecated
+  // PCFSoftShadowMap, so softness comes from the light's shadow.radius.
   renderer.shadowMap.type = THREE.PCFShadowMap;
 
   const scene = new THREE.Scene();

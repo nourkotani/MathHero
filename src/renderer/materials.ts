@@ -44,9 +44,23 @@ export function characterSurface(color: number): Surface {
   return material;
 }
 
-/** Lit surfaces on the arena, ground, and rocks. */
-export function environmentSurface(color: number, roughness: number): Surface {
-  return new THREE.MeshStandardMaterial({ color, roughness });
+/**
+ * A painted texture baked by scripts/bake-textures.mjs, inlined into the
+ * single file by the build. Color maps only — hence the sRGB color space.
+ */
+export function paintedMap(url: string): THREE.Texture {
+  const texture = new THREE.TextureLoader().load(url);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = 4;
+  return texture;
+}
+
+/** Lit surfaces on the arena, ground, and rocks. With a painted map, the
+ * texture carries the palette — pass white so it isn't double-tinted. */
+export function environmentSurface(color: number, roughness: number, map?: THREE.Texture): Surface {
+  return map === undefined
+    ? new THREE.MeshStandardMaterial({ color, roughness })
+    : new THREE.MeshStandardMaterial({ color, roughness, map });
 }
 
 /**
