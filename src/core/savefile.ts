@@ -6,6 +6,7 @@ import { validAppearance } from './appearance';
 import type { HeroAppearance } from './appearance';
 import { MAX_NAME_LENGTH, validColors } from './players';
 import type { PlayerRecord } from './players';
+import { SKILLS } from './skills';
 import type { GameState } from './types';
 
 /** A well-formed count/score/timestamp: finite, non-negative number. */
@@ -13,7 +14,7 @@ function validCount(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0;
 }
 
-export const SAVE_FILE_VERSION = 8;
+export const SAVE_FILE_VERSION = 9;
 
 export interface SaveFile {
   version: number;
@@ -95,6 +96,21 @@ const MIGRATIONS: Array<(doc: Record<string, unknown>) => Record<string, unknown
       }),
     ),
   }),
+  // v8 → v9: mastery data and Personal Bests become per-Skill. Everything a
+  // hero earned belongs to Multiply; Divide starts fresh. Frozen literal on
+  // purpose — a migration is a historical snapshot and must not change shape
+  // if SKILLS grows later.
+  (doc) => ({
+    ...doc,
+    version: 9,
+    players: (Array.isArray(doc.players) ? doc.players : []).map(
+      (p: Record<string, unknown>) => ({
+        ...p,
+        bests: { multiply: p.bests ?? {}, divide: {} },
+        factStats: { multiply: p.factStats ?? {}, divide: {} },
+      }),
+    ),
+  }),
 ];
 
 /**
@@ -161,8 +177,8 @@ function validatePlayer(entry: unknown): PlayerRecord | null {
     name === '' ||
     !validCount(p.roundsPlayed) ||
     !validCount(p.xp) ||
-    !validBests(p.bests) ||
-    !validFactStats(p.factStats) ||
+    !validPerSkill(p.bests, validBestsSlice) ||
+    !validPerSkill(p.factStats, validFactStatsSlice) ||
     !validPlayerAppearance(p.appearance) ||
     typeof colors !== 'object' ||
     colors === null ||
@@ -195,7 +211,22 @@ function validPlayerAppearance(appearance: unknown): boolean {
   return validAppearance(appearance as HeroAppearance);
 }
 
-function validFactStats(stats: unknown): boolean {
+/**
+ * A per-Skill map is valid when it holds exactly one valid slice per Skill —
+ * no Skill missing, no unknown keys. The same slice validators serve every
+ * Skill, so a future Skill is a SKILLS entry plus a migration.
+ */
+function validPerSkill(value: unknown, validSlice: (slice: unknown) => boolean): boolean {
+  if (typeof value !== 'object' || value === null) return false;
+  const map = value as Record<string, unknown>;
+  const keys = Object.keys(map);
+  return (
+    keys.length === SKILLS.length &&
+    SKILLS.every((skill) => keys.includes(skill) && validSlice(map[skill]))
+  );
+}
+
+function validFactStatsSlice(stats: unknown): boolean {
   if (typeof stats !== 'object' || stats === null) return false;
   return Object.entries(stats).every(
     ([key, attempts]) =>
@@ -211,7 +242,7 @@ function validFactStats(stats: unknown): boolean {
   );
 }
 
-function validBests(bests: unknown): boolean {
+function validBestsSlice(bests: unknown): boolean {
   if (typeof bests !== 'object' || bests === null) return false;
   return Object.entries(bests).every(
     ([key, value]) => ['easy', 'medium', 'hard'].includes(key) && validCount(value),

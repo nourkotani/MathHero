@@ -90,8 +90,8 @@ describe('practice Rounds', () => {
 
     const player = result.state.players[0];
     expect(player?.xp).toBe(10);
-    expect(player?.factStats[key]).toHaveLength(1);
-    expect(player?.bests).toEqual({});
+    expect(player?.factStats.multiply[key]).toHaveLength(1);
+    expect(player?.bests).toEqual({ multiply: {}, divide: {} });
     expect(result.effects.some((e) => e.type === 'NEW_PERSONAL_BEST')).toBe(false);
   });
 

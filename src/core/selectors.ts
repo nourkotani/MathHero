@@ -1,7 +1,18 @@
 // Derived values — computed from state, never stored, so the countdown can't
 // drift from the one time source (the tick stream).
 
+import type { Skill } from './skills';
 import type { GameState } from './types';
+
+/**
+ * The Skill the session is training — the single seam every per-Skill read
+ * and write goes through. Multiply-only until the Divide Round ships (#22
+ * backs this with real session state; nothing else changes).
+ */
+export function activeSkill(state: GameState): Skill {
+  void state;
+  return 'multiply';
+}
 
 export const MIN_TIMER_SECONDS = 30;
 export const MAX_TIMER_SECONDS = 600;

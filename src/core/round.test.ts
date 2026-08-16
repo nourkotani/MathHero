@@ -86,7 +86,7 @@ describe('Round lifecycle', () => {
     const player = result.state.players[0];
     expect(player?.xp).toBe(0);
     expect(player?.roundsPlayed).toBe(0);
-    expect(player?.bests).toEqual({});
+    expect(player?.bests).toEqual({ multiply: {}, divide: {} });
 
     // Quit is only meaningful mid-Round.
     expect(update(result.state, { type: 'ROUND_QUIT' }).state).toEqual(result.state);

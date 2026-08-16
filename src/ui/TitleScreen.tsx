@@ -33,7 +33,7 @@ function MasteryGrid({ player, onClose }: { player: PlayerRecord; onClose: () =>
               {TABLE_RANGE.map((c) => (
                 <div
                   key={`${r}-${c}`}
-                  class={`mastery-cell mastery-${masteryOf(player.factStats[factKey(r, c)])}`}
+                  class={`mastery-cell mastery-${masteryOf(player.factStats.multiply[factKey(r, c)])}`}
                   data-testid={`cell-${r}-${c}`}
                   title={`${r} × ${c}`}
                 />

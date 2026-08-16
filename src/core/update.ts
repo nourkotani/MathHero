@@ -9,8 +9,10 @@ import { seedPrng } from './prng';
 import { buildSaveFile, parseSaveFile, serializeSaveFile } from './savefile';
 import { pointsForCorrect } from './scoring';
 import { selectQuestion } from './selection';
+import { emptyPerSkill } from './skills';
 import { tierForStreak } from './streak';
 import {
+  activeSkill,
   DEFAULT_TIMER_SECONDS,
   MAX_TIMER_SECONDS,
   MIN_TIMER_SECONDS,
@@ -53,19 +55,27 @@ function noop(state: GameState): UpdateResult {
   return { state, effects: [] };
 }
 
+/** The active Player's attempt history for the Skill being trained. */
 function activeFactStats(state: GameState): FactStats | undefined {
-  return state.players.find((p) => p.id === state.activePlayerId)?.factStats;
+  return state.players.find((p) => p.id === state.activePlayerId)?.factStats[activeSkill(state)];
 }
 
-/** Record one attempt at the current question against the active Player. */
+/** Record one attempt at the current question against the active Player's active-Skill slice. */
 function withAttemptRecorded(state: GameState, correct: boolean): GameState {
+  const skill = activeSkill(state);
   const key = factKey(state.question.a, state.question.b);
   const ms = Math.max(0, state.now - state.questionAskedAt);
   return {
     ...state,
     players: state.players.map((p) =>
       p.id === state.activePlayerId
-        ? { ...p, factStats: recordAttempt(p.factStats, key, { correct, ms }) }
+        ? {
+            ...p,
+            factStats: {
+              ...p.factStats,
+              [skill]: recordAttempt(p.factStats[skill], key, { correct, ms }),
+            },
+          }
         : p,
     ),
   };
@@ -89,11 +99,12 @@ export function update(state: GameState, event: GameEvent): UpdateResult {
             const cosmetic = cosmeticUnlockedAt(level);
             effects.push(cosmetic ? { type: 'LEVEL_UP', level, cosmetic } : { type: 'LEVEL_UP', level });
           }
+          const skill = activeSkill(ticked);
           let bests = p.bests;
           // Practice Rounds award XP but never set Personal Bests — a focused
           // 2× table score isn't comparable to a real difficulty Round.
-          if (ticked.practiceTable === null && ticked.score > (bests[ticked.difficulty] ?? 0)) {
-            bests = { ...bests, [ticked.difficulty]: ticked.score };
+          if (ticked.practiceTable === null && ticked.score > (bests[skill][ticked.difficulty] ?? 0)) {
+            bests = { ...bests, [skill]: { ...bests[skill], [ticked.difficulty]: ticked.score } };
             bestEffects.push({
               type: 'NEW_PERSONAL_BEST',
               difficulty: ticked.difficulty,
@@ -189,8 +200,8 @@ export function update(state: GameState, event: GameEvent): UpdateResult {
         appearance: event.appearance,
         roundsPlayed: 0,
         xp: 0,
-        bests: {},
-        factStats: {},
+        bests: emptyPerSkill(() => ({})),
+        factStats: emptyPerSkill(() => ({})),
       };
       return {
         state: {

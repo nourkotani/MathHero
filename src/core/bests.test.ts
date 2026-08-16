@@ -17,7 +17,7 @@ function nextRound(state: GameState): GameState {
 describe('Personal Bests', () => {
   it('records the first scoring Round as the best for that difficulty', () => {
     const result = playRound(freshRound(31), 2, 999_999); // 20 points on Easy
-    expect(result.state.players[0]?.bests).toEqual({ easy: 20 });
+    expect(result.state.players[0]?.bests).toEqual({ multiply: { easy: 20 }, divide: {} });
     expect(result.effects.map((e) => e.type)).toEqual([
       'ROUND_ENDED',
       'NEW_PERSONAL_BEST',
@@ -27,7 +27,7 @@ describe('Personal Bests', () => {
 
   it('a zero-point Round records no best and no celebration', () => {
     const result = playRound(freshRound(32), 0, 999_999);
-    expect(result.state.players[0]?.bests).toEqual({});
+    expect(result.state.players[0]?.bests).toEqual({ multiply: {}, divide: {} });
     expect(result.effects.some((e) => e.type === 'NEW_PERSONAL_BEST')).toBe(false);
   });
 
@@ -36,7 +36,7 @@ describe('Personal Bests', () => {
     let state = playRound(freshRound(33), 5, 999_999).state;
     // Round 2 on Easy: 2 corrects = 20 points → no new best.
     const worse = playRound(nextRound(state), 2, 9_999_999);
-    expect(worse.state.players[0]?.bests).toEqual({ easy: 80 });
+    expect(worse.state.players[0]?.bests).toEqual({ multiply: { easy: 80 }, divide: {} });
     expect(worse.effects.some((e) => e.type === 'NEW_PERSONAL_BEST')).toBe(false);
 
     // Round 3 on Medium: 2 corrects = 40 points → separate best.
@@ -44,7 +44,10 @@ describe('Personal Bests', () => {
     state = update(state, { type: 'DIFFICULTY_CHANGED', difficulty: 'medium' }).state;
     state = update(state, { type: 'ROUND_STARTED' }).state;
     const medium = playRound(state, 2, 99_999_999);
-    expect(medium.state.players[0]?.bests).toEqual({ easy: 80, medium: 40 });
+    expect(medium.state.players[0]?.bests).toEqual({
+      multiply: { easy: 80, medium: 40 },
+      divide: {},
+    });
   });
 
   it('NEW_PERSONAL_BEST is ordered after LEVEL_UP effects', () => {
@@ -62,9 +65,9 @@ describe('Personal Bests', () => {
 describe('Family Leaderboard', () => {
   it('is derived from player bests and ordered by top score', () => {
     const players: PlayerRecord[] = [
-      { id: 'p1', name: 'Zara', colors: { hair: 'gold', outfitPrimary: 'blue', outfitSecondary: 'teal' }, appearance: { body: 'boy', hairStyle: 'spiky', hairLength: 'short', garment: 'gi', skinTone: 'tan' }, roundsPlayed: 1, xp: 100, bests: { easy: 100 }, factStats: {} },
-      { id: 'p2', name: 'Milo', colors: { hair: 'sky', outfitPrimary: 'red', outfitSecondary: 'white' }, appearance: { body: 'boy', hairStyle: 'spiky', hairLength: 'short', garment: 'gi', skinTone: 'tan' }, roundsPlayed: 2, xp: 400, bests: { easy: 80, hard: 300 }, factStats: {} },
-      { id: 'p3', name: 'Ana', colors: { hair: 'rose', outfitPrimary: 'green', outfitSecondary: 'blue' }, appearance: { body: 'boy', hairStyle: 'spiky', hairLength: 'short', garment: 'gi', skinTone: 'tan' }, roundsPlayed: 0, xp: 0, bests: {}, factStats: {} },
+      { id: 'p1', name: 'Zara', colors: { hair: 'gold', outfitPrimary: 'blue', outfitSecondary: 'teal' }, appearance: { body: 'boy', hairStyle: 'spiky', hairLength: 'short', garment: 'gi', skinTone: 'tan' }, roundsPlayed: 1, xp: 100, bests: { multiply: { easy: 100 }, divide: {} }, factStats: { multiply: {}, divide: {} } },
+      { id: 'p2', name: 'Milo', colors: { hair: 'sky', outfitPrimary: 'red', outfitSecondary: 'white' }, appearance: { body: 'boy', hairStyle: 'spiky', hairLength: 'short', garment: 'gi', skinTone: 'tan' }, roundsPlayed: 2, xp: 400, bests: { multiply: { easy: 80, hard: 300 }, divide: {} }, factStats: { multiply: {}, divide: {} } },
+      { id: 'p3', name: 'Ana', colors: { hair: 'rose', outfitPrimary: 'green', outfitSecondary: 'blue' }, appearance: { body: 'boy', hairStyle: 'spiky', hairLength: 'short', garment: 'gi', skinTone: 'tan' }, roundsPlayed: 0, xp: 0, bests: { multiply: {}, divide: {} }, factStats: { multiply: {}, divide: {} } },
     ];
     const board = familyLeaderboard(players);
     expect(board.map((e) => e.id)).toEqual(['p2', 'p1', 'p3']);
@@ -88,6 +91,6 @@ describe('Family Leaderboard', () => {
     });
     const migrated = parseSaveFile(v2);
     expect(migrated?.version).toBe(SAVE_FILE_VERSION);
-    expect(migrated?.players[0]).toMatchObject({ xp: 250, bests: {} });
+    expect(migrated?.players[0]).toMatchObject({ xp: 250, bests: { multiply: {}, divide: {} } });
   });
 });

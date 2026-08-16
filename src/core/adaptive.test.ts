@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { factKey, initialState, masteryOf, update } from './index';
+import { factKey, initialState, masteryOf, SAVE_FILE_VERSION, update } from './index';
 import type { FactAttempt, GameState, SaveFile } from './index';
 import { answerCorrectly, answerWrongly, dispatchAll, freshRound } from './test-helpers';
 
@@ -33,7 +33,7 @@ describe('attempt recording', () => {
     const key = factKey(state.question.a, state.question.b);
     state = update(state, { type: 'TICK', now: 1500 }).state;
     const result = answerCorrectly(state);
-    expect(result.state.players[0]?.factStats[key]).toEqual([{ correct: true, ms: 1500 }]);
+    expect(result.state.players[0]?.factStats.multiply[key]).toEqual([{ correct: true, ms: 1500 }]);
   });
 
   it('records wrong answers too', () => {
@@ -41,7 +41,7 @@ describe('attempt recording', () => {
     const key = factKey(state.question.a, state.question.b);
     state = update(state, { type: 'TICK', now: 3000 }).state;
     const result = answerWrongly(state);
-    expect(result.state.players[0]?.factStats[key]).toEqual([{ correct: false, ms: 3000 }]);
+    expect(result.state.players[0]?.factStats.multiply[key]).toEqual([{ correct: false, ms: 3000 }]);
   });
 });
 
@@ -77,7 +77,7 @@ describe('Adaptive Selection', () => {
 
   it('weights selection toward Facts the Player gets wrong', () => {
     const mkSave = (factStats: Record<string, FactAttempt[]>): SaveFile => ({
-      version: 8,
+      version: SAVE_FILE_VERSION,
       lastExportAt: null,
       muted: false,
       players: [
@@ -94,8 +94,8 @@ describe('Adaptive Selection', () => {
           },
           roundsPlayed: 0,
           xp: 0,
-          bests: {},
-          factStats,
+          bests: { multiply: {}, divide: {} },
+          factStats: { multiply: factStats, divide: {} },
         },
       ],
       nextPlayerId: 2,
@@ -127,6 +127,6 @@ describe('Adaptive Selection', () => {
     state = answerCorrectly(state).state;
     state = update(state, { type: 'TICK', now: 999_999 }).state; // round ends, save fires
 
-    expect(state.players[0]?.factStats[key]).toHaveLength(1);
+    expect(state.players[0]?.factStats.multiply[key]).toHaveLength(1);
   });
 });

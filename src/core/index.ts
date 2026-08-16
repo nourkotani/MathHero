@@ -56,6 +56,8 @@ export { familyLeaderboard } from './leaderboard';
 export type { LeaderboardEntry } from './leaderboard';
 export { HAIR_PRESETS, MAX_NAME_LENGTH, OUTFIT_PRESETS, presetHex } from './players';
 export type { ColorPreset, PlayerColors, PlayerRecord } from './players';
+export { SKILLS } from './skills';
+export type { Skill } from './skills';
 export {
   buildSaveFile,
   parseSaveFile,
@@ -64,6 +66,7 @@ export {
 } from './savefile';
 export type { SaveFile } from './savefile';
 export {
+  activeSkill,
   BACKUP_REMINDER_MS,
   backupReminderDue,
   DEFAULT_TIMER_SECONDS,

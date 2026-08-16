@@ -82,8 +82,8 @@ describe('cross-tab Save File reload', () => {
         },
         roundsPlayed: 0,
         xp: 0,
-        bests: {},
-        factStats: {},
+        bests: { multiply: {}, divide: {} },
+        factStats: { multiply: {}, divide: {} },
       })),
       nextPlayerId: names.length + 1,
       lastExportAt: 4321,
@@ -182,7 +182,7 @@ describe('the 7-day backup reminder', () => {
     // Also covers the previously untested v3→v4 and v4→v5 migrations.
     const save = parseSaveFile(v3);
     expect(save?.version).toBe(SAVE_FILE_VERSION);
-    expect(save?.players[0]?.factStats).toEqual({});
+    expect(save?.players[0]?.factStats).toEqual({ multiply: {}, divide: {} });
     expect(save?.lastExportAt).toBeNull();
 
     let state = dispatchAll(initialState({ seed: 76, save }), [
@@ -211,8 +211,8 @@ describe('Save File validation hardening', () => {
     },
     roundsPlayed: 1,
     xp: 100,
-    bests: {},
-    factStats: {},
+    bests: { multiply: {}, divide: {} },
+    factStats: { multiply: {}, divide: {} },
   };
   const doc = (overrides: object, player: object = validPlayer) =>
     JSON.stringify({
@@ -228,7 +228,11 @@ describe('Save File validation hardening', () => {
     expect(parseSaveFile(doc({}, { ...validPlayer, xp: Number.NaN }))).toBeNull();
     expect(parseSaveFile(doc({}, { ...validPlayer, roundsPlayed: -1 }))).toBeNull();
     expect(parseSaveFile(doc({ nextPlayerId: Number.POSITIVE_INFINITY }))).toBeNull();
-    expect(parseSaveFile(doc({}, { ...validPlayer, bests: { easy: Number.NaN } }))).toBeNull();
+    expect(
+      parseSaveFile(
+        doc({}, { ...validPlayer, bests: { multiply: { easy: Number.NaN }, divide: {} } }),
+      ),
+    ).toBeNull();
   });
 
   it('normalizes imported names the way creation does', () => {

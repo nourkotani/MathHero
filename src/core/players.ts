@@ -37,6 +37,7 @@ export interface PlayerColors {
 import type { HeroAppearance } from './appearance';
 import type { Difficulty } from './difficulty';
 import type { FactStats } from './mastery';
+import type { Skill } from './skills';
 
 export interface PlayerRecord {
   /** Stable id; names are display data, so renames keep every stat. */
@@ -46,12 +47,12 @@ export interface PlayerRecord {
   appearance: HeroAppearance;
   /** Rounds completed by this Player — every Round is attributed to someone. */
   roundsPlayed: number;
-  /** Lifetime XP: the sum of every Round's final score. Never resets. */
+  /** Lifetime XP: the sum of every Round's final score. Never resets — and one shared pool across Skills. */
   xp: number;
-  /** Personal Bests: highest Round score per Difficulty (absent until scored). */
-  bests: Partial<Record<Difficulty, number>>;
-  /** Recent attempts per Fact — the raw data mastery and weighting derive from. */
-  factStats: FactStats;
+  /** Personal Bests: highest Round score per Skill × Difficulty (absent until scored). */
+  bests: Record<Skill, Partial<Record<Difficulty, number>>>;
+  /** Recent attempts per Fact, tracked independently per Skill — the raw data mastery and weighting derive from. */
+  factStats: Record<Skill, FactStats>;
 }
 
 export const MAX_NAME_LENGTH = 20;

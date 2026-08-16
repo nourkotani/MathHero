@@ -17,8 +17,9 @@ export function familyLeaderboard(players: readonly PlayerRecord[]): Leaderboard
     .map((p) => ({
       id: p.id,
       name: p.name,
-      bests: p.bests,
-      topScore: Math.max(0, ...Object.values(p.bests)),
+      // Multiply-only until per-Skill records land on the screens (#23).
+      bests: p.bests.multiply,
+      topScore: Math.max(0, ...Object.values(p.bests.multiply)),
     }))
     .sort((a, b) => b.topScore - a.topScore || a.name.localeCompare(b.name));
 }
