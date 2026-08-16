@@ -46,7 +46,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
 
   const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 100);
   const rig = createCameraRig(camera);
-  const pipeline = createPipeline(renderer, scene, camera);
+  const pipeline = createPipeline(renderer, scene, camera, stage.sunDisc);
 
   // The quality tier degrades itself on weak devices — no settings UI. The
   // rule is the pure reducer in qualityTier.ts; this just feeds it samples.

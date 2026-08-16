@@ -5,6 +5,7 @@
 import * as THREE from 'three';
 import {
   backdropSurface,
+  cloudSprite,
   environmentSurface,
   glowSurface,
   markBloom,
@@ -14,19 +15,23 @@ import {
 } from './materials';
 import { STYLE } from './style';
 import arenaTopUrl from './textures/arena-top.png';
+import cloudUrl from './textures/cloud.png';
 import groundUrl from './textures/ground.png';
 import rockUrl from './textures/rock.png';
 import sigilUrl from './textures/sigil.png';
+import skyUrl from './textures/sky.png';
 
 export interface Stage {
   update(dt: number, elapsed: number, urgent: boolean): void;
+  /** The dusk sun's disc — the pipeline's god-ray pass shines from it. */
+  sunDisc: THREE.Mesh;
 }
 
 export function createStage(scene: THREE.Scene): Stage {
   // A dusk wasteland arena — dramatic anime-battle light, not a sunny field.
   scene.background = new THREE.Color(STYLE.sky);
   scene.fog = new THREE.Fog(STYLE.fog.color, STYLE.fog.near, STYLE.fog.far);
-  buildBackdrop(scene);
+  const sunDisc = buildBackdrop(scene);
 
   const hemi = new THREE.HemisphereLight(STYLE.hemi.sky, STYLE.hemi.ground, STYLE.hemi.intensity);
   scene.add(hemi);
@@ -159,23 +164,33 @@ export function createStage(scene: THREE.Scene): Stage {
   markBloom(sigil);
   scene.add(sigil);
 
-  // Slow dusk clouds drifting high overhead.
-  const clouds: THREE.Mesh[] = [];
-  const cloudMaterial = glowSurface(0xb18fd9, 0.35);
+  // Two layers of painted cloud sprites drifting at different depths — the
+  // parallax between them is what sells the sky's distance.
+  const clouds: Array<{ sprite: THREE.Sprite; speed: number; wrap: number }> = [];
+  const backMaterial = cloudSprite(cloudUrl, STYLE.clouds.back.tint, STYLE.clouds.back.opacity);
+  const frontMaterial = cloudSprite(cloudUrl, STYLE.clouds.front.tint, STYLE.clouds.front.opacity);
   for (let i = 0; i < 5; i++) {
-    const cloud = new THREE.Mesh(new THREE.SphereGeometry(2.4 + (i % 3), 10, 8), cloudMaterial);
-    cloud.scale.set(1.8, 0.35, 1);
-    cloud.position.set(-20 + i * 9, 12 + (i % 3) * 2.5, -18 - (i % 2) * 6);
-    scene.add(cloud);
-    clouds.push(cloud);
+    const sprite = new THREE.Sprite(backMaterial);
+    sprite.scale.set(11 + (i % 3) * 2.5, 4.6 + (i % 2), 1);
+    sprite.position.set(-24 + i * 11, 9 + (i % 3) * 1.6, -32 - (i % 2) * 6);
+    scene.add(sprite);
+    clouds.push({ sprite, speed: STYLE.clouds.back.speed, wrap: 30 });
+  }
+  for (let i = 0; i < 4; i++) {
+    const sprite = new THREE.Sprite(frontMaterial);
+    sprite.scale.set(7.5 + (i % 2) * 2, 3.2 + (i % 2) * 0.6, 1);
+    sprite.position.set(-18 + i * 12, 6.4 + (i % 2) * 1.3, -19 - (i % 3) * 3);
+    scene.add(sprite);
+    clouds.push({ sprite, speed: STYLE.clouds.front.speed, wrap: 26 });
   }
 
   return {
+    sunDisc,
     update(dt, elapsed, urgent) {
-      // Dusk clouds drift slowly across the sky.
+      // Dusk clouds drift slowly across the sky, each layer at its own pace.
       for (const cloud of clouds) {
-        cloud.position.x += dt * 0.4;
-        if (cloud.position.x > 26) cloud.position.x = -26;
+        cloud.sprite.position.x += dt * cloud.speed;
+        if (cloud.sprite.position.x > cloud.wrap) cloud.sprite.position.x = -cloud.wrap;
       }
 
       // Debris bobs and turns on residual energy; the sigil breathes.
@@ -204,33 +219,17 @@ export function createStage(scene: THREE.Scene): Stage {
 }
 
 /**
- * The backdrop beyond the fog: a gradient dusk dome, a low sun disc, sparse
- * stars, and silhouette ridges. Pure generated geometry — the ridges sit
- * inside the fog range so distance is implied by the existing fog; the dome,
- * sun, and stars sit beyond it, unfogged, as the sky itself.
+ * The backdrop beyond the fog: the painted dusk dome, a low sun disc, sparse
+ * stars, and silhouette ridges. The ridges sit inside the fog range so
+ * distance is implied by the existing fog; the dome, sun, and stars sit
+ * beyond it, unfogged, as the sky itself. Returns the sun disc — the
+ * pipeline's god-ray pass shines from it.
  */
-function buildBackdrop(scene: THREE.Scene): void {
-  // Sky dome: one inverted sphere, colored per vertex from warm horizon
-  // through dusk violet to a deep zenith.
-  const domeRadius = 80;
-  const dome = new THREE.SphereGeometry(domeRadius, 32, 18);
-  const position = dome.getAttribute('position');
-  const colors = new Float32Array(position.count * 3);
-  const horizon = new THREE.Color(STYLE.skyDome.horizon);
-  const mid = new THREE.Color(STYLE.skyDome.mid);
-  const zenith = new THREE.Color(STYLE.skyDome.zenith);
-  const shade = new THREE.Color();
-  const { horizonBand, duskBand } = STYLE.skyDome;
-  for (let i = 0; i < position.count; i++) {
-    const h = Math.max(0, position.getY(i) / domeRadius); // 0 at horizon, 1 at zenith
-    if (h < horizonBand) shade.lerpColors(horizon, mid, h / horizonBand);
-    else shade.lerpColors(mid, zenith, Math.min(1, (h - horizonBand) / (duskBand - horizonBand)));
-    colors[i * 3] = shade.r;
-    colors[i * 3 + 1] = shade.g;
-    colors[i * 3 + 2] = shade.b;
-  }
-  dome.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-  scene.add(new THREE.Mesh(dome, backdropSurface(0xffffff, { vertexColors: true, backSide: true })));
+function buildBackdrop(scene: THREE.Scene): THREE.Mesh {
+  // Sky dome: one inverted sphere wearing the baked painted sky — nebula
+  // drifts, mottling, and the warm horizon all live in the texture.
+  const dome = new THREE.SphereGeometry(80, 32, 18);
+  scene.add(new THREE.Mesh(dome, backdropSurface(0xffffff, { backSide: true, mapUrl: skyUrl })));
 
   // A low dusk sun, half-sunk behind the ridges.
   const sun = new THREE.Mesh(
@@ -277,4 +276,6 @@ function buildBackdrop(scene: THREE.Scene): void {
     ridge.rotation.y = i * 1.3;
     scene.add(ridge);
   }
+
+  return sun;
 }

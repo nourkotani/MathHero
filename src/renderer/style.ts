@@ -15,22 +15,21 @@ export const STYLE = {
     maxScale: 1.3,
   },
 
-  /** The dusk palette and light rig. */
+  /** The dusk palette and light rig. The sky dome itself is painted — its
+   * palette (zenith navy, nebula drifts, warm horizon) lives in the baker,
+   * scripts/bake-textures.mjs, alongside every other baked texture. */
   sky: 0x1b1f3a,
   fog: { color: 0x453156, near: 26, far: 68 },
-  /** The backdrop beyond the fog: sky dome gradient, sun, stars, ridges. */
-  skyDome: {
-    horizon: 0x9a5636,
-    mid: 0x3a2f52,
-    zenith: 0x121529,
-    /** Dome height where the warm horizon glow gives way to dusk violet. */
-    horizonBand: 0.12,
-    /** Dome height where the violet has fully deepened to the zenith navy. */
-    duskBand: 0.5,
-  },
   sunDisc: { color: 0xffc07a, position: [30, 9, -64] as const, radius: 4.5 },
+  /** Light shafts raking from the low sun (the full tier's extra pass). */
+  sunShafts: { density: 0.85, decay: 0.91, weight: 0.16, samples: 32 },
   stars: { count: 140, color: 0xcfd8ff, size: 1.1, opacity: 0.75 },
   ridges: { color: 0x3b2f52 },
+  /** Two parallax layers of drifting cloud sprites. */
+  clouds: {
+    back: { tint: 0x9b85c9, opacity: 0.45, speed: 0.25 },
+    front: { tint: 0xc9a8dd, opacity: 0.6, speed: 0.6 },
+  },
   hemi: { sky: 0x8fa3ff, ground: 0x5a3b22, intensity: 0.85 },
   sun: { color: 0xffb26b, intensity: 2.0 },
   rim: { color: 0x3ac0ff, intensity: 0.7 },

@@ -95,14 +95,25 @@ export function glowSurface(color: number, opacity?: number): THREE.MeshBasicMat
  */
 export function backdropSurface(
   color: number,
-  opts?: { vertexColors?: boolean; backSide?: boolean },
+  opts?: { vertexColors?: boolean; backSide?: boolean; mapUrl?: string },
 ): THREE.MeshBasicMaterial {
   return new THREE.MeshBasicMaterial({
     color,
     fog: false,
     vertexColors: opts?.vertexColors ?? false,
     side: opts?.backSide ? THREE.BackSide : THREE.FrontSide,
+    ...(opts?.mapUrl === undefined ? {} : { map: paintedMap(opts.mapUrl) }),
   });
+}
+
+/**
+ * A drifting cloud sprite: the baked puff with its real alpha channel,
+ * tinted per layer. Depth writes stay off so overlapping puffs blend.
+ */
+export function cloudSprite(url: string, tint: number, opacity: number): THREE.SpriteMaterial {
+  const map = new THREE.TextureLoader().load(url);
+  map.colorSpace = THREE.SRGBColorSpace;
+  return new THREE.SpriteMaterial({ map, color: tint, transparent: true, opacity, depthWrite: false });
 }
 
 /** The star field's point material — unlit, unfogged, softly transparent. */

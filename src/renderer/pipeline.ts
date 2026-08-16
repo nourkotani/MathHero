@@ -1,11 +1,11 @@
-// The pipeline facade: owns HOW a frame reaches the screen. Two
-// implementations live behind one interface — the pmndrs postprocessing
-// composer with selective bloom on the marked glow meshes, and the plain
+// The pipeline facade: owns HOW a frame reaches the screen. Three looks live
+// behind one interface — the pmndrs postprocessing composer with sun shafts
+// and selective bloom (full), the composer with bloom alone, and the plain
 // renderer (the sprite-glow fallback tier). Nothing outside this module
 // knows which is active (ADR 0004); a future pass slots in here.
 
 import * as THREE from 'three';
-import { EffectComposer, EffectPass, RenderPass, SelectiveBloomEffect } from 'postprocessing';
+import { EffectComposer, EffectPass, GodRaysEffect, RenderPass, SelectiveBloomEffect } from 'postprocessing';
 import { BLOOM_LAYER } from './materials';
 import type { VisualTier } from './qualityTier';
 import { STYLE } from './style';
@@ -20,11 +20,25 @@ export function createPipeline(
   renderer: THREE.WebGLRenderer,
   scene: THREE.Scene,
   camera: THREE.PerspectiveCamera,
+  sunDisc: THREE.Mesh,
 ): Pipeline {
-  let tier: VisualTier = 'bloom';
+  let tier: VisualTier = 'full';
 
   const composer = new EffectComposer(renderer);
   composer.addPass(new RenderPass(scene, camera));
+
+  // Sun shafts rake from the low dusk sun across the battlefield. A separate
+  // pass from bloom — both are convolution effects, which cannot share one —
+  // and the first thing the quality tier sheds.
+  const rays = new GodRaysEffect(camera, sunDisc, {
+    density: STYLE.sunShafts.density,
+    decay: STYLE.sunShafts.decay,
+    weight: STYLE.sunShafts.weight,
+    samples: STYLE.sunShafts.samples,
+  });
+  const raysPass = new EffectPass(camera, rays);
+  composer.addPass(raysPass);
+
   // Selective bloom: only meshes marked on the bloom layer feed the glow.
   // A luminance threshold would also catch bright lit cel bands (white gi
   // trim, pale arena stone) and read as haze — selection can't.
@@ -39,11 +53,12 @@ export function createPipeline(
 
   return {
     render(dtSeconds) {
-      if (tier === 'bloom') composer.render(dtSeconds);
-      else renderer.render(scene, camera);
+      if (tier === 'sprites') renderer.render(scene, camera);
+      else composer.render(dtSeconds);
     },
     setTier(next) {
       tier = next;
+      raysPass.enabled = next === 'full';
     },
     setSize(width, height) {
       renderer.setSize(width, height);
