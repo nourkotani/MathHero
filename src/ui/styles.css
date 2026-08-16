@@ -644,6 +644,24 @@ body {
   pointer-events: auto;
 }
 
+.skill-picker {
+  display: flex;
+  gap: 0.8rem;
+  pointer-events: auto;
+}
+
+/* The ✖/➗ cards read as arcade mode selects: symbol-first, row layout. */
+.skill-card {
+  flex-direction: row;
+  gap: 0.6rem;
+  padding: 0.55rem 1.8rem;
+}
+
+.skill-symbol {
+  font-size: 1.6rem;
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.45));
+}
+
 .mode-card {
   display: flex;
   flex-direction: column;

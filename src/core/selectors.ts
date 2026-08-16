@@ -6,12 +6,10 @@ import type { GameState } from './types';
 
 /**
  * The Skill the session is training — the single seam every per-Skill read
- * and write goes through. Multiply-only until the Divide Round ships (#22
- * backs this with real session state; nothing else changes).
+ * and write goes through.
  */
 export function activeSkill(state: GameState): Skill {
-  void state;
-  return 'multiply';
+  return state.skill;
 }
 
 export const MIN_TIMER_SECONDS = 30;

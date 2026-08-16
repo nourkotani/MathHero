@@ -1,4 +1,4 @@
-import { isFinalTenSeconds, remainingSeconds, tierForStreak } from '../core';
+import { isFinalTenSeconds, remainingSeconds, skillFor, tierForStreak } from '../core';
 import type { AppProps } from './App';
 import { formatClock } from './format';
 import { NumberPad } from './NumberPad';
@@ -6,6 +6,7 @@ import { NumberPad } from './NumberPad';
 export function RoundScreen({ state, dispatch }: AppProps) {
   const urgent = isFinalTenSeconds(state);
   const tier = tierForStreak(state.streak);
+  const skill = skillFor(state.skill);
   return (
     <div class="hud">
       <button
@@ -25,7 +26,7 @@ export function RoundScreen({ state, dispatch }: AppProps) {
         </div>
         {state.practiceTable !== null && (
           <div class="practice-badge" data-testid="practice-badge">
-            ✏️ {state.practiceTable}× practice
+            ✏️ {skill.practiceLabel(state.practiceTable)} practice
           </div>
         )}
         {tier.multiplier > 1 && (
@@ -51,7 +52,7 @@ export function RoundScreen({ state, dispatch }: AppProps) {
             data-testid="question"
             key={`${state.question.a}x${state.question.b}`}
           >
-            {state.question.a} × {state.question.b} ={' '}
+            {skill.display(state.question)} ={' '}
             <span class="answer" data-testid="answer" key={state.answerBuffer}>
               {state.answerBuffer === '' ? '?' : state.answerBuffer}
             </span>
@@ -62,8 +63,7 @@ export function RoundScreen({ state, dispatch }: AppProps) {
         <div class="feedback" data-testid="feedback">
           <div class="feedback-title">Almost! Remember:</div>
           <div class="feedback-equation">
-            {state.feedback.question.a} × {state.feedback.question.b} ={' '}
-            {state.feedback.correctAnswer}
+            {skill.display(state.feedback.question)} = {state.feedback.correctAnswer}
           </div>
         </div>
       )}

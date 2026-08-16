@@ -56,8 +56,8 @@ export { familyLeaderboard } from './leaderboard';
 export type { LeaderboardEntry } from './leaderboard';
 export { HAIR_PRESETS, MAX_NAME_LENGTH, OUTFIT_PRESETS, presetHex } from './players';
 export type { ColorPreset, PlayerColors, PlayerRecord } from './players';
-export { SKILLS } from './skills';
-export type { Skill } from './skills';
+export { SKILL_DEFS, skillFor, SKILLS } from './skills';
+export type { Skill, SkillDef } from './skills';
 export {
   buildSaveFile,
   parseSaveFile,

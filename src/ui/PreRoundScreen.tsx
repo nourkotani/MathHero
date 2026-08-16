@@ -5,6 +5,8 @@ import {
   MIN_PRACTICE_TABLE,
   MIN_TIMER_SECONDS,
   PRACTICE_BASE_POINTS,
+  SKILL_DEFS,
+  skillFor,
 } from '../core';
 import type { AppProps } from './App';
 import { formatClock } from './format';
@@ -22,6 +24,7 @@ export function PreRoundScreen({ state, dispatch }: AppProps) {
 
   const activePlayer = state.players.find((p) => p.id === state.activePlayerId);
   const practicing = state.practiceTable !== null;
+  const skill = skillFor(state.skill);
 
   return (
     <div class="hud screen-center pre-round">
@@ -35,6 +38,23 @@ export function PreRoundScreen({ state, dispatch }: AppProps) {
       <h1 class="screen-title" data-testid="active-player">
         Ready, {activePlayer?.name ?? 'hero'}?
       </h1>
+
+      <div class="picker-section">
+        <div class="picker-label">Pick your power</div>
+        <div class="skill-picker">
+          {SKILL_DEFS.map((def) => (
+            <button
+              key={def.id}
+              class={`mode-card skill-card${state.skill === def.id ? ' mode-selected' : ''}`}
+              data-testid={`skill-${def.id}`}
+              onClick={() => dispatch({ type: 'SKILL_CHANGED', skill: def.id })}
+            >
+              <span class="skill-symbol">{def.symbol}</span>
+              <span class="mode-name">{def.label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
 
       <div class="picker-section">
         <div class="picker-label">Pick your challenge</div>
@@ -55,14 +75,14 @@ export function PreRoundScreen({ state, dispatch }: AppProps) {
           ))}
         </div>
         <div class="picker-hint" data-testid="mode-hint">
-          {practicing
-            ? `Only ${state.practiceTable}× questions — go master that table! (+${PRACTICE_BASE_POINTS} pts each)`
+          {practicing && state.practiceTable !== null
+            ? `Only ${skill.practiceLabel(state.practiceTable)} questions — go master that table! (+${PRACTICE_BASE_POINTS} pts each)`
             : 'One number comes from those tables — the other can be anything up to 12!'}
         </div>
       </div>
 
       <div class="picker-section">
-        <div class="picker-label">…or practice one times table</div>
+        <div class="picker-label">…or practice one table</div>
         <div class="practice-picker">
           {PRACTICE_TABLES.map((table) => (
             <button
@@ -71,7 +91,7 @@ export function PreRoundScreen({ state, dispatch }: AppProps) {
               data-testid={`practice-${table}`}
               onClick={() => dispatch({ type: 'PRACTICE_TABLE_CHANGED', table })}
             >
-              {table}×
+              {skill.practiceLabel(table)}
             </button>
           ))}
         </div>

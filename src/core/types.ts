@@ -6,9 +6,14 @@ import type { Difficulty } from './difficulty';
 import type { CosmeticTier } from './level';
 import type { PlayerColors, PlayerRecord } from './players';
 import type { SaveFile } from './savefile';
+import type { Skill } from './skills';
 import type { StreakForm } from './streak';
 
-/** A multiplication question in the operand order it is displayed. */
+/**
+ * A Fact in the operand order it is displayed. The active Skill's definition
+ * turns it into a prompt: Multiply shows "a × b"; Divide shows the same pair
+ * inside-out as "(a·b) ÷ a" with the missing factor b as the answer.
+ */
 export interface Question {
   a: number;
   b: number;
@@ -38,6 +43,8 @@ export interface GameState {
   lastExportAt: number | null;
   /** Family-wide mute toggle; persists in the Save File. */
   muted: boolean;
+  /** The Skill this session trains. Session-only, like difficulty. */
+  skill: Skill;
   difficulty: Difficulty;
   /**
    * Practice mode: when set (1–12), Rounds ask only that times table and
@@ -80,6 +87,7 @@ export type GameEvent =
   /** The persisted Save File changed outside this tab (another open copy of the game saved). */
   | { type: 'SAVE_RELOADED'; text: string }
   | { type: 'TIMER_CHANGED'; seconds: number }
+  | { type: 'SKILL_CHANGED'; skill: Skill }
   | { type: 'DIFFICULTY_CHANGED'; difficulty: Difficulty }
   | { type: 'PRACTICE_TABLE_CHANGED'; table: number | null }
   | { type: 'ROUND_STARTED' }
@@ -101,7 +109,7 @@ export type GameEffect =
   | { type: 'ROUND_ABANDONED' }
   /** One per Hero Level gained, in order; carries any cosmetic tier unlocked. */
   | { type: 'LEVEL_UP'; level: number; cosmetic?: CosmeticTier }
-  | { type: 'NEW_PERSONAL_BEST'; difficulty: Difficulty; score: number }
+  | { type: 'NEW_PERSONAL_BEST'; skill: Skill; difficulty: Difficulty; score: number }
   /** The persisted slice changed — the persistence subscriber must save. */
   | { type: 'SAVE_FILE_CHANGED' }
   /** The download adapter should hand this serialized Save File to the parent. */

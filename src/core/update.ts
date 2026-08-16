@@ -9,7 +9,7 @@ import { seedPrng } from './prng';
 import { buildSaveFile, parseSaveFile, serializeSaveFile } from './savefile';
 import { pointsForCorrect } from './scoring';
 import { selectQuestion } from './selection';
-import { emptyPerSkill } from './skills';
+import { emptyPerSkill, skillFor } from './skills';
 import { tierForStreak } from './streak';
 import {
   activeSkill,
@@ -38,6 +38,7 @@ export function initialState(config: GameConfig): GameState {
     nextPlayerId: config.save?.nextPlayerId ?? 1,
     lastExportAt: config.save?.lastExportAt ?? null,
     muted: config.save?.muted ?? false,
+    skill: 'multiply',
     difficulty: 'easy',
     timerSeconds: DEFAULT_TIMER_SECONDS,
     now: 0,
@@ -107,6 +108,7 @@ export function update(state: GameState, event: GameEvent): UpdateResult {
             bests = { ...bests, [skill]: { ...bests[skill], [ticked.difficulty]: ticked.score } };
             bestEffects.push({
               type: 'NEW_PERSONAL_BEST',
+              skill,
               difficulty: ticked.difficulty,
               score: ticked.score,
             });
@@ -139,6 +141,7 @@ export function update(state: GameState, event: GameEvent): UpdateResult {
           factStats: activeFactStats(ticked),
           excludeKey: factKey(ticked.question.a, ticked.question.b),
           practiceTable: ticked.practiceTable,
+          skill: activeSkill(ticked),
         });
         return {
           state: {
@@ -324,6 +327,13 @@ export function update(state: GameState, event: GameEvent): UpdateResult {
       return { state: { ...state, timerSeconds: seconds }, effects: [] };
     }
 
+    case 'SKILL_CHANGED': {
+      if (state.phase !== 'pre-round') return noop(state);
+      // Practice composes with the Skill (÷8 practice), so it is kept —
+      // unlike picking a difficulty, which returns to tier mode.
+      return { state: { ...state, skill: event.skill }, effects: [] };
+    }
+
     case 'DIFFICULTY_CHANGED': {
       if (state.phase !== 'pre-round') return noop(state);
       // Picking a difficulty always returns to tier mode.
@@ -348,6 +358,7 @@ export function update(state: GameState, event: GameEvent): UpdateResult {
       const selected = selectQuestion(state.difficulty, state.prng, {
         factStats: activeFactStats(state),
         practiceTable: state.practiceTable,
+        skill: activeSkill(state),
       });
       return {
         state: {
@@ -400,7 +411,7 @@ export function update(state: GameState, event: GameEvent): UpdateResult {
       if (state.phase !== 'in-round' || state.feedback !== null || state.answerBuffer === '')
         return noop(state);
       const { question } = state;
-      const correctAnswer = question.a * question.b;
+      const correctAnswer = skillFor(activeSkill(state)).answer(question);
       const correct = Number(state.answerBuffer) === correctAnswer;
 
       const recorded = withAttemptRecorded(state, correct);
@@ -431,6 +442,7 @@ export function update(state: GameState, event: GameEvent): UpdateResult {
         factStats: activeFactStats(recorded),
         excludeKey: factKey(question.a, question.b),
         practiceTable: state.practiceTable,
+        skill: activeSkill(state),
       });
       const effects: GameEffect[] = [{ type: 'ANSWER_CORRECT', question, points }];
       if (transformed) {

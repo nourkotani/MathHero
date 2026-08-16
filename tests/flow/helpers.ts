@@ -32,12 +32,14 @@ export async function advanceClock(page: Page, ms: number): Promise<void> {
   await page.evaluate((m) => window.__mathhero?.advance(m), ms);
 }
 
-/** Read the current question off the HUD and return its correct answer. */
+/** Read the current question off the HUD and return its correct answer — both Skills. */
 export async function readCorrectAnswer(page: Page): Promise<number> {
   const text = await page.getByTestId('question').innerText();
-  const match = text.match(/(\d+)\s*×\s*(\d+)/);
-  if (!match) throw new Error(`could not parse question from HUD: ${text}`);
-  return Number(match[1]) * Number(match[2]);
+  const multiply = text.match(/(\d+)\s*×\s*(\d+)/);
+  if (multiply) return Number(multiply[1]) * Number(multiply[2]);
+  const divide = text.match(/(\d+)\s*÷\s*(\d+)/);
+  if (divide) return Number(divide[1]) / Number(divide[2]);
+  throw new Error(`could not parse question from HUD: ${text}`);
 }
 
 /** Answer via the on-screen pad, digit by digit, then submit with ✓. */

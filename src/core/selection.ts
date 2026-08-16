@@ -9,6 +9,8 @@ import { factKey } from './facts';
 import { adaptiveWeight } from './mastery';
 import type { FactStats } from './mastery';
 import { nextRandom } from './prng';
+import { skillFor } from './skills';
+import type { Skill } from './skills';
 import type { Question } from './types';
 
 export interface SelectionArgs {
@@ -65,8 +67,10 @@ export interface SelectionContext {
   factStats?: FactStats;
   /** Fact to exclude — the same question never appears twice in a row. */
   excludeKey?: string;
-  /** Practice mode: only this times table, no difficulty weighting. */
+  /** Practice mode: only this table, no difficulty weighting. */
   practiceTable?: number | null;
+  /** The Skill in play — only Practice orientation depends on it. */
+  skill?: Skill;
 }
 
 /** Practice candidates: the chosen table against 1–12, as canonical Facts. */
@@ -104,8 +108,11 @@ export function selectQuestion(
   // draw so the PRNG stream doesn't depend on whether a square was selected.
   const flip = nextRandom(selected.prng);
   const { a, b } = selected.question;
-  return {
-    question: flip.value < 0.5 && a !== b ? { a: b, b: a } : selected.question,
-    prng: flip.state,
-  };
+  const flipped = flip.value < 0.5 && a !== b ? { a: b, b: a } : selected.question;
+  // Practice may pin the orientation — the ÷8 table must divide by 8.
+  const question =
+    practice !== null && context.skill !== undefined
+      ? skillFor(context.skill).orientPractice(flipped, practice)
+      : flipped;
+  return { question, prng: flip.state };
 }
