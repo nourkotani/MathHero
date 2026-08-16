@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { factKey, initialState, masteryOf, SAVE_FILE_VERSION, update } from './index';
+import { factKey, FAST_MS, initialState, masteryOf, SAVE_FILE_VERSION, update } from './index';
 import type { FactAttempt, GameState, SaveFile } from './index';
 import { answerCorrectly, answerWrongly, dispatchAll, freshRound } from './test-helpers';
 
@@ -47,19 +47,25 @@ describe('attempt recording', () => {
 
 describe('mastery classification', () => {
   it('follows the 3-consecutive-fast-correct rule', () => {
-    expect(masteryOf(undefined)).toBe('unseen');
-    expect(masteryOf([])).toBe('unseen');
-    expect(masteryOf(fast(2))).toBe('learning');
-    expect(masteryOf(fast(3))).toBe('mastered');
-    expect(masteryOf([...wrongs(2), ...fast(3)])).toBe('mastered');
+    expect(masteryOf(undefined, FAST_MS)).toBe('unseen');
+    expect(masteryOf([], FAST_MS)).toBe('unseen');
+    expect(masteryOf(fast(2), FAST_MS)).toBe('learning');
+    expect(masteryOf(fast(3), FAST_MS)).toBe('mastered');
+    expect(masteryOf([...wrongs(2), ...fast(3)], FAST_MS)).toBe('mastered');
   });
 
   it('a slow correct answer prevents mastery', () => {
-    expect(masteryOf([...fast(2), { correct: true, ms: 9000 }])).toBe('learning');
+    expect(masteryOf([...fast(2), { correct: true, ms: 9000 }], FAST_MS)).toBe('learning');
+  });
+
+  it('judges "fast" at the given mastery window, not a fixed pace', () => {
+    const twentySeconds = Array.from({ length: 3 }, () => ({ correct: true, ms: 20_000 }));
+    expect(masteryOf(twentySeconds, FAST_MS)).toBe('learning');
+    expect(masteryOf(twentySeconds, 25_000)).toBe('mastered');
   });
 
   it('a miss un-masters', () => {
-    expect(masteryOf([...fast(3), { correct: false, ms: 2000 }])).toBe('struggling');
+    expect(masteryOf([...fast(3), { correct: false, ms: 2000 }], FAST_MS)).toBe('struggling');
   });
 });
 

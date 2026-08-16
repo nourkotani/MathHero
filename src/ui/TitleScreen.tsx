@@ -59,7 +59,7 @@ function MasteryGrid({
               {TABLE_RANGE.map((c) => (
                 <div
                   key={`${r}-${c}`}
-                  class={`mastery-cell mastery-${masteryOf(player.factStats[viewed][factKey(r, c)])}`}
+                  class={`mastery-cell mastery-${masteryOf(player.factStats[viewed][factKey(r, c)], def.masteryWindowMs)}`}
                   data-testid={`cell-${r}-${c}`}
                   title={def.display({ a: r, b: c })}
                 />

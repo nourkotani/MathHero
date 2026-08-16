@@ -160,4 +160,18 @@ describe('the Skill definition table', () => {
     expect(multiply.answer({ a: 7, b: 8 })).toBe(56);
     expect(multiply.practiceLabel(8)).toBe('8×');
   });
+
+  it('pays and paces the recall Skills at the baseline', () => {
+    for (const id of ['multiply', 'divide'] as const) {
+      expect(skillFor(id).basePointScale).toBe(1);
+      expect(skillFor(id).masteryWindowMs).toBe(6000);
+    }
+  });
+
+  it('dresses recall Facts without consuming PRNG draws', () => {
+    for (const id of ['multiply', 'divide'] as const) {
+      const dressed = skillFor(id).dress({ a: 3, b: 4 }, { practiceTable: null }, 12345);
+      expect(dressed.prng).toBe(12345);
+    }
+  });
 });

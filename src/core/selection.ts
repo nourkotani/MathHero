@@ -103,18 +103,20 @@ export function selectQuestion(
     const remaining = candidates.filter((q) => factKey(q.a, q.b) !== context.excludeKey);
     if (remaining.length > 0) candidates = remaining;
   }
+  const def = skillFor(context.skill);
   const selected = weightedSelector({
     candidates,
     prng,
-    weigh: (q) => baseWeigh(q) * adaptiveWeight(context.factStats?.[factKey(q.a, q.b)]),
+    weigh: (q) =>
+      baseWeigh(q) * adaptiveWeight(context.factStats?.[factKey(q.a, q.b)], def.masteryWindowMs),
   });
   // A Fact displays in either operand order at random. Always consume the
   // draw so the PRNG stream doesn't depend on whether a square was selected.
   const flip = nextRandom(selected.prng);
   const { a, b } = selected.question;
   const flipped = flip.value < 0.5 && a !== b ? { a: b, b: a } : selected.question;
-  // Practice may pin the orientation — the ÷8 table must divide by 8.
-  const question =
-    practice !== null ? skillFor(context.skill).orientPractice(flipped, practice) : flipped;
-  return { question, prng: flip.state };
+  // The Skill dresses the flipped Fact into the full Question: Practice may
+  // pin a side, and Skill-specific presentation draws happen inside (see the
+  // draw-order policy on SkillDef.dress).
+  return def.dress(flipped, { practiceTable: practice }, flip.state);
 }
