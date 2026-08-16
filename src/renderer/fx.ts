@@ -3,10 +3,12 @@
 // owns their GPU cleanup too.
 
 import * as THREE from 'three';
-import { glowSurface, markBloom, sparkSprite } from './materials';
+import { flipbookMaterial, glowSurface, markBloom, sparkSprite, warmFlipbook } from './materials';
 import { isOutlineHull } from './cel';
 import { DUMMY_X, HERO_X } from './constants';
 import { STYLE } from './style';
+import impactStarUrl from './textures/impact-star.png';
+import shockwaveUrl from './textures/shockwave.png';
 
 interface Particle {
   sprite: THREE.Sprite;
@@ -20,6 +22,19 @@ interface Particle {
 interface Blast {
   mesh: THREE.Mesh;
   big: boolean;
+}
+
+/** One playing flipbook: steps its own texture window frame by frame. */
+interface Flip {
+  object: THREE.Object3D;
+  material: THREE.SpriteMaterial | THREE.MeshBasicMaterial;
+  map: THREE.Texture;
+  frames: number;
+  life: number;
+  maxLife: number;
+  /** World scale at birth → at death. */
+  from: number;
+  to: number;
 }
 
 /** Short-lived meshes must release their GPU resources when removed. */
@@ -41,6 +56,11 @@ export interface Fx {
     life: number,
     size?: number,
   ): void;
+  /** An expanding impact shockwave — camera-facing pulse, or flat on the
+   *  arena floor for the big launches. */
+  shockwave(color: number, origin: THREE.Vector3, big: boolean, ground?: boolean): void;
+  /** The classic anime four-point impact flash. */
+  impactStar(color: number, origin: THREE.Vector3): void;
   fireBlast(big: boolean): void;
   update(dt: number, elapsed: number): void;
 }
@@ -48,6 +68,56 @@ export interface Fx {
 export function createFx(scene: THREE.Scene, onBlastImpact: (big: boolean) => void): Fx {
   const blasts: Blast[] = [];
   const particles: Particle[] = [];
+  const flips: Flip[] = [];
+
+  // Decode the sheets at startup — the first hit is always seconds away.
+  warmFlipbook(shockwaveUrl);
+  warmFlipbook(impactStarUrl);
+
+  /** Start one flipbook instance; it owns its texture window until it dies. */
+  function playFlip(
+    url: string,
+    frames: number,
+    color: number,
+    origin: THREE.Vector3,
+    duration: number,
+    from: number,
+    to: number,
+    ground = false,
+  ) {
+    const { material, map } = flipbookMaterial(url, frames, color, ground ? 'flat' : 'sprite');
+    let object: THREE.Object3D;
+    if (ground) {
+      const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), material);
+      mesh.rotation.x = -Math.PI / 2;
+      object = mesh;
+    } else {
+      object = new THREE.Sprite(material as THREE.SpriteMaterial);
+    }
+    object.position.copy(origin);
+    markBloom(object);
+    scene.add(object);
+    flips.push({ object, material, map, frames, life: duration, maxLife: duration, from, to });
+  }
+
+  function shockwave(color: number, origin: THREE.Vector3, big: boolean, ground = false) {
+    const s = STYLE.impact.shockwave;
+    playFlip(
+      shockwaveUrl,
+      8,
+      color,
+      ground ? origin.clone().setY(0.36) : origin,
+      big ? s.bigDuration : s.duration,
+      big ? s.bigFrom : s.from,
+      big ? s.bigTo : s.to,
+      ground,
+    );
+  }
+
+  function impactStar(color: number, origin: THREE.Vector3) {
+    const s = STYLE.impact.star;
+    playFlip(impactStarUrl, 6, color, origin, s.duration, s.from, s.to);
+  }
 
   /** One soft glow mote: the baked spark puff, tinted, bloom-marked. */
   function mote(color: number, size: number, origin: THREE.Vector3): THREE.Sprite {
@@ -96,8 +166,28 @@ export function createFx(scene: THREE.Scene, onBlastImpact: (big: boolean) => vo
   return {
     burst,
     spark,
+    shockwave,
+    impactStar,
     fireBlast,
     update(dt, elapsed) {
+      // Flipbooks: step the frame window, grow, and die at the last frame.
+      for (let i = flips.length - 1; i >= 0; i--) {
+        const f = flips[i];
+        if (!f) continue;
+        f.life -= dt;
+        const at = 1 - Math.max(0, f.life) / f.maxLife;
+        const frame = Math.min(f.frames - 1, Math.floor(at * f.frames));
+        f.map.offset.x = frame / f.frames;
+        const scale = f.from + (f.to - f.from) * at;
+        f.object.scale.setScalar(scale);
+        if (f.life <= 0) {
+          scene.remove(f.object);
+          if (f.object instanceof THREE.Mesh) f.object.geometry.dispose();
+          f.map.dispose();
+          f.material.dispose();
+          flips.splice(i, 1);
+        }
+      }
       // Energy blasts fly toward the dummy and burst on impact.
       for (let i = blasts.length - 1; i >= 0; i--) {
         const blast = blasts[i];
@@ -128,7 +218,13 @@ export function createFx(scene: THREE.Scene, onBlastImpact: (big: boolean) => vo
           blast.big ? 0.08 : 0.05,
         );
         if (blast.mesh.position.x >= DUMMY_X - 0.3) {
-          burst(blast.big ? 0xffe14d : 0x7ad7ff, blast.big ? 30 : 14, blast.mesh.position, blast.big ? 4 : 2.8);
+          const color = blast.big ? 0xffe14d : 0x7ad7ff;
+          burst(color, blast.big ? 30 : 14, blast.mesh.position, blast.big ? 4 : 2.8);
+          // The arcade finisher: a racing shockwave and the anime flash
+          // frame; big launches also slam a ring flat across the arena.
+          shockwave(color, blast.mesh.position.clone(), blast.big);
+          impactStar(0xffffff, blast.mesh.position.clone());
+          if (blast.big) shockwave(color, blast.mesh.position.clone(), true, true);
           scene.remove(blast.mesh);
           freeMesh(blast.mesh);
           blasts.splice(i, 1);

@@ -74,6 +74,12 @@ export const STYLE = {
     luminanceThreshold: 0.1,
   },
 
+  /** Impact flipbooks: shockwave ring and anime impact star. */
+  impact: {
+    shockwave: { duration: 0.32, from: 0.7, to: 2.6, bigDuration: 0.5, bigFrom: 1.1, bigTo: 4.6 },
+    star: { duration: 0.26, from: 1.0, to: 2.2 },
+  },
+
   /** Motion feel: action timings, hitstop, camera punch, blast smear. */
   juice: {
     /** A strike: coiled anticipation, then the wind-up/release curve. */

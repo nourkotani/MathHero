@@ -97,7 +97,12 @@ export function createReactions(opts: {
           hitPending = false;
           const look = FORM_LOOKS[currentForm];
           const transformed = currentForm !== 'base';
-          fx.burst(look.hitColor, transformed ? 18 : 12, new THREE.Vector3(DUMMY_X - 0.55, 1.7, 0), 3.2);
+          const impact = new THREE.Vector3(DUMMY_X - 0.55, 1.7, 0);
+          fx.burst(look.hitColor, transformed ? 18 : 12, impact, 3.2);
+          // Every strike lands with the anime flash frame; transformed
+          // heroes also punch a shockwave through the air.
+          fx.impactStar(0xffffff, impact);
+          if (transformed) fx.shockwave(look.hitColor, impact, false);
           juice.addShake(transformed ? 0.2 : 0.12);
           // High-streak hits freeze the frame for a beat — weight, not lag.
           if (look.hitstop) juice.hitstop();

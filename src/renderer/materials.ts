@@ -126,6 +126,58 @@ let sharedSparkMap: THREE.Texture | null = null;
  * shared by every particle; the material is per-particle (its opacity is
  * the fade).
  */
+const flipbookBases = new Map<string, THREE.Texture>();
+
+function flipbookBase(url: string): THREE.Texture {
+  let base = flipbookBases.get(url);
+  if (base === undefined) {
+    base = new THREE.TextureLoader().load(url);
+    base.colorSpace = THREE.SRGBColorSpace;
+    flipbookBases.set(url, base);
+  }
+  return base;
+}
+
+/** Start decoding a flipbook sheet now, long before its first playback. */
+export function warmFlipbook(url: string): void {
+  flipbookBase(url);
+}
+
+/**
+ * One playing instance of a baked flipbook sheet (N frames in a row).
+ * Texture offset/repeat live on the texture, not the material — so every
+ * instance owns its own clone and animates by stepping offset.x = frame / N.
+ * Each clone explicitly shares the base's image Source: a plain clone made
+ * before the data URI finishes decoding would copy undefined image data
+ * into its own Source and stay an untextured quad forever.
+ */
+export function flipbookMaterial(
+  url: string,
+  frames: number,
+  color: number,
+  kind: 'sprite' | 'flat',
+): { material: THREE.SpriteMaterial | THREE.MeshBasicMaterial; map: THREE.Texture } {
+  const base = flipbookBase(url);
+  const map = base.clone();
+  map.source = base.source;
+  map.repeat.set(1 / frames, 1);
+  map.needsUpdate = true;
+  const options = {
+    map,
+    color,
+    transparent: true,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+  };
+  return {
+    material:
+      kind === 'sprite'
+        ? new THREE.SpriteMaterial(options)
+        : new THREE.MeshBasicMaterial({ ...options, side: THREE.DoubleSide }),
+    map,
+  };
+}
+
 export function sparkSprite(color: number): THREE.SpriteMaterial {
   if (sharedSparkMap === null) {
     sharedSparkMap = new THREE.TextureLoader().load(sparkUrl);

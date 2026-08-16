@@ -384,6 +384,74 @@ function bakeCloud(size = 256) {
   return encodePng(size, size, pixels, 4);
 }
 
+// ------------------------------------------------------------ flipbook sheets
+
+/**
+ * Bake an RGBA flipbook: `frames` square frames side by side in one sheet,
+ * played at render time by stepping the texture offset. shadeFrame(u, v, t)
+ * paints one frame, with t = frame index / (frames - 1) running 0 → 1.
+ */
+function bakeFlipbook(frames, size, shadeFrame) {
+  const pixels = paintWide(size * frames, size, 4, (u, v) => {
+    const frame = Math.min(frames - 1, Math.floor(u * frames));
+    const t = frames === 1 ? 0 : frame / (frames - 1);
+    return shadeFrame(u * frames - frame, v, t);
+  });
+  return encodePng(size * frames, size, pixels, 4);
+}
+
+/**
+ * Impact shockwave: an expanding energy ring, thick and hot at birth,
+ * thinning and fading as it races outward. 8 frames.
+ */
+function bakeShockwave(frames = 8, size = 128) {
+  const wobble = makeNoise(1212, 8);
+  return bakeFlipbook(frames, size, (u, v, t) => {
+    const dx = u * 2 - 1;
+    const dy = v * 2 - 1;
+    const theta = Math.atan2(dy, dx);
+    // The ring wobbles slightly so it reads painted, not compass-drawn.
+    const wob = (fbm(wobble, (theta / Math.PI + 1) * 4, t * 3, 2) - 0.5) * 0.06;
+    const r = Math.hypot(dx, dy) + wob;
+    const radius = 0.15 + t * 0.78;
+    const thickness = 0.16 * (1 - t * 0.65);
+    const band = Math.max(0, 1 - Math.abs(r - radius) / thickness);
+    const alpha = band * band * (1 - t * t);
+    const heat = Math.min(1, band * 1.6);
+    return [255, 255 * (0.75 + heat * 0.25), 255 * (0.5 + heat * 0.5), 255 * alpha];
+  });
+}
+
+/**
+ * Anime impact star: the classic four-point flash frame — rays snap out
+ * long, then the whole star collapses and fades. 6 frames.
+ */
+function bakeImpactStar(frames = 6, size = 128) {
+  return bakeFlipbook(frames, size, (u, v, t) => {
+    const dx = u * 2 - 1;
+    const dy = v * 2 - 1;
+    const r = Math.hypot(dx, dy);
+    // Snap out fast, hold, then die: reach peaks early, alpha dives late.
+    const reach = Math.min(1, t * 3 + 0.35) * (1 - Math.max(0, t - 0.5) * 1.4);
+    let a = 0;
+    // Four long cardinal rays and four short diagonals, as thin lozenges.
+    for (let i = 0; i < 8; i++) {
+      const angle = (i / 8) * Math.PI * 2;
+      const long = i % 2 === 0;
+      const len = (long ? 0.95 : 0.4) * reach;
+      const along = dx * Math.cos(angle) + dy * Math.sin(angle);
+      const across = Math.abs(-dx * Math.sin(angle) + dy * Math.cos(angle));
+      if (along <= 0 || along > len) continue;
+      const width = (long ? 0.075 : 0.055) * (1 - along / len);
+      a = Math.max(a, Math.max(0, 1 - across / Math.max(width, 0.001)));
+    }
+    // A hot core that dies with the star.
+    a = Math.max(a, Math.max(0, 1 - r / (0.16 * reach + 0.001)));
+    const alpha = a * (t < 0.8 ? 1 : 1 - (t - 0.8) / 0.2);
+    return [255, 255, 255 * 0.9, 255 * Math.min(1, alpha)];
+  });
+}
+
 // --------------------------------------------------------------- spark.png
 
 /**
@@ -403,6 +471,143 @@ function bakeSpark(size = 64) {
   return encodePng(size, size, pixels, 4);
 }
 
+// ----------------------------------------------------------- face decals
+
+/**
+ * The hero's painted anime face, one variant per body style (the girl's
+ * eyes are larger with a lash flick). RGBA: transparent everywhere except
+ * the features, so every skin tone shows through the decal unchanged.
+ * Layered painter's-algorithm: brows and mouth, then sclera, lash line,
+ * iris, and highlights on top.
+ */
+function bakeFace(girl) {
+  const size = 256;
+  // Soft-edged coverage of an ellipse, 1 inside, feathering at the rim.
+  const ellipse = (u, v, cx, cy, rx, ry) => {
+    const d = Math.hypot((u - cx) / rx, (v - cy) / ry);
+    return Math.max(0, Math.min(1, (1.08 - d) / 0.16));
+  };
+  // Soft capsule between two points (for brows and the mouth arc).
+  const stroke = (u, v, x0, y0, x1, y1, w) => {
+    const dx = x1 - x0;
+    const dy = y1 - y0;
+    const len2 = dx * dx + dy * dy;
+    const t = Math.max(0, Math.min(1, ((u - x0) * dx + (v - y0) * dy) / len2));
+    const dist = Math.hypot(u - (x0 + dx * t), v - (y0 + dy * t));
+    return Math.max(0, Math.min(1, (w - dist) / (w * 0.45)));
+  };
+
+  const eyeRx = girl ? 0.1 : 0.082;
+  const eyeRy = girl ? 0.14 : 0.115;
+  const eyeCy = 0.46;
+
+  const pixels = paintWide(size, size, 4, (u, v) => {
+    let r = 0;
+    let g = 0;
+    let b = 0;
+    let a = 0;
+    const put = (cov, cr, cg, cb) => {
+      if (cov <= 0) return;
+      const o = Math.min(1, cov);
+      r = r * (1 - o) + cr * o;
+      g = g * (1 - o) + cg * o;
+      b = b * (1 - o) + cb * o;
+      a = Math.max(a, o);
+    };
+
+    for (const side of [-1, 1]) {
+      const cx = 0.5 + side * 0.175;
+      // Determined brows: inner ends dip toward the nose.
+      put(
+        stroke(u, v, cx - side * 0.085, 0.255, cx + side * 0.075, 0.29, 0.018),
+        32, 24, 20,
+      );
+      // Sclera, just off-white so it never reads as glow at dusk.
+      const sclera = ellipse(u, v, cx, eyeCy, eyeRx, eyeRy);
+      put(sclera, 243, 238, 226);
+      // Iris: big, warm, anime.
+      const iris = Math.min(sclera, ellipse(u, v, cx, eyeCy + 0.018, eyeRx * 0.58, eyeRy * 0.66));
+      put(iris, 62, 44, 34);
+      put(Math.min(iris, ellipse(u, v, cx, eyeCy + 0.05, eyeRx * 0.4, eyeRy * 0.36)), 38, 26, 20);
+      // Upper lash line hugging the sclera's top rim, thicker for the girl.
+      const lash = Math.min(
+        ellipse(u, v, cx, eyeCy, eyeRx * 1.12, eyeRy * 1.12) -
+          ellipse(u, v, cx, eyeCy + (girl ? 0.045 : 0.035), eyeRx, eyeRy),
+        v < eyeCy ? 1 : 0,
+      );
+      put(Math.max(0, lash), 26, 20, 18);
+      if (girl) {
+        // The lash flick at the outer corner.
+        put(
+          stroke(u, v, cx + side * eyeRx * 0.95, eyeCy - eyeRy * 0.55, cx + side * (eyeRx * 0.95 + 0.035), eyeCy - eyeRy * 0.85, 0.014),
+          26, 20, 18,
+        );
+      }
+      // Highlights last: the big spark and the small echo.
+      put(ellipse(u, v, cx - side * 0.028, eyeCy - 0.045, 0.026, 0.034), 255, 255, 255);
+      put(ellipse(u, v, cx + side * 0.02, eyeCy + 0.045, 0.013, 0.017), 255, 255, 255);
+    }
+
+    // A small steady mouth with the faintest upward curve.
+    put(stroke(u, v, 0.457, 0.745, 0.5, 0.755, 0.011), 92, 52, 46);
+    put(stroke(u, v, 0.5, 0.755, 0.543, 0.745, 0.011), 92, 52, 46);
+
+    return [r, g, b, 255 * a];
+  });
+  return encodePng(size, size, pixels, 4);
+}
+
+// -------------------------------------------------- cloth / hair / padding
+
+/**
+ * Multiply-maps for the toon materials: white where the player's chosen
+ * color must stay full, gently darker where fabric weave, hair strands, or
+ * worn padding shade it. They can only darken — that is the whole contract.
+ */
+function bakeCloth(size = 256) {
+  const weave = makeNoise(1313, 32);
+  const wash = makeNoise(1414, 8);
+  const pixels = paintWide(size, size, 3, (u, v) => {
+    let value = 1;
+    value -= Math.abs(fbm(weave, u * 32, v * 32, 3) - 0.5) * 0.1;
+    value -= (fbm(wash, u * 8, v * 8, 2) - 0.5) * 0.06;
+    value -= Math.max(0, Math.sin(v * Math.PI * 40)) * 0.015; // faint weft
+    const c = 255 * Math.min(1, value);
+    return [c, c, c];
+  });
+  return encodePng(size, size, pixels);
+}
+
+function bakeHairStrands(size = 256) {
+  const strand = makeNoise(1515, 64);
+  const pixels = paintWide(size, size, 3, (u, v) => {
+    // Vertical strand streaks: high frequency across, stretched along.
+    const s = fbm(strand, u * 64, v * 6, 3);
+    let value = 1 - Math.max(0, 0.55 - Math.abs(s - 0.5)) * 0.28;
+    value -= (fbm(strand, u * 10 + 30, v * 3, 2) - 0.5) * 0.08;
+    const c = 255 * Math.min(1, value);
+    return [c, c, c];
+  });
+  return encodePng(size, size, pixels);
+}
+
+function bakePadding(size = 256) {
+  const wear = makeNoise(1616, 16);
+  const pixels = paintWide(size, size, 3, (u, v) => {
+    let value = 1;
+    // Cross stitching in a wide diamond grid.
+    const gx = Math.abs(((u * 10) % 1) - 0.5);
+    const gy = Math.abs(((v * 10) % 1) - 0.5);
+    if (Math.min(gx, gy) < 0.045) value -= 0.1;
+    // Scuffs and worn patches from a thousand training blasts.
+    const scuff = fbm(wear, u * 16, v * 16, 3);
+    if (scuff < 0.42) value -= (0.42 - scuff) * 0.5;
+    const c = 255 * Math.min(1, value);
+    return [c, c, c];
+  });
+  return encodePng(size, size, pixels);
+}
+
 // --------------------------------------------------------------------- main
 
 mkdirSync(OUT_DIR, { recursive: true });
@@ -414,6 +619,13 @@ const bakes = [
   ['sky.png', bakeSky],
   ['cloud.png', bakeCloud],
   ['spark.png', bakeSpark],
+  ['shockwave.png', bakeShockwave],
+  ['impact-star.png', bakeImpactStar],
+  ['face-boy.png', () => bakeFace(false)],
+  ['face-girl.png', () => bakeFace(true)],
+  ['cloth.png', bakeCloth],
+  ['hair-strands.png', bakeHairStrands],
+  ['padding.png', bakePadding],
 ];
 for (const [name, bake] of bakes) {
   const png = bake();
