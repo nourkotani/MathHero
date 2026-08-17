@@ -25,6 +25,7 @@ interface Particle {
 interface Blast {
   mesh: THREE.Mesh;
   big: boolean;
+  color: number;
   /** The roiling flipbook riding the projectile, stepped on a time loop. */
   coreMap: THREE.Texture;
   coreMaterial: THREE.Material;
@@ -71,7 +72,8 @@ export interface Fx {
   chargeRing(color: number, origin: THREE.Vector3, big: boolean): void;
   /** A short crackling arc, re-striking every frame. */
   lightning(color: number, origin: THREE.Vector3, size: number): void;
-  fireBlast(big: boolean): void;
+  /** Fire a blast; small blasts carry the active form's color. */
+  fireBlast(big: boolean, color?: number): void;
   update(dt: number, elapsed: number): void;
 }
 
@@ -181,8 +183,7 @@ export function createFx(scene: THREE.Scene, onBlastImpact: (big: boolean) => vo
     particles.push({ sprite, velocity, life, maxLife: life, gravity: 0 });
   }
 
-  function fireBlast(big: boolean) {
-    const color = big ? 0xffe14d : 0x7ad7ff;
+  function fireBlast(big: boolean, color = big ? 0xffe14d : 0x7ad7ff) {
     const mesh = new THREE.Mesh(
       new THREE.SphereGeometry(big ? 0.42 : 0.24, 12, 10),
       glowSurface(color),
@@ -190,14 +191,15 @@ export function createFx(scene: THREE.Scene, onBlastImpact: (big: boolean) => vo
     markBloom(mesh);
     mesh.position.set(HERO_X + 0.8, 1.6, 0);
     // The roiling energy ball around the bloom-hot center.
+    const s = STYLE.impact.blastCore;
     const { material, map } = flipbookMaterial(blastCoreUrl, 6, color, 'sprite');
     const core = new THREE.Sprite(material as THREE.SpriteMaterial);
     // Child scale rides the parent's smear, so the fireball stretches too.
-    core.scale.setScalar(big ? 1.5 : 0.9);
+    core.scale.setScalar(big ? s.bigScale : s.scale);
     markBloom(core);
     mesh.add(core);
     scene.add(mesh);
-    blasts.push({ mesh, big, coreMap: map, coreMaterial: material });
+    blasts.push({ mesh, big, color, coreMap: map, coreMaterial: material });
     // Muzzle flash at the hero's outstretched fist.
     burst(color, big ? 10 : 5, mesh.position.clone(), 1.6);
   }
@@ -235,7 +237,7 @@ export function createFx(scene: THREE.Scene, onBlastImpact: (big: boolean) => vo
         if (!blast) continue;
         blast.mesh.position.x += dt * (blast.big ? 16 : 20);
         // The fireball roils on a time loop, independent of flight length.
-        blast.coreMap.offset.x = (Math.floor(elapsed * 20) % 6) / 6;
+        blast.coreMap.offset.x = (Math.floor(elapsed * STYLE.impact.blastCore.fps) % 6) / 6;
         // Smear: stretched along its flight, squashed across it, still
         // pulsing. The impact burst is the snap-back.
         const pulse = 1 + Math.sin(elapsed * 40) * 0.15;
@@ -246,7 +248,7 @@ export function createFx(scene: THREE.Scene, onBlastImpact: (big: boolean) => vo
         );
         // Energy crackles off the projectile as it screams across the arena.
         spark(
-          blast.big ? 0xffe14d : 0x7ad7ff,
+          blast.color,
           blast.mesh.position
             .clone()
             .add(
@@ -261,7 +263,9 @@ export function createFx(scene: THREE.Scene, onBlastImpact: (big: boolean) => vo
           blast.big ? 0.08 : 0.05,
         );
         if (blast.mesh.position.x >= DUMMY_X - 0.3) {
-          const color = blast.big ? 0xffe14d : 0x7ad7ff;
+          // The whole impact wears the blast's own color, so a surge hero's
+          // purple shot bursts purple instead of reverting to stock blue.
+          const color = blast.color;
           burst(color, blast.big ? 30 : 14, blast.mesh.position, blast.big ? 4 : 2.8);
           // The arcade finisher: a racing shockwave and the anime flash
           // frame; big launches also slam a ring flat across the arena.

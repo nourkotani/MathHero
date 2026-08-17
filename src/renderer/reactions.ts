@@ -243,8 +243,9 @@ export function createReactions(opts: {
             dummy.hit(currentForm !== 'base');
             // A crackle of charge energy as the hero coils to strike.
             fx.burst(FORM_LOOKS[currentForm].hitColor, 6, new THREE.Vector3(HERO_X + 0.4, 1.5, 0), 1.2);
-            // Any transformed hero throws visible energy with each strike.
-            if (currentForm !== 'base') fx.fireBlast(false);
+            // Any transformed hero throws visible energy with each strike,
+            // colored by the form that threw it.
+            if (currentForm !== 'base') fx.fireBlast(false, FORM_LOOKS[currentForm].auraColor);
             break;
           case 'ANSWER_WRONG':
             heroChannel.play(staggerClip(), 'stagger');
@@ -376,9 +377,15 @@ export function createReactions(opts: {
       // Lightning: surge and Super heroes crackle with re-striking arcs, and
       // the storm cosmetics (thunder spirits / spirit storm — one wisps-slot
       // tier at a time) arc between their wisps whenever they're worn.
-      const stormWorn =
-        hero.cosmetics.get('thunder-spirits')?.visible === true ||
-        hero.cosmetics.get('spirit-storm')?.visible === true;
+      // Each storm cosmetic arcs in its own palette (one wisps-slot tier
+      // can be worn at a time).
+      const stormColor =
+        hero.cosmetics.get('thunder-spirits')?.visible === true
+          ? 0x9be7ff
+          : hero.cosmetics.get('spirit-storm')?.visible === true
+            ? 0xd9b3ff
+            : null;
+      const stormWorn = stormColor !== null;
       const arcRate =
         currentForm === 'super'
           ? STYLE.lightningRate.super
@@ -396,7 +403,7 @@ export function createReactions(opts: {
           const radius = fromStorm ? 0.75 + Math.random() * 0.2 : 0.45 + Math.random() * 0.2;
           const y = fromStorm ? 1.3 + Math.random() * 0.8 : 0.7 + Math.random() * 1.3;
           fx.lightning(
-            fromStorm ? 0xbfefff : FORM_LOOKS[currentForm].sparkColor,
+            fromStorm ? (stormColor ?? 0xbfefff) : FORM_LOOKS[currentForm].sparkColor,
             new THREE.Vector3(
               hero.group.position.x + Math.cos(angle) * radius,
               hero.group.position.y + y,

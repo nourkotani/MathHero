@@ -82,6 +82,8 @@ export const STYLE = {
     chargeRing: { duration: 0.45, from: 3.4, to: 0.7, bigDuration: 0.7, bigFrom: 5.2, bigTo: 1 },
     /** One lightning crackle's lifetime. */
     lightningDuration: 0.28,
+    /** The roiling fireball riding each blast: sprite scale and loop speed. */
+    blastCore: { scale: 0.9, bigScale: 1.5, fps: 20 },
   },
 
   /** Lightning crackle rates (arcs per second). */
