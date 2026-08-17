@@ -78,6 +78,71 @@ test('a wrong answer scores nothing and moves on after the teaching moment', asy
   await expect(page.getByTestId('answer')).toHaveText('?');
 });
 
+test('a held key never adds digits the child did not type', async ({ page }) => {
+  // The unforgivable bug: answer correctly, get told you are wrong. Holding
+  // a key made the OS fire auto-repeats that the shell counted as real
+  // presses, so a correct 27 arrived at the grader as 277.
+  await openGame(page, '?testClock=1&seed=4242');
+  await createHero(page);
+  await startRound(page);
+
+  const answer = await readCorrectAnswer(page);
+  const digits = String(answer);
+  await page.evaluate((typed) => {
+    const press = (key: string, repeat: boolean) =>
+      window.dispatchEvent(new KeyboardEvent('keydown', { key, repeat, bubbles: true }));
+    for (const digit of typed) {
+      press(digit, false); // the press
+      press(digit, true); // …held a fraction too long
+      press(digit, true);
+    }
+  }, digits);
+
+  // What the child typed is exactly what the game sees, and it scores —
+  // no teaching moment, because nothing was wrong.
+  await expect(page.getByTestId('answer')).toHaveText(digits);
+  await page.getByTestId('pad-submit').click();
+  await expect(page.getByTestId('score')).toContainText('10');
+  await expect(page.getByTestId('feedback')).toHaveCount(0);
+});
+
+test('every question the game shows grades correctly, right through a Round', async ({ page }) => {
+  // End-to-end guard on the whole chain: whatever the HUD displays is what
+  // the grader judges. The answer is computed here from the visible prompt
+  // alone, so a display/grading mismatch on any Fact fails this test.
+  await openGame(page, '?testClock=1&seed=8791');
+  await createHero(page);
+  await startRound(page);
+
+  for (let i = 0; i < 15; i++) {
+    const shown = await page.getByTestId('question').innerText();
+    await answerOnPad(page, await readCorrectAnswer(page));
+    // A teaching moment here would mean a correct answer was called wrong.
+    await expect(page.getByTestId('feedback'), `question "${shown}" was graded wrong`).toHaveCount(
+      0,
+    );
+    await expect(page.getByTestId('answer')).toHaveText('?');
+  }
+  // 15 unbroken correct answers on Easy: 2×10 + 3×20 + 4×30 + 6×40.
+  await expect(page.getByTestId('score')).toContainText('440');
+});
+
+test('browser shortcut keystrokes never land in the answer', async ({ page }) => {
+  await openGame(page, '?testClock=1&seed=4243');
+  await createHero(page);
+  await startRound(page);
+
+  await page.evaluate(() => {
+    const shortcut = (key: string, mods: KeyboardEventInit) =>
+      window.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, ...mods }));
+    shortcut('1', { ctrlKey: true }); // switch browser tab
+    shortcut('4', { altKey: true });
+    shortcut('3', { metaKey: true });
+  });
+
+  await expect(page.getByTestId('answer')).toHaveText('?');
+});
+
 test('localStorage works under file:// (persistence harness smoke check)', async ({ page }) => {
   await openGame(page);
   const roundTrip = await page.evaluate(() => {

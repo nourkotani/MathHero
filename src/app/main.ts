@@ -110,6 +110,12 @@ document.addEventListener('visibilitychange', () => {
 // Keyboard is a second way to drive the same events as the on-screen pad.
 window.addEventListener('keydown', (e) => {
   if (e.target instanceof HTMLInputElement) return; // typing a name, not an answer
+  // One physical press is one keypress, always. Holding a key makes the OS
+  // fire a burst of repeats, which silently turned a correct 27 into 277 —
+  // the child typed the right answer and the game called it wrong.
+  if (e.repeat) return;
+  // Browser and OS shortcuts (Ctrl+1, Alt+4, ⌘3) are not answer digits.
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
   if (e.key >= '0' && e.key <= '9') {
     store.dispatch({ type: 'DIGIT_PRESSED', digit: Number(e.key) });
     // On a Name-the-Rule Question the key IS the card tap: submit at once.
