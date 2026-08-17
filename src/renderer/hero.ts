@@ -38,6 +38,8 @@ export interface Motion {
   bob?: { amp: number; speed: number };
   /** Wing beat: roll about the shoulder, mirrored per side by amp's sign. */
   flap?: { amp: number; speed: number };
+  /** Wing beat about the pitch axis — both wings rise and fall together. */
+  pitch?: { amp: number; speed: number };
   /** Breathing scale about the rest size. */
   pulse?: { amp: number; speed: number };
 }
@@ -48,6 +50,7 @@ export interface CosmeticMotor {
   motion: Motion;
   restY: number;
   restRoll: number;
+  restPitch: number;
   restScale: number;
 }
 
@@ -694,6 +697,7 @@ function buildCosmetics(motors: CosmeticMotor[]): Map<string, THREE.Object3D> {
       motion,
       restY: object.position.y,
       restRoll: object.rotation.z,
+      restPitch: object.rotation.x,
       restScale: object.scale.x,
     });
     return object;
@@ -719,46 +723,68 @@ function buildCosmetics(motors: CosmeticMotor[]): Map<string, THREE.Object3D> {
   };
 
   /**
-   * A pair of wings: `plan` feathers per side, each a light panel swept
-   * back and fanned upward from the shoulder blade. Side pivots carry the
-   * beat, so the two wings always flap in mirror.
+   * Ki wings: the aura flaring into wing sheets behind the shoulders.
+   *
+   * They fan in the hero's back/up plane — NOT out to the sides. The arena
+   * camera watches the hero side-on, so a pair fanned left and right can
+   * only ever be seen edge-on, which read as fins beside the head. Fanned
+   * backward and upward instead, the full wing faces the camera, and the
+   * two sides sit a little apart in depth so they still read as a pair.
    */
   const wings = (
-    plan: ReadonlyArray<{ length: number; lift: number; sweep: number; color: number }>,
+    plan: ReadonlyArray<{ length: number; lift: number; color: number }>,
     beat: number,
   ) => {
     const group = new THREE.Group();
     for (const side of [-1, 1]) {
       const pivot = new THREE.Group();
       pivot.position.set(side * S.wings.anchorX, S.wings.anchorY, S.wings.anchorZ);
-      for (const { length, lift, sweep, color } of plan) {
-        // Each feather hangs off a bone rotating at the shoulder, so lift
-        // swings the whole feather up like a wing instead of spinning it
-        // about its own middle.
-        const bone = new THREE.Group();
-        bone.rotation.y = side * sweep;
-        bone.rotation.z = side * lift;
-        const feather = panel(featherUrl, color, length, length * 0.5);
-        // The texture runs root → tip along +x: push it out half its length
-        // so the root sits at the shoulder joint.
-        feather.position.x = (side * length) / 2;
-        if (side < 0) feather.scale.x = -1; // mirror the sweep, not the art
-        bone.add(feather);
-        pivot.add(bone);
+      // The far wing splays a touch so the pair never perfectly overlaps.
+      pivot.rotation.y = side * S.wings.splay;
+      for (const { length, lift, color } of plan) {
+        // swing pitches the feather up from straight-back; turn lays the
+        // sheet flat to the camera with its root at the shoulder.
+        const swing = new THREE.Group();
+        swing.rotation.x = lift;
+        const turn = new THREE.Group();
+        turn.rotation.y = Math.PI / 2;
+        const feather = panel(featherUrl, color, length, length * S.wings.breadth);
+        feather.position.x = length / 2;
+        turn.add(feather);
+        swing.add(turn);
+        pivot.add(swing);
       }
-      moves(pivot, { flap: { amp: side * beat, speed: S.wings.beatSpeed } });
+      // Both wings beat together, the way a wing actually moves.
+      moves(pivot, { pitch: { amp: beat, speed: S.wings.beatSpeed } });
       group.add(pivot);
     }
+    // The hot root where the wings meet the back: they grow out of the
+    // hero's own energy instead of hovering behind them.
+    const root = mote(plan[0]?.color ?? 0xffffff, S.wings.rootFlare);
+    root.position.set(0, S.wings.anchorY, S.wings.anchorZ);
+    group.add(root);
     return group;
   };
 
-  /** A comet streak trailing behind the hero, head forward. */
-  const streak = (color: number, length: number, x: number, y: number, opacity = 1) => {
-    const trail = panel(streakUrl, color, length, length * 0.28, opacity);
-    // The sheet runs head → tail along +x; turn it to stream backwards.
-    trail.rotation.y = Math.PI / 2;
-    trail.position.set(x, y, -S.trail.offsetZ - length / 2);
-    return moves(trail, { pulse: { amp: S.trail.flicker, speed: S.trail.flickerSpeed } });
+  /**
+   * A ribbon of energy streaming off the hero's back, up and away.
+   *
+   * Deliberately NOT a thick streak pointing straight back at hip height —
+   * that reads as a tail. These are thin, they leave from the back at a
+   * rising angle, and their hot end is rooted on the body so the energy
+   * looks like it is coming off the hero rather than trailing after them.
+   */
+  const ribbon = (color: number, length: number, lift: number, x: number, opacity = 1) => {
+    const swing = new THREE.Group();
+    swing.rotation.x = lift;
+    const turn = new THREE.Group();
+    turn.rotation.y = Math.PI / 2;
+    const sheet = panel(streakUrl, color, length, length * S.trail.thinness, opacity);
+    sheet.position.x = length / 2;
+    turn.add(sheet);
+    swing.add(turn);
+    swing.position.set(x, S.trail.anchorY, S.trail.anchorZ);
+    return moves(swing, { pulse: { amp: S.trail.flicker, speed: S.trail.flickerSpeed } });
   };
 
   /** A ring of orbiting spirit motes. */
@@ -863,58 +889,78 @@ function buildCosmetics(motors: CosmeticMotor[]): Map<string, THREE.Object3D> {
 
   // Lift dominates sweep: the fan rises into a V behind the shoulders, so
   // the wings still read from the arena's side-on camera.
+  // Lift fans the sheets from near-vertical down to swept-back, so the
+  // pair opens like a fan across the view rather than poking out sideways.
+  // Feathers overlap at close angles so the fan reads as one sheet of
+  // light rather than a few separate blades.
   cosmetics.set(
     'energy-wings',
     wings(
       [
-        { length: 1.6, lift: 1.24, sweep: 0.34, color: 0x7dffa0 },
-        { length: 1.35, lift: 0.92, sweep: 0.44, color: 0x9dffc4 },
-        { length: 1.05, lift: 0.6, sweep: 0.56, color: 0xc9ffe0 },
+        { length: 1.45, lift: 1.12, color: 0x7dffa0 },
+        { length: 1.7, lift: 0.92, color: 0x9dffc4 },
+        { length: 1.8, lift: 0.72, color: 0x7dffa0 },
+        { length: 1.65, lift: 0.52, color: 0xc9ffe0 },
+        { length: 1.35, lift: 0.32, color: 0x9dffc4 },
       ],
-      0.1,
+      0.09,
     ),
   );
   cosmetics.set(
     'phoenix-wings',
     wings(
       [
-        { length: 2.0, lift: 1.3, sweep: 0.3, color: 0xffb347 },
-        { length: 1.7, lift: 1.0, sweep: 0.4, color: 0xffe14d },
-        { length: 1.35, lift: 0.7, sweep: 0.52, color: 0xff8f5a },
-        { length: 1.0, lift: 0.4, sweep: 0.64, color: 0xffd9a3 },
+        { length: 1.7, lift: 1.18, color: 0xffb347 },
+        { length: 2.0, lift: 0.98, color: 0xffe14d },
+        { length: 2.2, lift: 0.78, color: 0xffb347 },
+        { length: 2.05, lift: 0.58, color: 0xff8f5a },
+        { length: 1.75, lift: 0.38, color: 0xffd9a3 },
+        { length: 1.35, lift: 0.2, color: 0xffe14d },
       ],
-      0.13,
+      0.12,
     ),
   );
   cosmetics.set(
     'galaxy-wings',
     wings(
       [
-        { length: 2.3, lift: 1.34, sweep: 0.28, color: 0x8f5aff },
-        { length: 1.95, lift: 1.04, sweep: 0.38, color: 0x3ac0ff },
-        { length: 1.6, lift: 0.74, sweep: 0.5, color: 0xd9b3ff },
-        { length: 1.2, lift: 0.44, sweep: 0.62, color: 0xeaf4ff },
+        { length: 1.95, lift: 1.22, color: 0x8f5aff },
+        { length: 2.3, lift: 1.02, color: 0x3ac0ff },
+        { length: 2.5, lift: 0.82, color: 0x8f5aff },
+        { length: 2.35, lift: 0.62, color: 0xd9b3ff },
+        { length: 2.0, lift: 0.42, color: 0x3ac0ff },
+        { length: 1.55, lift: 0.22, color: 0xeaf4ff },
       ],
-      0.16,
+      0.15,
     ),
   );
 
   // ---- trail slot ---------------------------------------------------------
 
   const comet = new THREE.Group();
-  comet.add(streak(0xffa94d, 1.5, 0, 1.25));
+  comet.add(ribbon(0xffa94d, 1.45, 0.5, 0));
+  comet.add(ribbon(0xffc46b, 1.1, 0.78, -0.14, 0.75));
   cosmetics.set('comet-trail', comet);
 
   const twinComet = new THREE.Group();
-  twinComet.add(streak(0xffa94d, 1.5, -0.22, 1.35));
-  twinComet.add(streak(0xffe14d, 1.3, 0.22, 1.1));
+  twinComet.add(ribbon(0xffa94d, 1.6, 0.46, -0.16));
+  twinComet.add(ribbon(0xffe14d, 1.35, 0.72, 0.16));
+  twinComet.add(ribbon(0xffd9a3, 1.05, 0.94, 0, 0.7));
   cosmetics.set('twin-comet-trail', twinComet);
 
   const starfall = new THREE.Group();
-  starfall.add(streak(0xffd24d, 1.7, 0, 1.3));
+  starfall.add(ribbon(0xffd24d, 1.75, 0.44, -0.14));
+  starfall.add(ribbon(0xfff3b0, 1.45, 0.7, 0.14));
+  starfall.add(ribbon(0xffe9a3, 1.15, 0.96, 0, 0.75));
+  // Stars shaken loose, drifting off along the ribbons' path.
   for (let i = 0; i < 5; i++) {
     const fleck = mote(0xfff3b0, 0.26 - i * 0.02);
-    fleck.position.set((i % 2 ? 0.28 : -0.28), 1.5 - i * 0.16, -1.0 - i * 0.32);
+    const along = 0.5 + i * 0.32;
+    fleck.position.set(
+      i % 2 ? 0.2 : -0.2,
+      S.trail.anchorY + along * 0.62,
+      S.trail.anchorZ - along * 0.78,
+    );
     starfall.add(fleck);
   }
   cosmetics.set('starfall-trail', moves(starfall, { bob: { amp: 0.06, speed: 2.2 } }));

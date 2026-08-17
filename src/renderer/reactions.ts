@@ -347,6 +347,10 @@ export function createReactions(opts: {
         if (motion.flap) {
           object.rotation.z = motor.restRoll + Math.sin(elapsed * motion.flap.speed) * motion.flap.amp;
         }
+        if (motion.pitch) {
+          object.rotation.x =
+            motor.restPitch + Math.sin(elapsed * motion.pitch.speed) * motion.pitch.amp;
+        }
         if (motion.pulse) {
           object.scale.setScalar(
             motor.restScale * (1 + Math.sin(elapsed * motion.pulse.speed) * motion.pulse.amp),

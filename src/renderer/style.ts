@@ -51,13 +51,29 @@ export const STYLE = {
 
   /** Where the milestone cosmetics sit on the hero, and how they move. */
   cosmetics: {
-    /** Wings anchor at the shoulder blades, not floating off the back. */
-    wings: { anchorX: 0.3, anchorY: 1.72, anchorZ: -0.22, beatSpeed: 1.5 },
+    /** Wings anchor at the shoulder blades, not floating off the back.
+     * anchorX is small on purpose: the pair is separated in depth, while
+     * the sheets themselves fan back and up across the camera's view. */
+    wings: {
+      anchorX: 0.15,
+      anchorY: 1.58,
+      anchorZ: -0.26,
+      beatSpeed: 1.5,
+      /** Feather height as a fraction of its length — wide enough that
+       * neighbouring feathers overlap into a sheet. */
+      breadth: 0.52,
+      /** How far apart the two wings splay, in radians. */
+      splay: 0.3,
+      /** The flare where the wings meet the back. */
+      rootFlare: 0.55,
+    },
     /** A crown rests on the head; the halo floats above it. */
     crown: { radius: 0.33, y: 2.42, spin: 0.35 },
     halo: { y: 2.95, tilt: 0.16, bob: 0.04 },
     wisps: { bob: 0.07, bobSpeed: 2.1 },
-    trail: { offsetZ: 0.45, flicker: 0.07, flickerSpeed: 6 },
+    /** Ribbons leave the middle of the back and rise; thin so they never
+     * read as a tail. */
+    trail: { anchorY: 1.2, anchorZ: -0.26, thinness: 0.15, flicker: 0.07, flickerSpeed: 6 },
   },
 
   /** Hero-Level presence: orbiting power motes + charged trim, by bracket. */
