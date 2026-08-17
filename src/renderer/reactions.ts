@@ -102,7 +102,7 @@ export function createReactions(opts: {
           fx.burst(look.hitColor, transformed ? 18 : 12, impact, 3.2);
           // Every strike lands with the anime flash frame; transformed
           // heroes also punch a shockwave through the air.
-          fx.impactStar(0xffffff, impact);
+          fx.impactStar(impact);
           if (transformed) fx.shockwave(look.hitColor, impact, false);
           juice.addShake(transformed ? 0.2 : 0.12);
           // High-streak hits freeze the frame for a beat — weight, not lag.
@@ -374,42 +374,37 @@ export function createReactions(opts: {
         sparkAccum = 0;
       }
 
-      // Lightning: surge and Super heroes crackle with re-striking arcs, and
-      // the storm cosmetics (thunder spirits / spirit storm — one wisps-slot
-      // tier at a time) arc between their wisps whenever they're worn.
-      // Each storm cosmetic arcs in its own palette (one wisps-slot tier
-      // can be worn at a time).
-      const stormColor =
-        hero.cosmetics.get('thunder-spirits')?.visible === true
-          ? 0x9be7ff
-          : hero.cosmetics.get('spirit-storm')?.visible === true
-            ? 0xd9b3ff
-            : null;
-      const stormWorn = stormColor !== null;
-      const arcRate =
-        currentForm === 'super'
-          ? STYLE.lightningRate.super
-          : currentForm === 'surge'
-            ? STYLE.lightningRate.surge
-            : 0;
-      const totalRate = arcRate + (stormWorn ? STYLE.lightningRate.cosmetics : 0);
+      // Lightning: charged forms crackle with re-striking arcs, and a worn
+      // storm cosmetic (one wisps-slot tier at a time) arcs around its own
+      // wisp ring, in the palette stamped on the piece when it was built.
+      const storm = [...hero.cosmetics.values()].find(
+        (mesh) => mesh.visible && typeof mesh.userData.arcColor === 'number',
+      );
+      const stormColor = storm?.userData.arcColor as number | undefined;
+      const { arcRate } = FORM_LOOKS[currentForm];
+      const L = STYLE.lightning;
+      const totalRate = arcRate + (storm ? L.cosmeticRate : 0);
       if (totalRate > 0) {
         arcAccum += dt * totalRate;
         while (arcAccum >= 1) {
           arcAccum -= 1;
-          const fromStorm = arcRate === 0 || (stormWorn && Math.random() < 0.4);
+          const fromStorm =
+            stormColor !== undefined && (arcRate === 0 || Math.random() < L.cosmeticShare);
           const angle = Math.random() * Math.PI * 2;
-          // Form crackle hugs the body; storm arcs ride the wisp ring.
-          const radius = fromStorm ? 0.75 + Math.random() * 0.2 : 0.45 + Math.random() * 0.2;
-          const y = fromStorm ? 1.3 + Math.random() * 0.8 : 0.7 + Math.random() * 1.3;
+          const band = fromStorm ? L.stormRadius : L.formRadius;
+          const height = fromStorm ? L.stormHeight : L.formHeight;
+          const radius = band.min + Math.random() * band.spread;
+          const y = height.min + Math.random() * height.spread;
           fx.lightning(
-            fromStorm ? (stormColor ?? 0xbfefff) : FORM_LOOKS[currentForm].sparkColor,
+            fromStorm && stormColor !== undefined
+              ? stormColor
+              : FORM_LOOKS[currentForm].sparkColor,
             new THREE.Vector3(
               hero.group.position.x + Math.cos(angle) * radius,
               hero.group.position.y + y,
               hero.group.position.z + Math.sin(angle) * radius,
             ),
-            0.5 + Math.random() * 0.4,
+            L.size.min + Math.random() * L.size.spread,
           );
         }
       } else {

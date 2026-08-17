@@ -30,16 +30,18 @@ export const FORM_LOOKS: Record<
     hitColor: number;
     /** The rising aura motes. */
     sparkColor: number;
+    /** Lightning arcs per second this form crackles with (0 = none). */
+    arcRate: number;
     /** Do this form's hits freeze the frame for a beat? */
     hitstop: boolean;
   }
 > = {
   // Opacities are per shell; the aura's two nested shells overlap, so the
   // perceived density is roughly double what's written here.
-  base: { hair: null, auraColor: 0x000000, auraOpacity: 0, emissive: 0, bodyEmissive: 0xffffff, hitColor: 0xffffff, sparkColor: 0xffe9a3, hitstop: false },
-  aura: { hair: null, auraColor: 0x3ac0ff, auraOpacity: 0.28, emissive: 0.15, bodyEmissive: 0x3ac0ff, hitColor: 0x3ac0ff, sparkColor: 0x3ac0ff, hitstop: false },
-  surge: { hair: 0xffe14d, auraColor: 0x8f5aff, auraOpacity: 0.34, emissive: 0.35, bodyEmissive: 0x8f5aff, hitColor: 0x8f5aff, sparkColor: 0x8f5aff, hitstop: true },
-  super: { hair: 0xffd700, auraColor: 0xffb300, auraOpacity: 0.4, emissive: 0.6, bodyEmissive: 0xffb300, hitColor: 0xffb300, sparkColor: 0xffb300, hitstop: true },
+  base: { hair: null, auraColor: 0x000000, auraOpacity: 0, emissive: 0, bodyEmissive: 0xffffff, hitColor: 0xffffff, sparkColor: 0xffe9a3, arcRate: 0, hitstop: false },
+  aura: { hair: null, auraColor: 0x3ac0ff, auraOpacity: 0.28, emissive: 0.15, bodyEmissive: 0x3ac0ff, hitColor: 0x3ac0ff, sparkColor: 0x3ac0ff, arcRate: 0, hitstop: false },
+  surge: { hair: 0xffe14d, auraColor: 0x8f5aff, auraOpacity: 0.34, emissive: 0.35, bodyEmissive: 0x8f5aff, hitColor: 0x8f5aff, sparkColor: 0x8f5aff, arcRate: 3, hitstop: true },
+  super: { hair: 0xffd700, auraColor: 0xffb300, auraOpacity: 0.4, emissive: 0.6, bodyEmissive: 0xffb300, hitColor: 0xffb300, sparkColor: 0xffb300, arcRate: 5, hitstop: true },
 };
 
 /** Joint pivots the frame loop poses every frame. Limb meshes hang inside. */
@@ -677,6 +679,13 @@ function buildCosmetics(): Map<string, THREE.Object3D> {
   radiant.position.y = 3.05;
   cosmetics.set('radiant-halo', radiant);
 
+  // A storm cosmetic arcs in its own palette; the color is stamped where
+  // the piece is built, so recoloring the piece recolors its lightning.
+  const storms = (group: THREE.Object3D, arcColor: number) => {
+    group.userData.arcColor = arcColor;
+    return group;
+  };
+
   // wisps III — thunder spirits: the wisps learn lightning.
   const thunder = new THREE.Group();
   thunder.add(orbitBits(5, 0.8, 1.6, 0.12, [0x9be7ff, 0xd9f4ff]));
@@ -693,7 +702,7 @@ function buildCosmetics(): Map<string, THREE.Object3D> {
     bolt.position.set(Math.cos(angle) * 0.85, 2.0, Math.sin(angle) * 0.85);
     thunder.add(bolt);
   }
-  cosmetics.set('thunder-spirits', thunder);
+  cosmetics.set('thunder-spirits', storms(thunder, 0x9be7ff));
 
   // wings III — galaxy wings: cosmic violet-cyan, grandest span.
   cosmetics.set('galaxy-wings', wingFan([0x8f5aff, 0x3ac0ff, 0xd9b3ff], 1.4));
@@ -755,7 +764,7 @@ function buildCosmetics(): Map<string, THREE.Object3D> {
   const spiritStorm = new THREE.Group();
   spiritStorm.add(orbitBits(5, 0.95, 1.15, 0.11, [0x7ad7ff, 0xd9b3ff]));
   spiritStorm.add(orbitBits(4, 0.7, 2.0, 0.1, [0xd9b3ff, 0x7ad7ff]));
-  cosmetics.set('spirit-storm', spiritStorm);
+  cosmetics.set('spirit-storm', storms(spiritStorm, 0xd9b3ff));
 
   // form (Landmark 100) — the Legend state: a permanent radiant mantle of
   // light around the whole hero, crowned by a slow-burning star.

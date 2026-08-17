@@ -77,7 +77,9 @@ export const STYLE = {
   /** Impact flipbooks: shockwave ring and anime impact star. */
   impact: {
     shockwave: { duration: 0.32, from: 0.7, to: 2.6, bigDuration: 0.5, bigFrom: 1.1, bigTo: 4.6 },
-    star: { duration: 0.26, from: 1.0, to: 2.2 },
+    star: { duration: 0.26, from: 1.0, to: 2.2, color: 0xffffff },
+    /** Height the flat ground ring floats above the arena stone. */
+    groundRingY: 0.36,
     /** Power rushing inward on transformations; big = the Landmark scene. */
     chargeRing: { duration: 0.45, from: 3.4, to: 0.7, bigDuration: 0.7, bigFrom: 5.2, bigTo: 1 },
     /** One lightning crackle's lifetime. */
@@ -86,8 +88,20 @@ export const STYLE = {
     blastCore: { scale: 0.9, bigScale: 1.5, fps: 20 },
   },
 
-  /** Lightning crackle rates (arcs per second). */
-  lightningRate: { surge: 3, super: 5, cosmetics: 2 },
+  /** Where lightning strikes. Per-form crackle rates live in FORM_LOOKS —
+   * a form's look has exactly one home. */
+  lightning: {
+    /** Extra arcs per second while a storm cosmetic is worn. */
+    cosmeticRate: 2,
+    /** With both sources live, this share of arcs comes from the cosmetic. */
+    cosmeticShare: 0.4,
+    /** Form crackle hugs the body; storm arcs ride the wisp ring. */
+    formRadius: { min: 0.45, spread: 0.2 },
+    formHeight: { min: 0.7, spread: 1.3 },
+    stormRadius: { min: 0.75, spread: 0.2 },
+    stormHeight: { min: 1.3, spread: 0.8 },
+    size: { min: 0.5, spread: 0.4 },
+  },
 
   /** Motion feel: action timings, hitstop, camera punch, blast smear. */
   juice: {

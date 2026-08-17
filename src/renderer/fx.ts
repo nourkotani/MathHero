@@ -67,7 +67,7 @@ export interface Fx {
    *  arena floor for the big launches. */
   shockwave(color: number, origin: THREE.Vector3, big: boolean, ground?: boolean): void;
   /** The classic anime four-point impact flash. */
-  impactStar(color: number, origin: THREE.Vector3): void;
+  impactStar(origin: THREE.Vector3): void;
   /** Power rushing inward: a collapsing ring while a transformation gathers. */
   chargeRing(color: number, origin: THREE.Vector3, big: boolean): void;
   /** A short crackling arc, re-striking every frame. */
@@ -121,7 +121,7 @@ export function createFx(scene: THREE.Scene, onBlastImpact: (big: boolean) => vo
       shockwaveUrl,
       8,
       color,
-      ground ? origin.clone().setY(0.36) : origin,
+      ground ? origin.clone().setY(STYLE.impact.groundRingY) : origin,
       big ? s.bigDuration : s.duration,
       big ? s.bigFrom : s.from,
       big ? s.bigTo : s.to,
@@ -129,9 +129,10 @@ export function createFx(scene: THREE.Scene, onBlastImpact: (big: boolean) => vo
     );
   }
 
-  function impactStar(color: number, origin: THREE.Vector3) {
+  /** The anime flash frame: always the same hot white, wherever it lands. */
+  function impactStar(origin: THREE.Vector3) {
     const s = STYLE.impact.star;
-    playFlip(impactStarUrl, 6, color, origin, s.duration, s.from, s.to);
+    playFlip(impactStarUrl, 6, s.color, origin, s.duration, s.from, s.to);
   }
 
   function lightning(color: number, origin: THREE.Vector3, size: number) {
@@ -270,7 +271,7 @@ export function createFx(scene: THREE.Scene, onBlastImpact: (big: boolean) => vo
           // The arcade finisher: a racing shockwave and the anime flash
           // frame; big launches also slam a ring flat across the arena.
           shockwave(color, blast.mesh.position.clone(), blast.big);
-          impactStar(0xffffff, blast.mesh.position.clone());
+          impactStar(blast.mesh.position.clone());
           if (blast.big) shockwave(color, blast.mesh.position.clone(), true, true);
           scene.remove(blast.mesh);
           freeMesh(blast.mesh);
