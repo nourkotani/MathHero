@@ -18,7 +18,12 @@ export interface AppProps {
   /** Set by the shell when a NEW_PERSONAL_BEST effect fires; cleared on leaving Results. */
   newBest?: BestCelebration | null;
   /** LEVEL_UP effects captured by the shell for this Results screen, in order. */
-  levelUps?: Array<{ level: number; cosmeticLabel?: string; landmark?: boolean }>;
+  levelUps?: Array<{
+    level: number;
+    cosmeticLabel?: string;
+    landmark?: boolean;
+    formLabel?: string;
+  }>;
 }
 
 // Screens key off the core's phase field; a future screen is a new phase

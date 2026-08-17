@@ -1,7 +1,7 @@
 import { DEFAULT_APPEARANCE, validAppearance } from './appearance';
 import { MAX_PRACTICE_TABLE, MIN_PRACTICE_TABLE } from './difficulty';
 import { factKey } from './facts';
-import { cosmeticUnlockedAt, levelForXp } from './level';
+import { cosmeticUnlockedAt, formUnlockedAt, levelForXp } from './level';
 import { recordAttempt } from './mastery';
 import type { FactStats } from './mastery';
 import { HAIR_PRESETS, MAX_NAME_LENGTH, OUTFIT_PRESETS, validColors } from './players';
@@ -99,8 +99,12 @@ export function update(state: GameState, event: GameEvent): UpdateResult {
           const levelBefore = levelForXp(p.xp);
           const xp = p.xp + ticked.score;
           for (let level = levelBefore + 1; level <= levelForXp(xp); level++) {
+            // A Landmark level earns both a cosmetic tier and a Form; the
+            // ceremony reads whichever of them the effect carries.
             const cosmetic = cosmeticUnlockedAt(level);
-            effects.push(cosmetic ? { type: 'LEVEL_UP', level, cosmetic } : { type: 'LEVEL_UP', level });
+            const form = formUnlockedAt(level);
+            const up: GameEffect = { type: 'LEVEL_UP', level };
+            effects.push({ ...up, ...(cosmetic ? { cosmetic } : {}), ...(form ? { form } : {}) });
           }
           const skill = activeSkill(ticked);
           let bests = p.bests;

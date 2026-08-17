@@ -44,21 +44,24 @@ store.subscribe((state, effects) => renderer.onStoreUpdate(state, effects));
 // screen that earned them is up, never inferred by diffing state (ADR 0003).
 const uiRoot = document.getElementById('ui') as HTMLElement;
 let newBest: BestCelebration | null = null;
-let levelUps: Array<{ level: number; cosmeticLabel?: string; landmark?: boolean }> = [];
+let levelUps: Array<{
+  level: number;
+  cosmeticLabel?: string;
+  landmark?: boolean;
+  formLabel?: string;
+}> = [];
 store.subscribe((state, effects) => {
   for (const effect of effects) {
     if (effect.type === 'NEW_PERSONAL_BEST') {
       newBest = { skill: effect.skill, difficulty: effect.difficulty, score: effect.score };
     } else if (effect.type === 'LEVEL_UP') {
-      levelUps.push(
-        effect.cosmetic
-          ? {
-              level: effect.level,
-              cosmeticLabel: effect.cosmetic.label,
-              landmark: effect.cosmetic.landmark === true,
-            }
-          : { level: effect.level },
-      );
+      levelUps.push({
+        level: effect.level,
+        ...(effect.cosmetic
+          ? { cosmeticLabel: effect.cosmetic.label, landmark: effect.cosmetic.landmark === true }
+          : {}),
+        ...(effect.form ? { formLabel: effect.form.label } : {}),
+      });
     }
   }
   if (state.phase !== 'results') {

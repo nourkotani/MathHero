@@ -6,6 +6,7 @@
 import * as THREE from 'three';
 import {
   DEFAULT_APPEARANCE,
+  formForLevel,
   glowIntensityForLevel,
   HAIR_PRESETS,
   isFinalTenSeconds,
@@ -19,7 +20,8 @@ import { createCameraRig } from './cameraRig';
 import { HERO_X } from './constants';
 import { createDummy } from './dummy';
 import { createFx, freeMesh } from './fx';
-import { applyLevelToRig, buildHero } from './hero';
+import { applyLevelToRig, buildHero, FORM_PALETTES } from './hero';
+import type { FormPalette } from './hero';
 import { createPipeline } from './pipeline';
 import { initialTierState, nextTier } from './qualityTier';
 import { createReactions } from './reactions';
@@ -57,8 +59,10 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
   // Hitstop: a render-time freeze on big hits, applied at the dt pipeline.
   let hitstopTimer = 0;
 
-  let hero = buildHero(DEFAULT_APPEARANCE);
-  let appearanceKey = JSON.stringify(DEFAULT_APPEARANCE);
+  let hero = buildHero(DEFAULT_APPEARANCE, null);
+  // The build key covers the Form too: hair length, hair scale, eye color
+  // and aura shape are all baked in at construction.
+  let appearanceKey = JSON.stringify([DEFAULT_APPEARANCE, null]);
   placeHero();
   scene.add(hero.group);
 
@@ -67,13 +71,13 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     hero.group.rotation.y = Math.PI / 2;
   }
 
-  /** Swap the character model when the appearance changes (or is previewed). */
-  function rebuildHero(appearance: HeroAppearance) {
+  /** Swap the character model when the appearance or the Form changes. */
+  function rebuildHero(appearance: HeroAppearance, palette: FormPalette | null) {
     scene.remove(hero.group);
     hero.group.traverse((obj) => {
       if (obj instanceof THREE.Mesh) freeMesh(obj);
     });
-    hero = buildHero(appearance);
+    hero = buildHero(appearance, palette);
     placeHero();
     scene.add(hero.group);
   }
@@ -119,12 +123,21 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     if (!colors || !appearance) return;
     const level = draft ? 0 : levelForXp(player?.xp ?? 0);
 
-    const key = JSON.stringify(appearance);
+    // The Form a hero has earned — never during hero creation, where the
+    // Player is looking at their own chosen colors.
+    const form = draft ? undefined : formForLevel(level);
+    const palette = form ? (FORM_PALETTES[form.id] ?? null) : null;
+
+    const key = JSON.stringify([appearance, form?.id ?? null]);
     if (key !== appearanceKey) {
       appearanceKey = key;
-      rebuildHero(appearance);
+      rebuildHero(appearance, palette);
     }
-    reactions.setPlayerLook(presetHex(HAIR_PRESETS, colors.hair), glowIntensityForLevel(level));
+    reactions.setPlayerLook(
+      presetHex(HAIR_PRESETS, colors.hair),
+      glowIntensityForLevel(level),
+      palette,
+    );
     applyLevelToRig(hero, level);
     hero.bodyMaterial.color.setHex(presetHex(OUTFIT_PRESETS, colors.outfitPrimary));
     hero.trimMaterial.color.setHex(presetHex(OUTFIT_PRESETS, colors.outfitSecondary));

@@ -36,11 +36,14 @@ export function ResultsScreen({ state, dispatch, newBest, levelUps = [] }: AppPr
         >
           🎉 LEVEL UP! You reached Level {reachedLevel}!
           {levelUps
-            .filter((up) => up.cosmeticLabel !== undefined)
+            .filter((up) => up.cosmeticLabel !== undefined || up.formLabel !== undefined)
             .map((up) =>
               up.landmark ? (
                 <div class="cosmetic-unlock landmark-unlock" key={up.level} data-testid="landmark">
-                  🌟 TRANSFORMATION! {up.cosmeticLabel}!
+                  🌟 NEW FORM: {up.formLabel}!
+                  {up.cosmeticLabel !== undefined && (
+                    <div class="cosmetic-unlock">✨ And: {up.cosmeticLabel}!</div>
+                  )}
                 </div>
               ) : (
                 <div class="cosmetic-unlock" key={up.level}>

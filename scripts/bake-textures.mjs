@@ -662,7 +662,8 @@ function bakeWisp(size = 128) {
  * Layered painter's-algorithm: brows and mouth, then sclera, lash line,
  * iris, and highlights on top.
  */
-function bakeFace(girl) {
+function bakeFace(girl, part = 'face') {
+  const irisOnly = part === 'iris';
   const size = 256;
   // Soft-edged coverage of an ellipse, 1 inside, feathering at the rim.
   const ellipse = (u, v, cx, cy, rx, ry) => {
@@ -699,18 +700,28 @@ function bakeFace(girl) {
 
     for (const side of [-1, 1]) {
       const cx = 0.5 + side * 0.175;
+      const sclera = ellipse(u, v, cx, eyeCy, eyeRx, eyeRy);
+      if (irisOnly) {
+        // The iris sheet is white so a Form can tint it any color; only the
+        // iris and its highlights live here.
+        const iris = Math.min(sclera, ellipse(u, v, cx, eyeCy + 0.018, eyeRx * 0.58, eyeRy * 0.66));
+        put(iris, 255, 255, 255);
+        // The pupil stays dark whatever the Form's color.
+        put(
+          Math.min(iris, ellipse(u, v, cx, eyeCy + 0.05, eyeRx * 0.4, eyeRy * 0.36)) * 0.55,
+          20, 14, 12,
+        );
+        put(ellipse(u, v, cx - side * 0.028, eyeCy - 0.045, 0.026, 0.034), 255, 255, 255);
+        put(ellipse(u, v, cx + side * 0.02, eyeCy + 0.045, 0.013, 0.017), 255, 255, 255);
+        continue;
+      }
       // Determined brows: inner ends dip toward the nose, outer ends lift.
       put(
         stroke(u, v, cx - side * 0.085, 0.295, cx + side * 0.075, 0.26, 0.018),
         32, 24, 20,
       );
       // Sclera, just off-white so it never reads as glow at dusk.
-      const sclera = ellipse(u, v, cx, eyeCy, eyeRx, eyeRy);
       put(sclera, 243, 238, 226);
-      // Iris: big, warm, anime.
-      const iris = Math.min(sclera, ellipse(u, v, cx, eyeCy + 0.018, eyeRx * 0.58, eyeRy * 0.66));
-      put(iris, 62, 44, 34);
-      put(Math.min(iris, ellipse(u, v, cx, eyeCy + 0.05, eyeRx * 0.4, eyeRy * 0.36)), 38, 26, 20);
       // Upper lash line hugging the sclera's top rim, thicker for the girl.
       // The band fades out smoothly below the eye's midline — a hard cutoff
       // would draw a seam straight across the iris.
@@ -727,14 +738,14 @@ function bakeFace(girl) {
           26, 20, 18,
         );
       }
-      // Highlights last: the big spark and the small echo.
-      put(ellipse(u, v, cx - side * 0.028, eyeCy - 0.045, 0.026, 0.034), 255, 255, 255);
-      put(ellipse(u, v, cx + side * 0.02, eyeCy + 0.045, 0.013, 0.017), 255, 255, 255);
+      // Highlights ride the iris sheet, which draws over this one.
     }
 
-    // A small steady mouth with the faintest upward curve.
-    put(stroke(u, v, 0.457, 0.745, 0.5, 0.755, 0.011), 92, 52, 46);
-    put(stroke(u, v, 0.5, 0.755, 0.543, 0.745, 0.011), 92, 52, 46);
+    if (!irisOnly) {
+      // A small steady mouth with the faintest upward curve.
+      put(stroke(u, v, 0.457, 0.745, 0.5, 0.755, 0.011), 92, 52, 46);
+      put(stroke(u, v, 0.5, 0.755, 0.543, 0.745, 0.011), 92, 52, 46);
+    }
 
     return [r, g, b, 255 * a];
   });
@@ -814,6 +825,8 @@ const bakes = [
   ['wisp.png', bakeWisp],
   ['face-boy.png', () => bakeFace(false)],
   ['face-girl.png', () => bakeFace(true)],
+  ['iris-boy.png', () => bakeFace(false, 'iris')],
+  ['iris-girl.png', () => bakeFace(true, 'iris')],
   ['cloth.png', bakeCloth],
   ['hair-strands.png', bakeHairStrands],
   ['padding.png', bakePadding],

@@ -90,7 +90,7 @@ test('a veteran hero above level 30 keeps their level when the save migrates', a
   await expect(page.getByTestId('player-p1')).toContainText('Lv 35');
 });
 
-test('crossing a Landmark Level plays the transformation ceremony with its tier name', async ({
+test('crossing a Landmark Level plays the transformation ceremony, naming the Form', async ({
   page,
 }) => {
   await openGame(page, '?testClock=1&seed=77');
@@ -136,7 +136,10 @@ test('crossing a Landmark Level plays the transformation ceremony with its tier 
   // The ceremony names the level and the Landmark tier — and nothing about
   // the transformation scene blocks the Results screen under the test clock.
   await expect(page.getByTestId('level-up')).toContainText('Level 25');
-  await expect(page.getByTestId('landmark')).toContainText('TRANSFORMATION! Comet trail!');
+  // The Landmark names the Form the hero just became, and the cosmetic
+  // that came with it.
+  await expect(page.getByTestId('landmark')).toContainText('NEW FORM: Storm Gold!');
+  await expect(page.getByTestId('landmark')).toContainText('Comet trail');
   await expect(page.getByTestId('play-again')).toBeVisible();
 });
 

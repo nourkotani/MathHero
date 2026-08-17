@@ -33,6 +33,42 @@ export function glowIntensityForLevel(level: number): number {
   return Math.min(1, 0.9 + ((level - STEEP_START) / (MAX_LEVEL - STEEP_START)) * 0.1);
 }
 
+/**
+ * A Form: the hero's earned, permanent state of power. The Form owns what
+ * the hero *is* (its look is the renderer's business); the Power Streak
+ * owns how hard they are pushing right now. Append-only, ordered by level.
+ */
+export interface HeroForm {
+  /** Hero Level that earns this Form; every one of these is a Landmark. */
+  level: number;
+  id: string;
+  /** Kid-facing name, announced by the transformation ceremony. */
+  label: string;
+}
+
+export const FORMS: readonly HeroForm[] = [
+  { level: 10, id: 'gold-spark', label: 'Gold Spark' },
+  { level: 25, id: 'storm-gold', label: 'Storm Gold' },
+  { level: 50, id: 'wild-mane', label: 'Wild Mane' },
+  { level: 70, id: 'crimson-sage', label: 'Crimson Sage' },
+  { level: 85, id: 'rose-dawn', label: 'Rose Dawn' },
+  { level: 100, id: 'legend', label: 'Legend' },
+];
+
+/** The Form a hero of this level is in, or undefined below the first one. */
+export function formForLevel(level: number): HeroForm | undefined {
+  let earned: HeroForm | undefined;
+  for (const form of FORMS) {
+    if (level >= form.level) earned = form;
+  }
+  return earned;
+}
+
+/** The Form earned exactly at this level, if any — the ceremony's trigger. */
+export function formUnlockedAt(level: number): HeroForm | undefined {
+  return FORMS.find((form) => form.level === level);
+}
+
 /** The piece of the hero a cosmetic tier dresses; higher tiers evolve the slot. */
 export type CosmeticSlot = 'ring' | 'crown' | 'wisps' | 'wings' | 'trail' | 'halo' | 'form';
 
@@ -48,11 +84,12 @@ export interface CosmeticTier {
 
 // Every 5th level unlocks a cosmetic tier. Tiers through 30 introduce their
 // slots; tiers from 35 up evolve one — the hero grows grander, never more
-// cluttered. Landmark Levels are 25, 50, 75, and 100; level 100 is the
-// Legend state, the one tier of the form slot.
+// cluttered. The Landmark flags sit on the levels where a Form is earned
+// (see FORMS), so the full transformation scene fires exactly when the hero
+// actually transforms; level 100 is Legend, the one tier of the form slot.
 export const COSMETIC_MILESTONES: readonly CosmeticTier[] = [
   { level: 5, id: 'crimson-aura', label: 'Crimson aura', slot: 'ring' },
-  { level: 10, id: 'energy-crown', label: 'Energy crown', slot: 'crown' },
+  { level: 10, id: 'energy-crown', label: 'Energy crown', slot: 'crown', landmark: true },
   { level: 15, id: 'lightning-wisps', label: 'Lightning wisps', slot: 'wisps' },
   { level: 20, id: 'energy-wings', label: 'Energy wings', slot: 'wings' },
   { level: 25, id: 'comet-trail', label: 'Comet trail', slot: 'trail', landmark: true },
@@ -64,10 +101,10 @@ export const COSMETIC_MILESTONES: readonly CosmeticTier[] = [
   { level: 55, id: 'twin-comet-trail', label: 'Twin comet trail', slot: 'trail' },
   { level: 60, id: 'radiant-halo', label: 'Radiant halo', slot: 'halo' },
   { level: 65, id: 'thunder-spirits', label: 'Thunder spirits', slot: 'wisps' },
-  { level: 70, id: 'galaxy-wings', label: 'Galaxy wings', slot: 'wings' },
-  { level: 75, id: 'celestial-crown', label: 'Celestial crown', slot: 'crown', landmark: true },
+  { level: 70, id: 'galaxy-wings', label: 'Galaxy wings', slot: 'wings', landmark: true },
+  { level: 75, id: 'celestial-crown', label: 'Celestial crown', slot: 'crown' },
   { level: 80, id: 'starfall-trail', label: 'Starfall trail', slot: 'trail' },
-  { level: 85, id: 'nova-ring', label: 'Nova ring', slot: 'ring' },
+  { level: 85, id: 'nova-ring', label: 'Nova ring', slot: 'ring', landmark: true },
   { level: 90, id: 'aurora-halo', label: 'Aurora halo', slot: 'halo' },
   { level: 95, id: 'spirit-storm', label: 'Spirit storm', slot: 'wisps' },
   { level: 100, id: 'legend', label: 'Legend', slot: 'form', landmark: true },

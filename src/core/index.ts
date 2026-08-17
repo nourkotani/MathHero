@@ -15,6 +15,9 @@ export type { StreakForm, StreakTier } from './streak';
 export {
   COSMETIC_MILESTONES,
   cosmeticUnlockedAt,
+  formForLevel,
+  FORMS,
+  formUnlockedAt,
   glowIntensityForLevel,
   levelForXp,
   MAX_LEVEL,
@@ -23,7 +26,7 @@ export {
   XP_PER_LEVEL,
   xpForLevel,
 } from './level';
-export type { CosmeticSlot, CosmeticTier } from './level';
+export type { CosmeticSlot, CosmeticTier, HeroForm } from './level';
 export {
   BODY_OPTIONS,
   DEFAULT_APPEARANCE,

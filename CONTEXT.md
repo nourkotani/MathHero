@@ -40,22 +40,37 @@ Determines which times tables are in play, identically for every Skill — the r
 Base points scale with the Skill's **base-point scale** — Multiply/Divide ×1, Pattern ×2, Machine ×3 — so the slower detective Skills still pay fair XP per minute of training.
 
 ### Power Streak
-Consecutive correct answers *within one Round*. The score multiplier and the visual transformation are **one unified system** — transforming and multiplying points are the same event:
+Consecutive correct answers *within one Round*. The score multiplier and the visual intensity are **one unified system** — powering up and multiplying points are the same event. A Streak never changes *which* Form the hero is in; it turns that Form's own power up:
 
-| Streak | Multiplier | Transformation |
+| Streak | Multiplier | Intensity |
 |---|---|---|
-| 0–2 | ×1 | Base form |
-| 3–5 | ×2 | Aura ignites |
-| 6–9 | ×3 | Glowing hair, crackling energy |
-| 10+ | ×4 | Super mode — golden aura, energy blast per correct answer |
+| 0–2 | ×1 | At rest — the hero's Form glows quietly |
+| 3–5 | ×2 | The aura ignites |
+| 6–9 | ×3 | Hair blazes, energy crackles |
+| 10+ | ×4 | Full power — the aura roars and every correct answer fires an energy blast |
 
-A wrong answer drops the character back to base form and ×1. Resets at the start of every Round; never persisted.
+A wrong answer drops the hero back to rest and ×1. Resets at the start of every Round; never persisted.
+
+### Form
+The hero's earned state of power, unlocked by Hero Level and worn **permanently** — a Form is who the hero *is*, while the Power Streak is how hard they are pushing right now. Each Form sets the hero's hair color and shape, eye color, aura color and character (jagged and fierce, or smooth and calm), and whether energy arcs crackle and bright motes rise around them. Six Forms are earned across the climb, each at a Landmark Level:
+
+| Level | Form | Look |
+|---|---|---|
+| 0 | (the hero's own) | Their chosen colors, no aura at rest |
+| 10 | **Gold Spark** | Golden hair and a golden flame |
+| 25 | **Storm Gold** | Gold with blue energy arcs crackling around it |
+| 50 | **Wild Mane** | A long, wild mane and a towering aura |
+| 70 | **Crimson Sage** | Deep crimson, calm and smooth instead of jagged |
+| 85 | **Rose Dawn** | Rose and violet, with bright motes rising |
+| 100 | **Legend** | Silver-white, serene, endlessly shimmering |
+
+The hero's chosen hair color is who they are underneath: it shows at Hero creation, on the Title screen, and at rest before the first Form is earned.
 
 ### XP / Hero Level
-XP equals total points scored: every Round's final score is added to the Player's lifetime XP. Levels 1–30 cost 500 XP each; above 30 every level costs 25 XP more than the one before it, so the climb steepens toward the cap. **Level 100 is the cap** — XP keeps accumulating past it, but the level stays 100. Levels never reset. Every level slightly intensifies the character's permanent glow/particles; every 5th level automatically unlocks a cosmetic tier. Early tiers add new pieces (aura ring, energy crown, lightning wisps, energy wings, comet trail, twin halo); from level 35 on, each tier **evolves** one of those pieces into a grander form instead of stacking another on, so a veteran hero reads sharper, never cluttered. There is no shop or currency — unlocks are automatic.
+XP equals total points scored: every Round's final score is added to the Player's lifetime XP. Levels 1–30 cost 500 XP each; above 30 every level costs 25 XP more than the one before it, so the climb steepens toward the cap. **Level 100 is the cap** — XP keeps accumulating past it, but the level stays 100. Levels never reset. Every level slightly intensifies the character's permanent glow/particles; every 5th level automatically unlocks a cosmetic tier, and the six Landmark Levels each unlock a new **Form**. Early tiers add new pieces (aura ring, energy crown, lightning wisps, energy wings, comet trail, twin halo); from level 35 on, each tier **evolves** one of those pieces into a grander form instead of stacking another on, so a veteran hero reads sharper, never cluttered. There is no shop or currency — unlocks are automatic.
 
 ### Landmark Level
-Hero Levels 25, 50, 75, and 100 — level-ups that transform the hero's whole presence rather than upgrading a single piece, celebrated with a full transformation scene in the Results ceremony (regular level-ups keep the quicker celebration). Level 100 is the **Legend** state: the hero's final, permanently radiant form.
+Hero Levels 10, 25, 50, 70, 85, and 100 — the levels where the hero earns a new **Form**. These transform the hero's whole presence rather than upgrading a single piece, and are celebrated with a full transformation scene in the Results ceremony (regular level-ups keep the quicker celebration). Level 100 is **Legend**: the hero's final, permanently radiant Form.
 
 ### Adaptive Selection
 Question picking is weighted random: Facts the Player answers wrongly or slowly appear more often until mastered. Runs on the active Skill's own attempt data. The same question never appears twice in a row. A Fact is **mastered** when its last 3 answers were all correct and each beat the Skill's **mastery window** — the pace that counts as fluent for that Skill: ~6 seconds for Multiply/Divide, ~15 for Pattern, ~25 for Machine. A wrong answer un-masters it.

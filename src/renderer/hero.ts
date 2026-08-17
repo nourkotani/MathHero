@@ -20,6 +20,8 @@ import clothUrl from './textures/cloth.png';
 import faceBoyUrl from './textures/face-boy.png';
 import faceGirlUrl from './textures/face-girl.png';
 import featherUrl from './textures/feather.png';
+import irisBoyUrl from './textures/iris-boy.png';
+import irisGirlUrl from './textures/iris-girl.png';
 import hairStrandsUrl from './textures/hair-strands.png';
 import haloRingUrl from './textures/halo-ring.png';
 import streakUrl from './textures/streak.png';
@@ -49,8 +51,72 @@ export interface CosmeticMotor {
   restScale: number;
 }
 
+/**
+ * A hero's look is `Form palette × Streak intensity`, and each factor has
+ * exactly one home: FORM_PALETTES below says what an ascended hero IS,
+ * FORM_LOOKS says how hard they are pushing. composeLook multiplies them.
+ *
+ * A hero who has not earned a Form yet uses FORM_LOOKS alone — which is
+ * precisely the game as it shipped before Forms existed, gold Super hair
+ * and all.
+ */
+export interface FormPalette {
+  /** Hair color while in this Form; the chosen color waits underneath. */
+  hair: number;
+  /** Iris color — the quiet signal that a hero has changed. */
+  eye: number;
+  auraColor: number;
+  sparkColor: number;
+  hitColor: number;
+  /** Aura lobe amplitude: high burns jagged and fierce, low flows smooth. */
+  lobes: number;
+  /** Energy arcs per second at rest, before the Streak's multiplier. */
+  restArcs: number;
+  /** Rising motes per second at rest. */
+  restMotes: number;
+  /** The aura never fully dies once a Form is earned. */
+  restAura: number;
+  /** Hair grows and stiffens with power. */
+  hairScale: number;
+  /** The long-maned Form forces the full mane whatever was chosen. */
+  mane: boolean;
+}
+
+/** Keyed by the core's Form ids (see FORMS in level.ts). */
+export const FORM_PALETTES: Record<string, FormPalette> = {
+  'gold-spark': {
+    hair: 0xffd94a, eye: 0x6fe3c4, auraColor: 0xffc44d, sparkColor: 0xffe9a3, hitColor: 0xffd24d,
+    lobes: 0.13, restArcs: 0, restMotes: 2, restAura: 0.1, hairScale: 1.08, mane: false,
+  },
+  'storm-gold': {
+    hair: 0xffe14d, eye: 0x7de3ff, auraColor: 0xffd24d, sparkColor: 0x9be7ff, hitColor: 0x7ad7ff,
+    lobes: 0.2, restArcs: 2.5, restMotes: 2, restAura: 0.14, hairScale: 1.16, mane: false,
+  },
+  'wild-mane': {
+    hair: 0xffe98a, eye: 0x8ef0d0, auraColor: 0xffcf5a, sparkColor: 0xfff3b0, hitColor: 0xffe14d,
+    lobes: 0.24, restArcs: 3, restMotes: 3, restAura: 0.2, hairScale: 1.3, mane: true,
+  },
+  'crimson-sage': {
+    hair: 0xd63a4a, eye: 0xff9db0, auraColor: 0xff4d5e, sparkColor: 0xffb3bd, hitColor: 0xff6b7a,
+    lobes: 0.05, restArcs: 0.8, restMotes: 4, restAura: 0.24, hairScale: 1.12, mane: false,
+  },
+  'rose-dawn': {
+    hair: 0xff8fc4, eye: 0xffd0e8, auraColor: 0xff6fb5, sparkColor: 0xffc2e6, hitColor: 0xff8fd0,
+    lobes: 0.07, restArcs: 1.5, restMotes: 6, restAura: 0.28, hairScale: 1.16, mane: false,
+  },
+  legend: {
+    hair: 0xeaf2ff, eye: 0xdfe9f5, auraColor: 0xcfe4ff, sparkColor: 0xffffff, hitColor: 0xeaf4ff,
+    lobes: 0.03, restArcs: 0.6, restMotes: 8, restAura: 0.3, hairScale: 1.14, mane: false,
+  },
+};
+
+/** The iris a hero wears before any Form: plain warm brown. */
+export const BASE_EYE = 0x3e2c22;
+/** The aura's default lobe amplitude — the shape the game always had. */
+export const BASE_LOBES = 0.13;
+
 // Visual treatment per streak form, keyed by the core's form names — the ONE
-// place a form's look lives; no site may special-case a form by name.
+// place a form's INTENSITY lives; no site may special-case a form by name.
 // hair: null keeps the Player's own hair color.
 export const FORM_LOOKS: Record<
   StreakForm,
@@ -116,14 +182,55 @@ export interface HeroRig {
   moteMaterial: THREE.SpriteMaterial;
 }
 
+/** The effective look: what the hero IS, turned up by how hard they push. */
+export interface ComposedLook {
+  hair: number | null;
+  auraColor: number;
+  auraOpacity: number;
+  emissive: number;
+  bodyEmissive: number;
+  hitColor: number;
+  sparkColor: number;
+  arcRate: number;
+  moteRate: number;
+  hitstop: boolean;
+}
+
+/**
+ * Compose a Form's palette with a Streak's intensity. With no Form the
+ * Streak's own table answers alone, so an unascended hero is untouched by
+ * this whole system.
+ */
+export function composeLook(streak: StreakForm, palette: FormPalette | null): ComposedLook {
+  const push = FORM_LOOKS[streak];
+  const moteRate = STREAK_MOTES[streak];
+  if (palette === null) return { ...push, moteRate };
+  return {
+    ...push,
+    // The Form owns every color; the Streak owns how loud it gets.
+    hair: palette.hair,
+    auraColor: palette.auraColor,
+    bodyEmissive: palette.auraColor,
+    hitColor: palette.hitColor,
+    sparkColor: palette.sparkColor,
+    auraOpacity: Math.max(palette.restAura, push.auraOpacity),
+    arcRate: palette.restArcs + push.arcRate,
+    moteRate: palette.restMotes + moteRate,
+  };
+}
+
+/** Rising aura motes per second, by Streak alone (pre-Form behaviour). */
+const STREAK_MOTES: Record<StreakForm, number> = { base: 0, aura: 14, surge: 22, super: 34 };
+
 /** Dress the rig for a streak form, blended with the Player's permanent glow. */
 export function applyFormToRig(
   rig: HeroRig,
   form: StreakForm,
   playerHair: number,
   playerGlow: number,
+  palette: FormPalette | null = null,
 ): void {
-  const look = FORM_LOOKS[form];
+  const look = composeLook(form, palette);
   const hairHex = look.hair ?? playerHair;
   for (const spike of rig.hairMaterials) {
     spike.color.setHex(hairHex);
@@ -170,7 +277,10 @@ export function applyLevelToRig(rig: HeroRig, level: number): void {
  * Rig layout (group-local y, feet at 0): hips 0.88, torso pivot 1.0,
  * shoulders 1.7, head pivot 1.88, head center ~2.04.
  */
-export function buildHero(appearance: HeroAppearance): HeroRig {
+export function buildHero(
+  appearance: HeroAppearance,
+  palette: FormPalette | null = null,
+): HeroRig {
   const group = new THREE.Group();
   const girl = appearance.body === 'girl';
 
@@ -257,13 +367,21 @@ export function buildHero(appearance: HeroAppearance): HeroRig {
   // The painted anime face: a transparent decal on a sphere segment just
   // off the skull, so every skin tone shows through around the features.
   // The girl's variant carries the larger eyes and the lash flicks.
-  const face = new THREE.Mesh(
-    new THREE.SphereGeometry(0.35, 24, 16, Math.PI / 2 - 0.95, 1.9, 0.85, 1.45),
-    faceDecal(girl ? faceGirlUrl : faceBoyUrl),
-  );
+  const faceShape = () =>
+    new THREE.SphereGeometry(0.35, 24, 16, Math.PI / 2 - 0.95, 1.9, 0.85, 1.45);
+  const face = new THREE.Mesh(faceShape(), faceDecal(girl ? faceGirlUrl : faceBoyUrl));
   face.position.y = 0.16;
   face.renderOrder = 1;
   head.add(face);
+
+  // The irises ride their own sheet so a Form can change the hero's eyes
+  // without rebaking a whole face per Form.
+  const irisMaterial = faceDecal(girl ? irisGirlUrl : irisBoyUrl);
+  irisMaterial.color.setHex(palette?.eye ?? BASE_EYE);
+  const irises = new THREE.Mesh(faceShape(), irisMaterial);
+  irises.position.y = 0.16;
+  irises.renderOrder = 2;
+  head.add(irises);
 
   // Anime hair from the chosen style; every strand shares the swappable
   // hair materials so streak forms and player colors recolor them all.
@@ -273,7 +391,18 @@ export function buildHero(appearance: HeroAppearance): HeroRig {
     hairMaterials.push(material);
     return material;
   };
-  buildHair(head, appearance.hairStyle, appearance.hairLength === 'long', hairMat);
+  // Hair grows and stiffens with the Form; the maned Form takes the full
+  // mane whatever length was chosen. Scaling the whole do from the head
+  // pivot is what makes a powered-up hero's hair visibly rise.
+  const hairGroup = new THREE.Group();
+  hairGroup.scale.setScalar(palette?.hairScale ?? 1);
+  head.add(hairGroup);
+  buildHair(
+    hairGroup,
+    appearance.hairStyle,
+    appearance.hairLength === 'long' || palette?.mane === true,
+    hairMat,
+  );
 
   // Arms: shoulder pivot → upper arm → elbow pivot → forearm, band, fist.
   const shoulderX = girl ? 0.47 : 0.55;
@@ -364,7 +493,7 @@ export function buildHero(appearance: HeroAppearance): HeroRig {
   // The aura is a teardrop of flame wrapped around the fighter: two shells
   // of the same lobed profile — the smaller inner one is the hot core,
   // whiter and denser, and counter-rotation makes the fire churn.
-  const auraGeometry = buildAuraGeometry();
+  const auraGeometry = buildAuraGeometry(palette?.lobes ?? BASE_LOBES);
   const auraOuter = new THREE.Mesh(auraGeometry, auraMaterial);
   const auraInner = new THREE.Mesh(auraGeometry, auraCoreMaterial);
   markBloom(auraOuter);
@@ -432,7 +561,7 @@ export function buildHero(appearance: HeroAppearance): HeroRig {
  * hair — with radial lobes sculpted in so the rim licks like fire when the
  * shells rotate.
  */
-function buildAuraGeometry(): THREE.BufferGeometry {
+function buildAuraGeometry(lobeAmplitude = BASE_LOBES): THREE.BufferGeometry {
   const profile = [
     new THREE.Vector2(0.18, 0),
     new THREE.Vector2(0.62, 0.12),
@@ -451,7 +580,7 @@ function buildAuraGeometry(): THREE.BufferGeometry {
     const y = position.getY(i);
     const z = position.getZ(i);
     const theta = Math.atan2(z, x);
-    const lobe = 1 + 0.13 * Math.sin(theta * 3 + y * 2.2);
+    const lobe = 1 + lobeAmplitude * Math.sin(theta * 3 + y * 2.2);
     position.setX(i, x * lobe);
     position.setZ(i, z * lobe);
   }
@@ -464,7 +593,7 @@ type HairMat = () => Surface;
  * Anime hair styles, each in a short and a long variant, built in head-pivot
  * space so the whole do swings with every nod and shake.
  */
-function buildHair(head: THREE.Group, style: HairStyle, long: boolean, hairMat: HairMat): void {
+function buildHair(head: THREE.Object3D, style: HairStyle, long: boolean, hairMat: HairMat): void {
   const spike = (
     x: number,
     y: number,

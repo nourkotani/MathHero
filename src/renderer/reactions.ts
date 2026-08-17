@@ -7,8 +7,8 @@ import * as THREE from 'three';
 import type { GameEffect, StreakForm } from '../core';
 import { DUMMY_X, HERO_X } from './constants';
 import { STYLE } from './style';
-import { applyFormToRig, FORM_LOOKS } from './hero';
-import type { HeroRig } from './hero';
+import { applyFormToRig, composeLook } from './hero';
+import type { FormPalette, HeroRig } from './hero';
 import type { Dummy } from './dummy';
 import type { Fx } from './fx';
 import { createChannel } from './timeline';
@@ -30,8 +30,8 @@ export interface Juice {
 
 export interface Reactions {
   handleEffects(effects: GameEffect[]): void;
-  /** The Player's permanent identity: chosen hair color + level glow. */
-  setPlayerLook(hair: number, glow: number): void;
+  /** The Player's permanent identity: chosen hair, level glow, earned Form. */
+  setPlayerLook(hair: number, glow: number, palette: FormPalette | null): void;
   /** Re-dress the current rig (after colors change or the hero rebuilds). */
   refreshForm(): void;
   isStaggering(): boolean;
@@ -53,11 +53,16 @@ export function createReactions(opts: {
   let currentForm: StreakForm = 'base';
   let playerHair = 0x2b2b2b;
   let playerGlow = 0;
+  /** The hero's earned Form, or null before the first one is earned. */
+  let palette: FormPalette | null = null;
 
   function applyForm(form: StreakForm) {
     currentForm = form;
-    applyFormToRig(getHero(), form, playerHair, playerGlow);
+    applyFormToRig(getHero(), form, playerHair, playerGlow, palette);
   }
+
+  /** What the hero looks like right now: earned Form × current Streak. */
+  const look = () => composeLook(currentForm, palette);
   applyForm('base');
 
   /**
@@ -96,17 +101,17 @@ export function createReactions(opts: {
         // The exact moment the strike lands: impact sparks fly off the dummy.
         if (hitPending && t >= 0.62) {
           hitPending = false;
-          const look = FORM_LOOKS[currentForm];
+          const hit = look();
           const transformed = currentForm !== 'base';
           const impact = new THREE.Vector3(DUMMY_X - 0.55, 1.7, 0);
-          fx.burst(look.hitColor, transformed ? 18 : 12, impact, 3.2);
+          fx.burst(hit.hitColor, transformed ? 18 : 12, impact, 3.2);
           // Every strike lands with the anime flash frame; transformed
           // heroes also punch a shockwave through the air.
           fx.impactStar(impact);
-          if (transformed) fx.shockwave(look.hitColor, impact, false);
+          if (transformed) fx.shockwave(hit.hitColor, impact, false);
           juice.addShake(transformed ? 0.2 : 0.12);
           // High-streak hits freeze the frame for a beat — weight, not lag.
-          if (look.hitstop) juice.hitstop();
+          if (hit.hitstop) juice.hitstop();
         }
         switch (kind) {
           case 0: // dash punch: coil back, lunge in with a straight right
@@ -242,10 +247,10 @@ export function createReactions(opts: {
             heroChannel.play(attackClip(attackCycle++ % 4), 'attack');
             dummy.hit(currentForm !== 'base');
             // A crackle of charge energy as the hero coils to strike.
-            fx.burst(FORM_LOOKS[currentForm].hitColor, 6, new THREE.Vector3(HERO_X + 0.4, 1.5, 0), 1.2);
+            fx.burst(look().hitColor, 6, new THREE.Vector3(HERO_X + 0.4, 1.5, 0), 1.2);
             // Any transformed hero throws visible energy with each strike,
             // colored by the form that threw it.
-            if (currentForm !== 'base') fx.fireBlast(false, FORM_LOOKS[currentForm].auraColor);
+            if (currentForm !== 'base') fx.fireBlast(false, look().auraColor);
             break;
           case 'ANSWER_WRONG':
             heroChannel.play(staggerClip(), 'stagger');
@@ -253,10 +258,10 @@ export function createReactions(opts: {
             break;
           case 'TRANSFORMED':
             applyForm(effect.form);
-            fx.burst(FORM_LOOKS[effect.form].auraColor, 24, hero.group.position.clone().setY(1.5), 3.5);
+            fx.burst(look().auraColor, 24, hero.group.position.clone().setY(1.5), 3.5);
             // Power rushes inward as the new form ignites.
             fx.chargeRing(
-              FORM_LOOKS[effect.form].auraColor,
+              look().auraColor,
               hero.group.position.clone().setY(1.3),
               effect.form === 'super',
             );
@@ -295,9 +300,10 @@ export function createReactions(opts: {
         }
       }
     },
-    setPlayerLook(hair, glow) {
+    setPlayerLook(hair, glow, formPalette) {
       playerHair = hair;
       playerGlow = glow;
+      palette = formPalette;
     },
     refreshForm() {
       applyForm(currentForm);
@@ -367,10 +373,11 @@ export function createReactions(opts: {
       // Transformed heroes shed rising energy motes that hug the body's
       // silhouette — narrow at the boots and head, widest at the torso —
       // so the aura reads as pouring off the fighter, not a vague cloud.
-      if (currentForm !== 'base' || playerGlow > 0.3) {
-        const rate = currentForm === 'super' ? 34 : currentForm === 'surge' ? 22 : 14;
+      const now = look();
+      if (now.moteRate > 0 || playerGlow > 0.3) {
+        const rate = now.moteRate > 0 ? now.moteRate : 14;
         sparkAccum += dt * rate;
-        const sparkColor = FORM_LOOKS[currentForm].sparkColor;
+        const sparkColor = now.sparkColor;
         while (sparkAccum >= 1) {
           sparkAccum -= 1;
           const y = 0.15 + Math.random() * 2.1;
@@ -399,7 +406,7 @@ export function createReactions(opts: {
         (mesh) => mesh.visible && typeof mesh.userData.arcColor === 'number',
       );
       const stormColor = storm?.userData.arcColor as number | undefined;
-      const { arcRate } = FORM_LOOKS[currentForm];
+      const { arcRate } = now;
       const L = STYLE.lightning;
       const totalRate = arcRate + (storm ? L.cosmeticRate : 0);
       if (totalRate > 0) {
@@ -414,9 +421,7 @@ export function createReactions(opts: {
           const radius = band.min + Math.random() * band.spread;
           const y = height.min + Math.random() * height.spread;
           fx.lightning(
-            fromStorm && stormColor !== undefined
-              ? stormColor
-              : FORM_LOOKS[currentForm].sparkColor,
+            fromStorm && stormColor !== undefined ? stormColor : now.sparkColor,
             new THREE.Vector3(
               hero.group.position.x + Math.cos(angle) * radius,
               hero.group.position.y + y,

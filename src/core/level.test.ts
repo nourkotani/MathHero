@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   COSMETIC_MILESTONES,
   cosmeticUnlockedAt,
+  formForLevel,
+  FORMS,
+  formUnlockedAt,
   glowIntensityForLevel,
   levelForXp,
   MAX_LEVEL,
@@ -80,9 +83,42 @@ describe('the level curve', () => {
     expect(legend?.label).toBe('Legend');
   });
 
-  it('flags exactly 25, 50, 75, and 100 as Landmark Levels', () => {
+  it('flags exactly the Form levels as Landmark Levels', () => {
     const landmarks = COSMETIC_MILESTONES.filter((t) => t.landmark).map((t) => t.level);
-    expect(landmarks).toEqual([25, 50, 75, 100]);
+    expect(landmarks).toEqual([10, 25, 50, 70, 85, 100]);
+    // The full transformation scene must fire exactly where a hero
+    // transforms: every Form level is a Landmark and vice versa.
+    expect(landmarks).toEqual(FORMS.map((f) => f.level));
+  });
+
+  it('earns six Forms, each at its own Landmark, ending in Legend', () => {
+    expect(FORMS).toHaveLength(6);
+    expect(FORMS.map((f) => f.level)).toEqual([10, 25, 50, 70, 85, 100]);
+    expect(FORMS.at(-1)).toMatchObject({ id: 'legend', label: 'Legend' });
+    // Ordered, unique, and inside the level cap.
+    const levels = FORMS.map((f) => f.level);
+    expect([...levels].sort((a, b) => a - b)).toEqual(levels);
+    expect(new Set(levels).size).toBe(levels.length);
+    expect(Math.max(...levels)).toBeLessThanOrEqual(MAX_LEVEL);
+  });
+
+  it('a hero holds the highest Form they have reached, and none before the first', () => {
+    expect(formForLevel(0)).toBeUndefined();
+    expect(formForLevel(9)).toBeUndefined();
+    expect(formForLevel(10)?.id).toBe('gold-spark');
+    expect(formForLevel(24)?.id).toBe('gold-spark');
+    expect(formForLevel(25)?.id).toBe('storm-gold');
+    expect(formForLevel(69)?.id).toBe('wild-mane');
+    expect(formForLevel(70)?.id).toBe('crimson-sage');
+    expect(formForLevel(99)?.id).toBe('rose-dawn');
+    expect(formForLevel(100)?.id).toBe('legend');
+  });
+
+  it('unlocks a Form only at its own level', () => {
+    expect(formUnlockedAt(10)?.id).toBe('gold-spark');
+    expect(formUnlockedAt(11)).toBeUndefined();
+    expect(formUnlockedAt(24)).toBeUndefined();
+    expect(formUnlockedAt(85)?.id).toBe('rose-dawn');
   });
 
   it('wears only the highest unlocked tier per slot', () => {

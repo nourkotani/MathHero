@@ -3,7 +3,7 @@
 
 import type { HeroAppearance } from './appearance';
 import type { Difficulty } from './difficulty';
-import type { CosmeticTier } from './level';
+import type { CosmeticTier, HeroForm } from './level';
 import type { PlayerColors, PlayerRecord } from './players';
 import type { SaveFile } from './savefile';
 import type { Skill } from './skills';
@@ -126,8 +126,9 @@ export type GameEffect =
   | { type: 'ROUND_ENDED'; finalScore: number }
   /** The player gave up mid-Round: nothing is recorded, no ceremony plays. */
   | { type: 'ROUND_ABANDONED' }
-  /** One per Hero Level gained, in order; carries any cosmetic tier unlocked. */
-  | { type: 'LEVEL_UP'; level: number; cosmetic?: CosmeticTier }
+  /** One per Hero Level gained, in order; carries any cosmetic tier and any
+   *  Form earned at that level. */
+  | { type: 'LEVEL_UP'; level: number; cosmetic?: CosmeticTier; form?: HeroForm }
   | { type: 'NEW_PERSONAL_BEST'; skill: Skill; difficulty: Difficulty; score: number }
   /** The persisted slice changed — the persistence subscriber must save. */
   | { type: 'SAVE_FILE_CHANGED' }
