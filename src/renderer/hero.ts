@@ -22,6 +22,8 @@ import faceGirlUrl from './textures/face-girl.png';
 import featherUrl from './textures/feather.png';
 import irisBoyUrl from './textures/iris-boy.png';
 import irisGirlUrl from './textures/iris-girl.png';
+import sparkBoyUrl from './textures/spark-boy.png';
+import sparkGirlUrl from './textures/spark-girl.png';
 import hairStrandsUrl from './textures/hair-strands.png';
 import haloRingUrl from './textures/halo-ring.png';
 import streakUrl from './textures/streak.png';
@@ -385,6 +387,14 @@ export function buildHero(
   irises.position.y = 0.16;
   irises.renderOrder = 2;
   head.add(irises);
+
+  // The catchlights sit on their own untinted sheet above the iris. On the
+  // tinted sheet they took the Form's color, and an eye whose highlight
+  // matches its iris has no spark in it at all — which reads as a stare.
+  const sparks = new THREE.Mesh(faceShape(), faceDecal(girl ? sparkGirlUrl : sparkBoyUrl));
+  sparks.position.y = 0.16;
+  sparks.renderOrder = 3;
+  head.add(sparks);
 
   // Anime hair from the chosen style; every strand shares the swappable
   // hair materials so streak forms and player colors recolor them all.
