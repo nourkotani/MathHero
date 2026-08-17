@@ -149,6 +149,36 @@ export function cloudSprite(url: string, tint: number, opacity: number): THREE.S
   return new THREE.SpriteMaterial({ map, color: tint, transparent: true, opacity, depthWrite: false });
 }
 
+/**
+ * A cosmetic light-panel: a baked alpha shape (feather, halo ring, streak)
+ * worn on a flat plane and tinted per piece. Additive and depth-write-free
+ * so overlapping pieces flare together instead of punching holes in each
+ * other, double-sided because wings and halos are seen from both faces.
+ */
+export function cosmeticPanel(url: string, color: number, opacity = 1): THREE.MeshBasicMaterial {
+  return new THREE.MeshBasicMaterial({
+    map: paintedMap(url),
+    color,
+    transparent: true,
+    opacity,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+  });
+}
+
+/** The same light, worn as a camera-facing sprite (wisps, star flecks). */
+export function cosmeticSprite(url: string, color: number, opacity = 1): THREE.SpriteMaterial {
+  return new THREE.SpriteMaterial({
+    map: paintedMap(url),
+    color,
+    transparent: true,
+    opacity,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+  });
+}
+
 let sharedSparkMap: THREE.Texture | null = null;
 
 /**

@@ -542,6 +542,117 @@ function bakeLightning(frames = 6, size = 128) {
   });
 }
 
+// ------------------------------------------------------ cosmetic sheets
+
+/**
+ * One wing feather panel: a swept quill with a soft barbed edge, cut out by
+ * alpha so the silhouette reads as a feather rather than a cone. Brightest
+ * along the shaft, fading to translucent at the vane's trailing edge.
+ * u runs root → tip, v runs across the vane.
+ */
+function bakeFeather(width = 256, height = 128) {
+  // Cel art wants a crisp blade, not fine barbs: at play distance soft
+  // detail turns to mush, so the silhouette carries the whole read.
+  const SPLITS = 3; // barb separations cut into the trailing half
+
+  const pixels = paintWide(width, height, 4, (u, v) => {
+    // Rounded at the root, swept to a point at the tip, cambered upward.
+    const camber = 0.5 - Math.sin(u * Math.PI * 0.85) * 0.16;
+    const taper = Math.sin(Math.min(1, 0.12 + u * 1.02) * Math.PI * 0.9) ** 0.75;
+    const halfWidth = 0.42 * taper * (1 - u * 0.55);
+    let across = Math.abs(v - camber) / Math.max(halfWidth, 0.0001);
+    if (across > 1.2) return [0, 0, 0, 0];
+
+    // Barb splits: clean notches angled back from the trailing edge.
+    let notch = 0;
+    for (let i = 1; i <= SPLITS; i++) {
+      const at = 0.34 + (i / (SPLITS + 1)) * 0.5;
+      const d = Math.abs(u - at + (v - camber) * 0.35);
+      notch = Math.max(notch, Math.max(0, 1 - d / 0.022));
+    }
+    // Trailing side only, so the leading edge stays one clean line.
+    if (v > camber) across += notch * 0.55;
+
+    // Near-binary alpha with a thin soft rim keeps the shape crisp.
+    const alpha = Math.max(0, Math.min(1, (1 - across) * 7));
+    // Hot leading edge and shaft, cooling toward the trailing vane.
+    const shaft = Math.max(0, 1 - Math.abs(v - camber) / (halfWidth * 0.22 + 0.0001));
+    const lead = v < camber ? Math.max(0, 1 - across * 1.6) * 0.35 : 0;
+    const value = Math.min(1, 0.6 + shaft * 0.4 + lead + (1 - u) * 0.08);
+    return [255 * value, 255 * value, 255 * value, 255 * alpha];
+  });
+  return encodePng(width, height, pixels, 4);
+}
+
+/**
+ * A halo / energy ring as a flat disc with real falloff: a bright band that
+ * fades softly inward and outward, with a faint second bloom rim. Replaces
+ * the hard-edged torus so rings read as light, not plastic hoops.
+ */
+function bakeHaloRing(size = 256) {
+  const shimmer = makeNoise(1919, 32);
+
+  const pixels = paintWide(size, size, 4, (u, v) => {
+    const dx = u * 2 - 1;
+    const dy = v * 2 - 1;
+    const r = Math.hypot(dx, dy);
+    const theta = Math.atan2(dy, dx);
+    // A slow shimmer around the circumference keeps it from reading CG-flat.
+    const wobble = (fbm(shimmer, (theta / Math.PI + 1) * 6, 0.5, 2) - 0.5) * 0.03;
+    const band = Math.max(0, 1 - Math.abs(r - (0.78 + wobble)) / 0.11);
+    const halo = Math.max(0, 1 - Math.abs(r - 0.78) / 0.3) * 0.28;
+    const alpha = Math.min(1, band * band * 1.15 + halo * halo);
+    const heat = Math.min(1, band * 1.3);
+    return [255, 255 * (0.86 + heat * 0.14), 255 * (0.7 + heat * 0.3), 255 * alpha];
+  });
+  return encodePng(size, size, pixels, 4);
+}
+
+/**
+ * A comet streak: hot round head at one end, tapering to nothing at the
+ * other, with a couple of lighter filaments in the tail. u runs head → tail.
+ */
+function bakeStreak(width = 256, height = 64) {
+  const wisp = makeNoise(2020, 32);
+
+  const pixels = paintWide(width, height, 4, (u, v) => {
+    const across = Math.abs(v - 0.5) * 2;
+    // Thick at the head, pinched to a point at the tail.
+    const thickness = (1 - u) ** 0.7;
+    const body = Math.max(0, 1 - across / Math.max(thickness, 0.001));
+    // Filaments split off the main streak toward the tail.
+    const strand = fbm(wisp, u * 8, v * 6, 3);
+    const filament = Math.max(0, 1 - Math.abs(across - strand * 0.9) / 0.25) * u * 0.4;
+    const head = Math.max(0, 1 - Math.hypot((u - 0.04) * 6, (v - 0.5) * 2.4));
+    const alpha = Math.min(1, body * body * (1 - u * 0.55) + filament + head);
+    const heat = Math.min(1, head + body * (1 - u) * 0.9);
+    return [255, 255 * (0.78 + heat * 0.22), 255 * (0.45 + heat * 0.55), 255 * alpha];
+  });
+  return encodePng(width, height, pixels, 4);
+}
+
+/**
+ * A wisp / spirit mote: a soft four-point star glow — rounder and gentler
+ * than the impact spark, so orbiting spirits read as living energy.
+ */
+function bakeWisp(size = 128) {
+  const pixels = paintWide(size, size, 4, (u, v) => {
+    const dx = (u - 0.5) * 2;
+    const dy = (v - 0.5) * 2;
+    const r = Math.hypot(dx, dy);
+    const halo = Math.max(0, 1 - r) ** 2.6;
+    const core = Math.max(0, 1 - r * 3.4) ** 1.4;
+    // Gentle four-point flare so it twinkles rather than blobs.
+    const points =
+      Math.max(0, 1 - Math.abs(dx) * 7) * Math.max(0, 1 - Math.abs(dy) * 1.5) +
+      Math.max(0, 1 - Math.abs(dy) * 7) * Math.max(0, 1 - Math.abs(dx) * 1.5);
+    const alpha = Math.min(1, halo * 0.7 + core + points * 0.5);
+    const white = 255 * Math.min(1, 0.7 + core * 0.3);
+    return [white, white, white, 255 * alpha];
+  });
+  return encodePng(size, size, pixels, 4);
+}
+
 // ----------------------------------------------------------- face decals
 
 /**
@@ -697,6 +808,10 @@ const bakes = [
   ['blast-core.png', bakeBlastCore],
   ['charge-ring.png', bakeChargeRing],
   ['lightning.png', bakeLightning],
+  ['feather.png', bakeFeather],
+  ['halo-ring.png', bakeHaloRing],
+  ['streak.png', bakeStreak],
+  ['wisp.png', bakeWisp],
   ['face-boy.png', () => bakeFace(false)],
   ['face-girl.png', () => bakeFace(true)],
   ['cloth.png', bakeCloth],

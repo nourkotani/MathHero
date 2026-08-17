@@ -49,6 +49,17 @@ export const STYLE = {
     { color: 0x6f5aff, intensity: 2.5, position: [6, 1.0, -4] as const },
   ],
 
+  /** Where the milestone cosmetics sit on the hero, and how they move. */
+  cosmetics: {
+    /** Wings anchor at the shoulder blades, not floating off the back. */
+    wings: { anchorX: 0.3, anchorY: 1.72, anchorZ: -0.22, beatSpeed: 1.5 },
+    /** A crown rests on the head; the halo floats above it. */
+    crown: { radius: 0.33, y: 2.42, spin: 0.35 },
+    halo: { y: 2.95, tilt: 0.16, bob: 0.04 },
+    wisps: { bob: 0.07, bobSpeed: 2.1 },
+    trail: { offsetZ: 0.45, flicker: 0.07, flickerSpeed: 6 },
+  },
+
   /** Hero-Level presence: orbiting power motes + charged trim, by bracket. */
   levelStyle: {
     /** One orbiting mote per this many Hero Levels. */

@@ -330,6 +330,24 @@ export function createReactions(opts: {
       hero.powerMotes.rotation.y = elapsed * 1.3;
       hero.powerMotes.position.y = 1.05 + Math.sin(elapsed * 2.6) * 0.07;
 
+      // Earned cosmetics live: wings beat, halos turn and drift, trails
+      // flicker, spirits orbit. Each piece declared its own motion when it
+      // was built, so nothing here special-cases a cosmetic by name.
+      for (const motor of hero.cosmeticMotors) {
+        const { object, motion } = motor;
+        if (!object.visible) continue;
+        if (motion.spin !== undefined) object.rotation.y = elapsed * motion.spin;
+        if (motion.bob) object.position.y = motor.restY + Math.sin(elapsed * motion.bob.speed) * motion.bob.amp;
+        if (motion.flap) {
+          object.rotation.z = motor.restRoll + Math.sin(elapsed * motion.flap.speed) * motion.flap.amp;
+        }
+        if (motion.pulse) {
+          object.scale.setScalar(
+            motor.restScale * (1 + Math.sin(elapsed * motion.pulse.speed) * motion.pulse.amp),
+          );
+        }
+      }
+
       // Guard stance: left foot forward, knees soft, fists raised.
       const j = hero.joints;
       const breathe = Math.sin(elapsed * 2.2);

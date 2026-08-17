@@ -5,14 +5,49 @@
 import * as THREE from 'three';
 import { presetHex, SKIN_PRESETS } from '../core';
 import type { HairStyle, HeroAppearance, StreakForm } from '../core';
-import { characterSurface, faceDecal, glowSurface, markBloom } from './materials';
+import {
+  characterSurface,
+  cosmeticPanel,
+  cosmeticSprite,
+  faceDecal,
+  glowSurface,
+  markBloom,
+} from './materials';
 import { STYLE } from './style';
 import type { Surface } from './materials';
 import { applyCelTreatment } from './cel';
 import clothUrl from './textures/cloth.png';
 import faceBoyUrl from './textures/face-boy.png';
 import faceGirlUrl from './textures/face-girl.png';
+import featherUrl from './textures/feather.png';
 import hairStrandsUrl from './textures/hair-strands.png';
+import haloRingUrl from './textures/halo-ring.png';
+import streakUrl from './textures/streak.png';
+import wispUrl from './textures/wisp.png';
+
+/**
+ * Render-time motion a cosmetic piece can carry. Pieces declare what they
+ * do; the frame loop applies it, so no site animates a cosmetic by name.
+ */
+export interface Motion {
+  /** Radians per second about the hero's up axis. */
+  spin?: number;
+  /** Vertical drift about the rest height. */
+  bob?: { amp: number; speed: number };
+  /** Wing beat: roll about the shoulder, mirrored per side by amp's sign. */
+  flap?: { amp: number; speed: number };
+  /** Breathing scale about the rest size. */
+  pulse?: { amp: number; speed: number };
+}
+
+/** One animated cosmetic piece, with the rest pose captured at build time. */
+export interface CosmeticMotor {
+  object: THREE.Object3D;
+  motion: Motion;
+  restY: number;
+  restRoll: number;
+  restScale: number;
+}
 
 // Visual treatment per streak form, keyed by the core's form names — the ONE
 // place a form's look lives; no site may special-case a form by name.
@@ -73,10 +108,12 @@ export interface HeroRig {
   auraCoreMaterial: THREE.MeshBasicMaterial;
   /** Milestone cosmetic meshes keyed by their table id; hidden until unlocked. */
   cosmetics: Map<string, THREE.Object3D>;
+  /** Every cosmetic piece that animates, with its rest pose. */
+  cosmeticMotors: CosmeticMotor[];
   /** Hero-Level presence: the orbiting mote ring (spun by the frame loop). */
   powerMotes: THREE.Group;
-  moteMeshes: THREE.Mesh[];
-  moteMaterial: THREE.MeshBasicMaterial;
+  moteMeshes: THREE.Sprite[];
+  moteMaterial: THREE.SpriteMaterial;
 }
 
 /** Dress the rig for a streak form, blended with the Player's permanent glow. */
@@ -343,10 +380,13 @@ export function buildHero(appearance: HeroAppearance): HeroRig {
   // one by one as Hero Levels climb. The frame loop spins the group.
   const powerMotes = new THREE.Group();
   powerMotes.position.y = 1.05;
-  const moteMaterial = glowSurface(0xffffff, 0.9);
-  const moteMeshes: THREE.Mesh[] = [];
+  // Soft twinkling glow, like every other mote of energy in the game — a
+  // bare polyhedron read as a floating grey gem.
+  const moteMaterial = cosmeticSprite(wispUrl, 0xffffff, 0.9);
+  const moteMeshes: THREE.Sprite[] = [];
   for (let i = 0; i < STYLE.levelStyle.maxMotes; i++) {
-    const mote = new THREE.Mesh(new THREE.OctahedronGeometry(0.1), moteMaterial);
+    const mote = new THREE.Sprite(moteMaterial);
+    mote.scale.setScalar(0.34);
     const angle = (i / STYLE.levelStyle.maxMotes) * Math.PI * 2;
     mote.position.set(Math.cos(angle) * 0.8, Math.sin(angle * 3) * 0.06, Math.sin(angle) * 0.8);
     markBloom(mote);
@@ -356,7 +396,8 @@ export function buildHero(appearance: HeroAppearance): HeroRig {
   }
   group.add(powerMotes);
 
-  const cosmetics = buildCosmetics();
+  const cosmeticMotors: CosmeticMotor[] = [];
+  const cosmetics = buildCosmetics(cosmeticMotors);
   for (const mesh of cosmetics.values()) {
     mesh.visible = false;
     // Cosmetic energy glows for real; children too (wisps, wings, halos).
@@ -378,6 +419,7 @@ export function buildHero(appearance: HeroAppearance): HeroRig {
     auraMaterial,
     auraCoreMaterial,
     cosmetics,
+    cosmeticMotors,
     powerMotes,
     moteMeshes,
     moteMaterial,
@@ -501,282 +543,298 @@ function buildHair(head: THREE.Group, style: HairStyle, long: boolean, hairMat: 
   }
 }
 
-/** One simple mesh per milestone cosmetic id from the core's table. */
-function buildCosmetics(): Map<string, THREE.Object3D> {
+/**
+ * The milestone cosmetics: one entry per tier id in the core's table.
+ *
+ * These are light, not plastic. Anything that glows is a baked alpha shape
+ * on a plane or sprite — feathers with a real silhouette, halo rings with
+ * falloff, streaks that taper — additively blended so overlapping pieces
+ * flare together. Only the crowns keep solid geometry, because a crown is
+ * an object a hero wears. Every piece that should live registers a motor
+ * (see CosmeticMotor); the frame loop animates those and nothing here
+ * needs to know when it runs.
+ */
+function buildCosmetics(motors: CosmeticMotor[]): Map<string, THREE.Object3D> {
   const cosmetics = new Map<string, THREE.Object3D>();
-  const glowMaterial = (color: number) => glowSurface(color, 0.85);
+  const S = STYLE.cosmetics;
 
-  const crimsonAura = new THREE.Mesh(
-    new THREE.TorusGeometry(0.85, 0.06, 10, 32),
-    glowMaterial(0xff3b3b),
-  );
-  crimsonAura.rotation.x = Math.PI / 2;
-  crimsonAura.position.y = 0.15;
-  cosmetics.set('crimson-aura', crimsonAura);
-
-  // Energy crown: the ring plus four rising prongs, like held-back power.
-  const crown = new THREE.Group();
-  const crownRing = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.05, 8, 24), glowMaterial(0xffd700));
-  crownRing.rotation.x = Math.PI / 2;
-  crown.add(crownRing);
-  for (let i = 0; i < 4; i++) {
-    const angle = (i / 4) * Math.PI * 2;
-    const prong = new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.22, 6), glowMaterial(0xffe14d));
-    prong.position.set(Math.cos(angle) * 0.3, 0.12, Math.sin(angle) * 0.3);
-    crown.add(prong);
-  }
-  crown.position.y = 2.85;
-  cosmetics.set('energy-crown', crown);
-
-  const wisps = new THREE.Group();
-  for (const [x, y] of [
-    [-0.7, 1.4],
-    [0.7, 1.7],
-    [-0.5, 2.2],
-  ] as const) {
-    const wisp = new THREE.Mesh(new THREE.OctahedronGeometry(0.1), glowMaterial(0x9be7ff));
-    wisp.position.set(x, y, 0.2);
-    wisps.add(wisp);
-  }
-  cosmetics.set('lightning-wisps', wisps);
-
-  // Energy wings: three fanned feathers per side, longest on top.
-  const wings = new THREE.Group();
-  const feathers: Array<[number, number, number, number]> = [
-    // [cone radius, length, z-tilt, height]
-    [0.32, 1.5, 2.45, 1.6],
-    [0.24, 1.15, 2.15, 1.42],
-    [0.17, 0.85, 1.85, 1.24],
-  ];
-  for (const side of [-1, 1]) {
-    for (const [radius, length, tilt, y] of feathers) {
-      const feather = new THREE.Mesh(new THREE.ConeGeometry(radius, length, 6), glowMaterial(0x7dffa0));
-      feather.position.set(side * (0.45 + length * 0.28), y, -0.4);
-      feather.rotation.z = side * tilt;
-      wings.add(feather);
-    }
-  }
-  cosmetics.set('energy-wings', wings);
-
-  const trail = new THREE.Mesh(new THREE.ConeGeometry(0.2, 1.2, 8), glowMaterial(0xffa94d));
-  trail.position.set(0, 1.0, -0.7);
-  trail.rotation.x = Math.PI / 2;
-  cosmetics.set('comet-trail', trail);
-
-  const halo = new THREE.Group();
-  for (const dy of [0, 0.25] as const) {
-    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.45, 0.04, 8, 24), glowMaterial(0xfff3b0));
-    ring.rotation.x = Math.PI / 2;
-    ring.position.y = 3.0 + dy;
-    halo.add(ring);
-  }
-  cosmetics.set('twin-halo', halo);
-
-  // ---- Evolved tiers (levels 35–95): each one replaces its slot's earlier
-  // piece with a grander form, in the same original design language. Small
-  // shared builders keep the fourteen shapes from becoming fourteen snowflakes.
-
-  const flatRing = (radius: number, tube: number, y: number, color: number) => {
-    const ring = new THREE.Mesh(new THREE.TorusGeometry(radius, tube, 8, 32), glowMaterial(color));
-    ring.rotation.x = Math.PI / 2;
-    ring.position.y = y;
-    return ring;
+  /** Register render-time motion for a piece, capturing its rest pose. */
+  const moves = <T extends THREE.Object3D>(object: T, motion: Motion): T => {
+    motors.push({
+      object,
+      motion,
+      restY: object.position.y,
+      restRoll: object.rotation.z,
+      restScale: object.scale.x,
+    });
+    return object;
   };
-  const orbitBits = (
-    count: number,
-    radius: number,
-    y: number,
-    size: number,
-    colors: readonly number[],
+
+  /** A flat light panel (feather, halo ring, streak) of the given size. */
+  const panel = (url: string, color: number, w: number, h: number, opacity = 1) =>
+    new THREE.Mesh(new THREE.PlaneGeometry(w, h), cosmeticPanel(url, color, opacity));
+
+  /** A camera-facing mote of light. */
+  const mote = (color: number, size: number, opacity = 1) => {
+    const sprite = new THREE.Sprite(cosmeticSprite(wispUrl, color, opacity));
+    sprite.scale.setScalar(size);
+    return sprite;
+  };
+
+  /** A horizontal ring of light — halos above, energy rings underfoot. */
+  const ring = (color: number, radius: number, y: number, opacity = 1) => {
+    const disc = panel(haloRingUrl, color, radius * 2, radius * 2, opacity);
+    disc.rotation.x = -Math.PI / 2;
+    disc.position.y = y;
+    return disc;
+  };
+
+  /**
+   * A pair of wings: `plan` feathers per side, each a light panel swept
+   * back and fanned upward from the shoulder blade. Side pivots carry the
+   * beat, so the two wings always flap in mirror.
+   */
+  const wings = (
+    plan: ReadonlyArray<{ length: number; lift: number; sweep: number; color: number }>,
+    beat: number,
   ) => {
+    const group = new THREE.Group();
+    for (const side of [-1, 1]) {
+      const pivot = new THREE.Group();
+      pivot.position.set(side * S.wings.anchorX, S.wings.anchorY, S.wings.anchorZ);
+      for (const { length, lift, sweep, color } of plan) {
+        // Each feather hangs off a bone rotating at the shoulder, so lift
+        // swings the whole feather up like a wing instead of spinning it
+        // about its own middle.
+        const bone = new THREE.Group();
+        bone.rotation.y = side * sweep;
+        bone.rotation.z = side * lift;
+        const feather = panel(featherUrl, color, length, length * 0.5);
+        // The texture runs root → tip along +x: push it out half its length
+        // so the root sits at the shoulder joint.
+        feather.position.x = (side * length) / 2;
+        if (side < 0) feather.scale.x = -1; // mirror the sweep, not the art
+        bone.add(feather);
+        pivot.add(bone);
+      }
+      moves(pivot, { flap: { amp: side * beat, speed: S.wings.beatSpeed } });
+      group.add(pivot);
+    }
+    return group;
+  };
+
+  /** A comet streak trailing behind the hero, head forward. */
+  const streak = (color: number, length: number, x: number, y: number, opacity = 1) => {
+    const trail = panel(streakUrl, color, length, length * 0.28, opacity);
+    // The sheet runs head → tail along +x; turn it to stream backwards.
+    trail.rotation.y = Math.PI / 2;
+    trail.position.set(x, y, -S.trail.offsetZ - length / 2);
+    return moves(trail, { pulse: { amp: S.trail.flicker, speed: S.trail.flickerSpeed } });
+  };
+
+  /** A ring of orbiting spirit motes. */
+  const spirits = (count: number, radius: number, y: number, size: number, colors: readonly number[], spin: number) => {
     const group = new THREE.Group();
     for (let i = 0; i < count; i++) {
       const angle = (i / count) * Math.PI * 2;
-      const bit = new THREE.Mesh(
-        new THREE.OctahedronGeometry(size),
-        glowMaterial(colors[i % colors.length] ?? 0xffffff),
+      const spirit = mote(colors[i % colors.length] ?? 0xffffff, size);
+      spirit.position.set(Math.cos(angle) * radius, Math.sin(angle * 2) * 0.12, Math.sin(angle) * radius);
+      group.add(spirit);
+    }
+    group.position.y = y;
+    return moves(group, { spin, bob: { amp: S.wisps.bob, speed: S.wisps.bobSpeed } });
+  };
+
+  /** A crown: a solid band the hero wears, ringed with prongs and jewels. */
+  const crown = (
+    band: number,
+    prong: number,
+    jewel: number,
+    prongs: number,
+    prongHeight: number,
+  ) => {
+    const group = new THREE.Group();
+    const circlet = new THREE.Mesh(
+      new THREE.TorusGeometry(S.crown.radius, 0.035, 12, 40),
+      glowSurface(band, 0.95),
+    );
+    circlet.rotation.x = Math.PI / 2;
+    group.add(circlet);
+    for (let i = 0; i < prongs; i++) {
+      const angle = (i / prongs) * Math.PI * 2;
+      const spike = new THREE.Mesh(
+        new THREE.ConeGeometry(0.045, prongHeight, 10),
+        glowSurface(prong, 0.95),
       );
-      bit.position.set(Math.cos(angle) * radius, y + Math.sin(angle * 2) * 0.08, Math.sin(angle) * radius);
-      group.add(bit);
+      spike.position.set(
+        Math.cos(angle) * S.crown.radius,
+        prongHeight / 2,
+        Math.sin(angle) * S.crown.radius,
+      );
+      group.add(spike);
+      // A jewel of light at the foot of every prong.
+      const gem = mote(jewel, 0.16);
+      gem.position.set(Math.cos(angle) * S.crown.radius, 0.02, Math.sin(angle) * S.crown.radius);
+      group.add(gem);
     }
-    return group;
-  };
-  const wingFan = (colors: readonly [number, number, number], lengthScale: number) => {
-    const group = new THREE.Group();
-    const feathers: Array<[number, number, number, number]> = [
-      [0.32, 1.5, 2.45, 1.6],
-      [0.24, 1.15, 2.15, 1.42],
-      [0.17, 0.85, 1.85, 1.24],
-    ];
-    for (const side of [-1, 1]) {
-      feathers.forEach(([radius, length, tilt, y], i) => {
-        const scaled = length * lengthScale;
-        const feather = new THREE.Mesh(
-          new THREE.ConeGeometry(radius * lengthScale, scaled, 6),
-          glowMaterial(colors[i] ?? 0xffffff),
-        );
-        feather.position.set(side * (0.45 + scaled * 0.28), y, -0.4);
-        feather.rotation.z = side * tilt;
-        group.add(feather);
-      });
-    }
-    return group;
-  };
-  const cometTrail = (colors: readonly number[], spread: number) => {
-    const group = new THREE.Group();
-    colors.forEach((color, i) => {
-      const trail = new THREE.Mesh(new THREE.ConeGeometry(0.18, 1.2, 8), glowMaterial(color));
-      trail.position.set((i - (colors.length - 1) / 2) * spread, 1.0 + i * 0.18, -0.7);
-      trail.rotation.x = Math.PI / 2;
-      group.add(trail);
-    });
-    return group;
+    group.position.y = S.crown.y;
+    return moves(group, { spin: S.crown.spin });
   };
 
-  // wisps II — storm wisps: more spirits, brighter, riding higher.
-  cosmetics.set('storm-wisps', orbitBits(5, 0.75, 1.7, 0.11, [0xbfefff, 0x7ad7ff]));
+  // ---- ring slot: energy circling the hero's feet -------------------------
 
-  // crown II — blazing crown: the ring catches fire.
-  const blazing = new THREE.Group();
-  blazing.add(flatRing(0.32, 0.05, 0, 0xffb02e));
+  const crimson = new THREE.Group();
+  crimson.add(ring(0xff3b3b, 0.85, 0.14));
+  cosmetics.set('crimson-aura', moves(crimson, { spin: 0.5, pulse: { amp: 0.05, speed: 1.7 } }));
+
+  const inferno = new THREE.Group();
+  inferno.add(ring(0xff5a2e, 0.95, 0.12));
+  inferno.add(ring(0xffb02e, 0.72, 0.3, 0.85));
   for (let i = 0; i < 6; i++) {
     const angle = (i / 6) * Math.PI * 2;
-    const flame = new THREE.Mesh(new THREE.ConeGeometry(0.055, 0.3, 6), glowMaterial(0xff7a2e));
-    flame.position.set(Math.cos(angle) * 0.32, 0.16, Math.sin(angle) * 0.32);
-    blazing.add(flame);
+    const ember = mote(0xff8f3a, 0.3);
+    ember.position.set(Math.cos(angle) * 0.92, 0.3, Math.sin(angle) * 0.92);
+    inferno.add(ember);
   }
-  blazing.position.y = 2.85;
-  cosmetics.set('blazing-crown', blazing);
+  cosmetics.set('inferno-ring', moves(inferno, { spin: -0.7, pulse: { amp: 0.07, speed: 2.3 } }));
 
-  // wings II — phoenix wings: longer, burning warm.
-  cosmetics.set('phoenix-wings', wingFan([0xffb347, 0xffe14d, 0xff8f5a], 1.2));
-
-  // ring II (Landmark 50) — inferno ring: a double band wreathed in flame.
-  const inferno = new THREE.Group();
-  inferno.add(flatRing(0.9, 0.06, 0.15, 0xff5a2e));
-  inferno.add(flatRing(0.72, 0.045, 0.22, 0xffb02e));
-  for (let i = 0; i < 8; i++) {
-    const angle = (i / 8) * Math.PI * 2;
-    const tongue = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.34, 6), glowMaterial(0xff8f3a));
-    tongue.position.set(Math.cos(angle) * 0.9, 0.34, Math.sin(angle) * 0.9);
-    inferno.add(tongue);
-  }
-  cosmetics.set('inferno-ring', inferno);
-
-  // trail II — twin comet trail.
-  cosmetics.set('twin-comet-trail', cometTrail([0xffa94d, 0xffe14d], 0.34));
-
-  // halo II — radiant halo: one great ring with light spokes.
-  const radiant = new THREE.Group();
-  radiant.add(flatRing(0.55, 0.05, 0, 0xfff3b0));
-  for (let i = 0; i < 8; i++) {
-    const angle = (i / 8) * Math.PI * 2;
-    const spoke = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.025, 0.025), glowMaterial(0xfff8d9));
-    spoke.position.set(Math.cos(angle) * 0.55, 0, Math.sin(angle) * 0.55);
-    spoke.rotation.y = -angle;
-    radiant.add(spoke);
-  }
-  radiant.position.y = 3.05;
-  cosmetics.set('radiant-halo', radiant);
-
-  // A storm cosmetic arcs in its own palette; the color is stamped where
-  // the piece is built, so recoloring the piece recolors its lightning.
-  const storms = (group: THREE.Object3D, arcColor: number) => {
-    group.userData.arcColor = arcColor;
-    return group;
-  };
-
-  // wisps III — thunder spirits: the wisps learn lightning.
-  const thunder = new THREE.Group();
-  thunder.add(orbitBits(5, 0.8, 1.6, 0.12, [0x9be7ff, 0xd9f4ff]));
-  for (let i = 0; i < 3; i++) {
-    const angle = (i / 3) * Math.PI * 2 + 0.5;
-    const bolt = new THREE.Group();
-    const upper = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.22, 0.035), glowMaterial(0xeaffff));
-    upper.rotation.z = 0.5;
-    const lower = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.22, 0.035), glowMaterial(0xeaffff));
-    lower.position.y = -0.18;
-    lower.rotation.z = -0.5;
-    bolt.add(upper);
-    bolt.add(lower);
-    bolt.position.set(Math.cos(angle) * 0.85, 2.0, Math.sin(angle) * 0.85);
-    thunder.add(bolt);
-  }
-  cosmetics.set('thunder-spirits', storms(thunder, 0x9be7ff));
-
-  // wings III — galaxy wings: cosmic violet-cyan, grandest span.
-  cosmetics.set('galaxy-wings', wingFan([0x8f5aff, 0x3ac0ff, 0xd9b3ff], 1.4));
-
-  // crown III (Landmark 75) — celestial crown: stars ride the ring.
-  const celestial = new THREE.Group();
-  celestial.add(flatRing(0.36, 0.045, 0, 0xfff3ff));
-  for (let i = 0; i < 8; i++) {
-    const angle = (i / 8) * Math.PI * 2;
-    const star = new THREE.Mesh(new THREE.OctahedronGeometry(0.055), glowMaterial(0xd9e8ff));
-    star.position.set(Math.cos(angle) * 0.36, 0.1, Math.sin(angle) * 0.36);
-    celestial.add(star);
-  }
-  const crest = new THREE.Mesh(new THREE.OctahedronGeometry(0.11), glowMaterial(0xffffff));
-  crest.position.y = 0.38;
-  celestial.add(crest);
-  celestial.position.y = 2.9;
-  cosmetics.set('celestial-crown', celestial);
-
-  // trail III — starfall trail: the comet sheds falling stars.
-  const starfall = new THREE.Group();
-  starfall.add(cometTrail([0xffd24d], 0));
-  for (let i = 0; i < 4; i++) {
-    const fleck = new THREE.Mesh(new THREE.OctahedronGeometry(0.06), glowMaterial(0xfff3b0));
-    fleck.position.set((i % 2) * 0.3 - 0.15, 0.9 - i * 0.12, -1.1 - i * 0.25);
-    starfall.add(fleck);
-  }
-  cosmetics.set('starfall-trail', starfall);
-
-  // ring III — nova ring: three tilted bands like a newborn star system.
   const nova = new THREE.Group();
-  const novaBands: Array<[number, number, number]> = [
-    [0.95, 0.28, 0xffd24d],
-    [0.8, -0.24, 0xff7a4d],
-    [0.65, 0.12, 0xfff3b0],
-  ];
-  for (const [radius, tilt, color] of novaBands) {
-    const band = flatRing(radius, 0.04, 0, color);
-    band.rotation.x = Math.PI / 2 + tilt;
-    band.position.y = 0.25;
+  for (const [radius, tilt, color] of [
+    [0.98, 0.3, 0xffd24d],
+    [0.82, -0.26, 0xff7a4d],
+    [0.66, 0.13, 0xfff3b0],
+  ] as const) {
+    const band = ring(color, radius, 0.26);
+    band.rotation.x = -Math.PI / 2 + tilt;
     nova.add(band);
   }
-  cosmetics.set('nova-ring', nova);
+  cosmetics.set('nova-ring', moves(nova, { spin: 0.9, pulse: { amp: 0.06, speed: 2.6 } }));
 
-  // halo III — aurora halo: stacked dawn-colored rings.
-  const aurora = new THREE.Group();
-  const auroraRings: Array<[number, number]> = [
-    [0x7dffd0, 0],
-    [0xb18fff, 0.16],
-    [0xffe9a3, 0.32],
-  ];
-  for (const [color, dy] of auroraRings) {
-    aurora.add(flatRing(0.5 - dy * 0.35, 0.035, dy, color));
-  }
-  aurora.position.y = 3.0;
-  cosmetics.set('aurora-halo', aurora);
+  // ---- crown slot ---------------------------------------------------------
 
-  // wisps IV — spirit storm: two full rings of spirits.
+  cosmetics.set('energy-crown', crown(0xffd700, 0xffe14d, 0xfff3b0, 5, 0.2));
+  cosmetics.set('blazing-crown', crown(0xffb02e, 0xff7a2e, 0xffd24d, 7, 0.28));
+  const celestial = crown(0xfff3ff, 0xd9e8ff, 0xffffff, 8, 0.24);
+  const crest = mote(0xffffff, 0.34);
+  crest.position.y = 0.36;
+  celestial.add(crest);
+  cosmetics.set('celestial-crown', celestial);
+
+  // ---- wisps slot: spirits orbiting the fighter ---------------------------
+
+  cosmetics.set('lightning-wisps', spirits(3, 0.72, 1.7, 0.3, [0x9be7ff], 0.9));
+  cosmetics.set('storm-wisps', spirits(5, 0.78, 1.7, 0.34, [0xbfefff, 0x7ad7ff], 1.1));
+  cosmetics.set('thunder-spirits', spirits(5, 0.82, 1.65, 0.4, [0x9be7ff, 0xeaffff], 1.3));
   const spiritStorm = new THREE.Group();
-  spiritStorm.add(orbitBits(5, 0.95, 1.15, 0.11, [0x7ad7ff, 0xd9b3ff]));
-  spiritStorm.add(orbitBits(4, 0.7, 2.0, 0.1, [0xd9b3ff, 0x7ad7ff]));
-  cosmetics.set('spirit-storm', storms(spiritStorm, 0xd9b3ff));
+  spiritStorm.add(spirits(5, 0.95, 1.15, 0.36, [0x7ad7ff, 0xd9b3ff], 1.2));
+  spiritStorm.add(spirits(4, 0.72, 2.0, 0.32, [0xd9b3ff, 0x7ad7ff], -1.5));
+  cosmetics.set('spirit-storm', spiritStorm);
 
-  // form (Landmark 100) — the Legend state: a permanent radiant mantle of
-  // light around the whole hero, crowned by a slow-burning star.
+  // ---- wings slot ---------------------------------------------------------
+
+  // Lift dominates sweep: the fan rises into a V behind the shoulders, so
+  // the wings still read from the arena's side-on camera.
+  cosmetics.set(
+    'energy-wings',
+    wings(
+      [
+        { length: 1.6, lift: 1.24, sweep: 0.34, color: 0x7dffa0 },
+        { length: 1.35, lift: 0.92, sweep: 0.44, color: 0x9dffc4 },
+        { length: 1.05, lift: 0.6, sweep: 0.56, color: 0xc9ffe0 },
+      ],
+      0.1,
+    ),
+  );
+  cosmetics.set(
+    'phoenix-wings',
+    wings(
+      [
+        { length: 2.0, lift: 1.3, sweep: 0.3, color: 0xffb347 },
+        { length: 1.7, lift: 1.0, sweep: 0.4, color: 0xffe14d },
+        { length: 1.35, lift: 0.7, sweep: 0.52, color: 0xff8f5a },
+        { length: 1.0, lift: 0.4, sweep: 0.64, color: 0xffd9a3 },
+      ],
+      0.13,
+    ),
+  );
+  cosmetics.set(
+    'galaxy-wings',
+    wings(
+      [
+        { length: 2.3, lift: 1.34, sweep: 0.28, color: 0x8f5aff },
+        { length: 1.95, lift: 1.04, sweep: 0.38, color: 0x3ac0ff },
+        { length: 1.6, lift: 0.74, sweep: 0.5, color: 0xd9b3ff },
+        { length: 1.2, lift: 0.44, sweep: 0.62, color: 0xeaf4ff },
+      ],
+      0.16,
+    ),
+  );
+
+  // ---- trail slot ---------------------------------------------------------
+
+  const comet = new THREE.Group();
+  comet.add(streak(0xffa94d, 1.5, 0, 1.25));
+  cosmetics.set('comet-trail', comet);
+
+  const twinComet = new THREE.Group();
+  twinComet.add(streak(0xffa94d, 1.5, -0.22, 1.35));
+  twinComet.add(streak(0xffe14d, 1.3, 0.22, 1.1));
+  cosmetics.set('twin-comet-trail', twinComet);
+
+  const starfall = new THREE.Group();
+  starfall.add(streak(0xffd24d, 1.7, 0, 1.3));
+  for (let i = 0; i < 5; i++) {
+    const fleck = mote(0xfff3b0, 0.26 - i * 0.02);
+    fleck.position.set((i % 2 ? 0.28 : -0.28), 1.5 - i * 0.16, -1.0 - i * 0.32);
+    starfall.add(fleck);
+  }
+  cosmetics.set('starfall-trail', moves(starfall, { bob: { amp: 0.06, speed: 2.2 } }));
+
+  // ---- halo slot: rings of light above the head ---------------------------
+
+  const twinHalo = new THREE.Group();
+  twinHalo.add(ring(0xfff3b0, 0.44, 0));
+  twinHalo.add(ring(0xffffff, 0.32, 0.16, 0.8));
+  twinHalo.position.y = S.halo.y;
+  twinHalo.rotation.z = S.halo.tilt;
+  cosmetics.set('twin-halo', moves(twinHalo, { spin: 0.6, bob: { amp: S.halo.bob, speed: 1.4 } }));
+
+  const radiant = new THREE.Group();
+  radiant.add(ring(0xfff3b0, 0.56, 0));
+  for (let i = 0; i < 8; i++) {
+    const angle = (i / 8) * Math.PI * 2;
+    const spoke = mote(0xfff8d9, 0.2);
+    spoke.position.set(Math.cos(angle) * 0.56, 0, Math.sin(angle) * 0.56);
+    radiant.add(spoke);
+  }
+  radiant.position.y = S.halo.y;
+  radiant.rotation.z = S.halo.tilt;
+  cosmetics.set('radiant-halo', moves(radiant, { spin: 0.8, bob: { amp: S.halo.bob, speed: 1.2 } }));
+
+  const aurora = new THREE.Group();
+  aurora.add(ring(0x7dffd0, 0.58, 0));
+  aurora.add(ring(0xb18fff, 0.46, 0.14, 0.9));
+  aurora.add(ring(0xffe9a3, 0.34, 0.28, 0.8));
+  aurora.position.y = S.halo.y;
+  aurora.rotation.z = S.halo.tilt;
+  cosmetics.set('aurora-halo', moves(aurora, { spin: 0.5, bob: { amp: S.halo.bob, speed: 1.1 } }));
+
+  // ---- form slot: the Legend state ---------------------------------------
+
   const legend = new THREE.Group();
-  const mantle = new THREE.Mesh(buildAuraGeometry(), glowSurface(0xfff0c9, 0.14));
-  mantle.scale.set(1.12, 0.92, 1.12);
-  legend.add(mantle);
-  legend.add(flatRing(0.62, 0.05, 3.2, 0xffffff));
-  legend.add(flatRing(0.42, 0.04, 3.38, 0xffe9a3));
-  const legendStar = new THREE.Mesh(new THREE.OctahedronGeometry(0.16), glowMaterial(0xffffff));
-  legendStar.position.y = 3.62;
-  legend.add(legendStar);
+  const mantle = new THREE.Mesh(buildAuraGeometry(), glowSurface(0xfff0c9, 0.16));
+  // Uniform on purpose: the breathing pulse scales it as one.
+  mantle.scale.setScalar(1.06);
+  legend.add(moves(mantle, { pulse: { amp: 0.03, speed: 1.3 }, spin: 0.25 }));
+  const legendHalo = new THREE.Group();
+  legendHalo.add(ring(0xffffff, 0.62, 0));
+  legendHalo.add(ring(0xffe9a3, 0.44, 0.18, 0.9));
+  legendHalo.position.y = S.halo.y + 0.18;
+  legendHalo.rotation.z = -S.halo.tilt;
+  legend.add(moves(legendHalo, { spin: -0.7, bob: { amp: 0.05, speed: 1.5 } }));
+  const legendStar = mote(0xffffff, 0.5);
+  legendStar.position.y = S.halo.y + 0.62;
+  legend.add(moves(legendStar, { pulse: { amp: 0.16, speed: 2.4 } }));
   cosmetics.set('legend', legend);
 
   return cosmetics;
