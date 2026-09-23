@@ -10,8 +10,11 @@ A self-contained, offline 3D multiplication game (times tables 1–12) for two k
 
 ## Work model
 
-- The spec is GitHub issue **#1**; tickets are **#2–#12**, each labeled `ready-for-agent` with explicit "Blocked by" edges. Work the frontier: any ticket whose blockers are closed. Check acceptance criteria off in the issue; close the ticket when all are met. Never modify or close #1.
-- Ticket #2 (walking skeleton) establishes the toolchain and both test harnesses; every later ticket extends them.
+- Work comes as **spec issues** on GitHub, each with tickets labeled `ready-for-agent`. Every ticket names its spec under "Parent" and lists its "Blocked by" edges. Work the frontier: any open ticket whose blockers are closed. Check acceptance criteria off in the ticket; close the ticket when all are met. Never modify or close a spec issue.
+- Open specs:
+  - **#44 Every device** — tickets #46, #47, #48, #57 (layout by screen shape, WebKit smoke set, hosted install; ADR 0006).
+  - **#45 Arcade look** — tickets #49–#56, #58 (Blender-built hero, Training Dummy, and arena; Hair Style; ADR 0007). Install a Blender MCP before #49; the committed Blender script is the record, never a hand-edited `.blend` or `.glb`.
+- Closed history: #1 (v1, tickets #2–#12; #2 set up the toolchain and both test harnesses), #13, #20, #24, #29, #43.
 
 ## Hard rules
 
