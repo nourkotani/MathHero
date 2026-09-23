@@ -27,5 +27,21 @@ export default defineConfig({
         launchOptions: { args: ['--enable-unsafe-swiftshader'] },
       },
     },
+    {
+      // iPhone 17 Pro held in portrait (402×874 CSS px), by touch. Only the
+      // layout suite runs here: the full suite on a second project would
+      // double the ~12-minute gate. Layout is in CSS px, so DPR 1 keeps
+      // software WebGL fast without changing what the child sees.
+      name: 'iphone-17-pro',
+      testMatch: /layout\.spec\.ts/,
+      use: {
+        browserName: 'chromium',
+        viewport: { width: 402, height: 874 },
+        deviceScaleFactor: 1,
+        isMobile: true,
+        hasTouch: true,
+        launchOptions: { args: ['--enable-unsafe-swiftshader'] },
+      },
+    },
   ],
 });

@@ -70,8 +70,9 @@ export function createPipeline(
       speedLinesPass.enabled = next === 'full';
     },
     setSize(width, height) {
-      renderer.setSize(width, height);
-      composer.setSize(width, height);
+      // updateStyle=false: the CSS owns the canvas box (see index.ts).
+      renderer.setSize(width, height, false);
+      composer.setSize(width, height, false);
     },
     flashSpeedLines() {
       if (tier === 'full') speedLines.flash();

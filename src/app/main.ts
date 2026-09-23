@@ -8,6 +8,7 @@ import { createRenderer } from '../renderer';
 import { App } from '../ui/App';
 import type { BestCelebration } from '../ui/App';
 import { manualClock, realClock } from './clock';
+import { blockPageZoom, watchLayout } from './layout';
 import type { ManualClock } from './clock';
 import { createStore } from './store';
 
@@ -28,6 +29,10 @@ const testMode = params.has('testClock');
 
 const seedParam = params.get('seed');
 const seed = seedParam !== null ? Number(seedParam) : Date.now() >>> 0;
+
+// The Layout follows the viewport's shape; the CSS does the rest.
+watchLayout();
+blockPageZoom();
 
 const clock = testMode ? manualClock() : realClock();
 const persistence = localStorageAdapter();
@@ -64,6 +69,8 @@ store.subscribe((state, effects) => {
       });
     }
   }
+  // The CSS gives the stacked Round its arena region by screen.
+  document.documentElement.dataset.screen = state.phase;
   if (state.phase !== 'results') {
     newBest = null;
     levelUps = [];

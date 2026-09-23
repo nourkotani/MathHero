@@ -8,7 +8,7 @@ export function RoundScreen({ state, dispatch }: AppProps) {
   const tier = tierForStreak(state.streak);
   const skill = skillFor(state.skill);
   return (
-    <div class="hud">
+    <div class="hud round">
       <button
         class="corner-button quit-button"
         data-testid="quit-round"

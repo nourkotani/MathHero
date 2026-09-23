@@ -28,6 +28,13 @@ body {
   font-family: 'Segoe UI', system-ui, sans-serif;
   user-select: none;
   color: var(--text);
+  /* Shows wherever the canvas does not: the pad panel of the stacked Round. */
+  background: radial-gradient(ellipse at 50% 0%, #1d2350 0%, #0b0e22 70%);
+  /* Touch: no pinch or double-tap zoom, no pan, no grey tap flash, no
+     long-press callout. Taps still become clicks. */
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
 }
 
 #scene {
@@ -49,7 +56,9 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 1.5rem;
+  /* Clear of the Dynamic Island, the home bar, and the rounded corners. */
+  padding: max(1.5rem, env(safe-area-inset-top)) max(1.5rem, env(safe-area-inset-right))
+    max(1.5rem, env(safe-area-inset-bottom)) max(1.5rem, env(safe-area-inset-left));
   animation: screen-in 0.25s ease-out;
 }
 
@@ -1291,4 +1300,109 @@ body {
   font-size: 1.5rem;
   color: var(--text-dim);
   text-shadow: 0 2px 8px rgba(0, 0, 0, 0.8);
+}
+
+/* ---------- Stacked Round (Layout: a tall screen) ---------- */
+
+/* The arena takes the top of the screen and the canvas shrinks to it; the
+   score and countdown float over the arena, and the Question and the pad
+   fill the bottom, in thumb reach. */
+:root {
+  --arena-h: 42vh;
+  --arena-h: 42svh;
+  --safe-top: max(1rem, env(safe-area-inset-top));
+}
+
+html[data-layout='stacked'][data-screen='in-round'] #scene {
+  height: var(--arena-h);
+}
+
+html[data-layout='stacked'] .round {
+  padding-top: calc(var(--arena-h) + 0.4rem);
+}
+
+html[data-layout='stacked'] .round .round-top {
+  position: absolute;
+  top: var(--safe-top);
+  left: max(1rem, env(safe-area-inset-left));
+  right: max(1rem, env(safe-area-inset-right));
+  width: auto;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+html[data-layout='stacked'] .round .score,
+html[data-layout='stacked'] .round .countdown {
+  font-size: 2rem;
+}
+
+html[data-layout='stacked'] .round .multiplier {
+  font-size: 1.6rem;
+}
+
+html[data-layout='stacked'] .round .practice-badge {
+  font-size: 1rem;
+}
+
+html[data-layout='stacked'] .round .quit-button {
+  top: calc(var(--safe-top) + 3rem);
+  bottom: auto;
+  left: max(1rem, env(safe-area-inset-left));
+  font-size: 1rem;
+}
+
+html[data-layout='stacked'] .round .question {
+  /* Centered in the space between the arena and the pad. */
+  margin-block: auto;
+  font-size: clamp(1.8rem, 9vw, 2.8rem);
+  text-align: center;
+}
+
+html[data-layout='stacked'] .round .machine-panel,
+html[data-layout='stacked'] .round .rule-cards {
+  margin-block: auto;
+}
+
+html[data-layout='stacked'] .round .machine-panel {
+  padding: 0.4rem 1.2rem 0.5rem;
+}
+
+html[data-layout='stacked'] .round .machine-title {
+  font-size: 0.9rem;
+  margin-bottom: 0.1rem;
+}
+
+html[data-layout='stacked'] .round .machine-row {
+  font-size: 1.4rem;
+}
+
+html[data-layout='stacked'] .round .machine-panel .machine-query.question {
+  font-size: 1.9rem;
+}
+
+html[data-layout='stacked'] .round .rule-card {
+  min-width: min(16rem, 80vw);
+}
+
+html[data-layout='stacked'] .round .number-pad {
+  margin-top: auto;
+  gap: 0.55rem;
+}
+
+html[data-layout='stacked'] .round .pad-key {
+  height: 4rem;
+}
+
+html[data-layout='stacked'] .round .feedback {
+  margin-block: auto;
+  padding: 1rem 1.5rem;
+  max-width: 100%;
+}
+
+html[data-layout='stacked'] .round .feedback-title {
+  font-size: 1.2rem;
+}
+
+html[data-layout='stacked'] .round .feedback-equation {
+  font-size: clamp(1.8rem, 9vw, 2.6rem);
 }

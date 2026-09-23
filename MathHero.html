@@ -2,7 +2,13 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- viewport-fit=cover lets the page reach under the Dynamic Island and the
+         home bar; the CSS keeps content clear of them with the safe-area insets.
+         No zoom: a fast double-tap on the pad must never zoom mid-Round. -->
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
+    />
     <title>MathHero</title>
   </head>
   <body>

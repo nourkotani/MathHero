@@ -36,7 +36,10 @@ export interface Renderer {
 export function createRenderer(canvas: HTMLCanvasElement): Renderer {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-  renderer.setSize(window.innerWidth, window.innerHeight);
+  // The CSS owns the canvas box (the arena region of the Layout); the
+  // drawing buffer follows it. updateStyle=false everywhere: an inline px
+  // size would pin the box and the observer below would never fire again.
+  renderer.setSize(canvas.clientWidth || 1, canvas.clientHeight || 1, false);
   // One directional shadow grounds the characters (see stage.ts).
   renderer.shadowMap.enabled = true;
   // PCF with a blur radius on the sun (stage.ts): three r185 deprecated
@@ -46,7 +49,12 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
   const scene = new THREE.Scene();
   const stage = createStage(scene);
 
-  const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 100);
+  const camera = new THREE.PerspectiveCamera(
+    50,
+    (canvas.clientWidth || 1) / (canvas.clientHeight || 1),
+    0.1,
+    100,
+  );
   const rig = createCameraRig(camera);
   const pipeline = createPipeline(renderer, scene, camera, stage.sunDisc);
 
@@ -150,11 +158,16 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     reactions.refreshForm();
   }
 
-  window.addEventListener('resize', () => {
-    camera.aspect = window.innerWidth / window.innerHeight;
+  // The arena region changes with the window, a turned device, and the
+  // stacked Round; the canvas box is the one source of its size.
+  new ResizeObserver(() => {
+    const width = canvas.clientWidth;
+    const height = canvas.clientHeight;
+    if (width === 0 || height === 0) return;
+    camera.aspect = width / height;
     camera.updateProjectionMatrix();
-    pipeline.setSize(window.innerWidth, window.innerHeight);
-  });
+    pipeline.setSize(width, height);
+  }).observe(canvas);
 
   return {
     onStoreUpdate(state, effects) {

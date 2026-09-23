@@ -100,6 +100,9 @@ Each device (a computer, an iPhone, an iPad) keeps its **own** Save File; nothin
 ### Screens
 Title (player select, Family Leaderboard, New Hero, settings: export/import + sound toggle) → Hero creation (new players only) → Pre-round (skill + difficulty + timer + Start) → Round (3D arena) → Results (score, best streak, XP gained, level-up ceremony, personal-best celebration) → back to Title.
 
+### Layout
+The shape of the screen, never the device type, picks the layout. A tall screen (a phone or an iPad in portrait) uses the **stacked** layout: the arena on top, the Question and number pad below. A wide screen (a computer, or an iPad in landscape) uses the **side-by-side** layout. Turning a device changes the layout at once.
+
 ### Sound
 All effects are synthesized in-browser (no audio asset files): power-up hums, hit zaps, level-up fanfares. Mute toggle on the Title screen. No background music.
 
