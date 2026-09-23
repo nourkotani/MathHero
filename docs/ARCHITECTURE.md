@@ -1,6 +1,6 @@
 # MathHero Architecture
 
-Vocabulary comes from [`CONTEXT.md`](../CONTEXT.md) — use its terms verbatim. Packaging constraints are fixed by [ADR 0001](./adr/0001-static-single-file-with-localstorage.md); the UI/language stack by [ADR 0002](./adr/0002-typescript-preact-local-verification.md); the core contract by [ADR 0003](./adr/0003-core-emits-effects.md).
+Vocabulary comes from [`CONTEXT.md`](../CONTEXT.md) — use its terms verbatim. Packaging constraints are fixed by [ADR 0001](./adr/0001-static-single-file-with-localstorage.md); the UI/language stack by [ADR 0002](./adr/0002-typescript-preact-local-verification.md); the core contract by [ADR 0003](./adr/0003-core-emits-effects.md); the hosted install by [ADR 0006](./adr/0006-hosted-install-alongside-the-single-file.md); the Blender art pipeline by [ADR 0007](./adr/0007-scripted-blender-models-as-baked-output.md).
 
 ## Stack
 
@@ -11,10 +11,12 @@ Vocabulary comes from [`CONTEXT.md`](../CONTEXT.md) — use its terms verbatim. 
 | 2D UI | Preact — declarative DOM overlay above the canvas |
 | Build | Vite + single-file inlining to one self-contained `MathHero.html` |
 | Core tests | Vitest, headless |
-| Flow tests | Playwright, run against the **built** `MathHero.html` |
+| Flow tests | Playwright, run against the **built** `MathHero.html` — full suite on Chromium, plus a WebKit smoke set at phone and iPad viewports (ADR 0006) |
 | Audio | WebAudio synthesis only — no audio files |
 | Persistence | localStorage + explicit JSON export/import |
 | Lint/format | ESLint + Prettier |
+| 3D art | Blender, driven by committed `bpy` scripts; `npm run bake:models` exports meshopt glTF (ADR 0007) |
+| Distribution | The single file (double-click or an offline viewer app), and a hosted copy on GitHub Pages with a manifest + service worker, deployed by a manual `npm run deploy` (ADR 0006) |
 
 There is no CI: `npm run check` (typecheck → lint → core tests → build → flow tests against the build) is the gate, and it must pass locally before every commit.
 
@@ -61,8 +63,8 @@ Violations only surface in the built artifact, which is why the flow-test suite 
 
 ## Rendering & performance
 
-- Budget: **60fps on integrated graphics** — this runs on a family machine, not a gaming rig.
-- The hero, arena, Training Dummy, and all effects are procedural (geometry, materials, shaders, particles). Painted textures are **baked, not authored**: `scripts/bake-textures.mjs` generates them deterministically (seeded noise, no external art) into `src/renderer/textures/`, and the build inlines them into the single file ([ADR 0005](./adr/0005-baked-painted-textures-and-tier-ladder.md)). No downloaded or hand-drawn asset files.
+- Budget: **60fps on the family's devices** — powerful desktops and iPhones first; the iPad relies on the quality ladder.
+- The hero, arena, and Training Dummy are baked from committed Blender scripts into inlined glTF ([ADR 0007](./adr/0007-scripted-blender-models-as-baked-output.md)); light-based effects (aura, arcs, motes, cosmetics, blasts) stay procedural (materials, shaders, particles). Painted textures are **baked, not authored**: `scripts/bake-textures.mjs` generates them deterministically (seeded noise, no external art) into `src/renderer/textures/`, and the build inlines them into the single file ([ADR 0005](./adr/0005-baked-painted-textures-and-tier-ladder.md)). No downloaded or hand-drawn asset files.
 - Transformation glow is real selective bloom via the pmndrs `postprocessing` composer; the strongest tier adds sun shafts and speed-lines, and sustained low fps sheds one tier at a time down to the additive-sprite fallback ([ADR 0004](./adr/0004-composer-bloom-with-sprite-fallback.md), amended by [ADR 0005](./adr/0005-baked-painted-textures-and-tier-ladder.md)).
 - All readable text (questions, score, menus, HUD) lives in the Preact DOM overlay, never rendered inside the canvas.
 

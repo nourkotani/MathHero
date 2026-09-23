@@ -8,7 +8,7 @@ A self-contained, offline 3D math practice game for kids — multiplication, div
 The kind of math a Round trains: **Multiply** ✖️, **Divide** ➗, **Machine** ⚙️ (crack the secret rule of an input→output machine), or **Pattern** 🔁 (continue or name a number sequence). Chosen on the Pre-round screen before Difficulty. All Skills draw from the same Facts; each Skill tracks its own mastery data and Personal Bests, while XP / Hero Level is one shared pool fed by every Round regardless of Skill. Each Skill defines how a Fact is worn (displayed) and graded, its base-point scale, and its mastery window — adding a future Skill means defining those, nothing else forks.
 
 ### Player
-A named profile (e.g., the daughter, her sibling). Created once, then selected before each Round. Owns a character appearance (chosen colors), a Hero Level, XP, mastery data, and Personal Bests. Multiple Players share one Save File. Players can be renamed and deleted from the Title screen (delete requires a strong confirmation; it permanently erases that hero).
+A named profile (e.g., the daughter, her sibling). Created once, then selected before each Round. Owns a character appearance (chosen colors), a Hero Level, XP, mastery data, and Personal Bests. Multiple Players share one Save File. Players can be renamed, given a new Hair Style, and deleted from the Title screen (delete requires a strong confirmation; it permanently erases that hero).
 
 ### Round
 One timed play session: a Player answers Questions until the timer expires. Configured by a Skill, a Difficulty, and a timer length (default 2 minutes, settable 30 seconds–10 minutes). Produces a score.
@@ -66,6 +66,8 @@ The hero's earned state of power, unlocked by Hero Level and worn **permanently*
 
 The hero's chosen hair color is who they are underneath: it shows at Hero creation, on the Title screen, and at rest before the first Form is earned.
 
+Gold Spark and Storm Gold recolor the hero's own **Hair Style** but keep its shape. From **Wild Mane** on, every Hair Style ascends into that Form's shared mane — past level 50 the hero has outgrown their old look.
+
 ### XP / Hero Level
 XP equals total points scored: every Round's final score is added to the Player's lifetime XP. Levels 1–30 cost 500 XP each; above 30 every level costs 25 XP more than the one before it, so the climb steepens toward the cap. **Level 100 is the cap** — XP keeps accumulating past it, but the level stays 100. Levels never reset. Every level slightly intensifies the character's permanent glow/particles; every 5th level automatically unlocks a cosmetic tier, and the six Landmark Levels each unlock a new **Form**. Early tiers add new pieces (aura ring, energy crown, lightning wisps, energy wings, comet trail, twin halo); from level 35 on, each tier **evolves** one of those pieces into a grander form instead of stacking another on, so a veteran hero reads sharper, never cluttered. There is no shop or currency — unlocks are automatic.
 
@@ -93,6 +95,8 @@ Cross-Player comparison of Personal Bests, shown on the main menu; each Player's
 ### Save File
 A single JSON document containing every Player's data. Lives in browser localStorage during play; the Player can export it to / import it from a `.json` file on disk via explicit menu buttons on the Title screen. If more than 7 days pass since the last export, the game shows a gentle "back up your heroes!" reminder. The game runs fully offline from a static HTML file — no server, no internet.
 
+Each device (a computer, an iPhone, an iPad) keeps its **own** Save File; nothing syncs between devices. Export on one device and Import on another is the only way to move heroes between them.
+
 ### Screens
 Title (player select, Family Leaderboard, New Hero, settings: export/import + sound toggle) → Hero creation (new players only) → Pre-round (skill + difficulty + timer + Start) → Round (3D arena) → Results (score, best streak, XP gained, level-up ceremony, personal-best celebration) → back to Title.
 
@@ -100,4 +104,7 @@ Title (player select, Family Leaderboard, New Hero, settings: export/import + so
 All effects are synthesized in-browser (no audio asset files): power-up hums, hit zaps, level-up fanfares. Mute toggle on the Title screen. No background music.
 
 ### Character
-An original, procedurally built anime-style 3D hero (no licensed assets). DBZ-*inspired*, not DBZ. At Hero creation the Player picks a name plus hair color and outfit primary/secondary colors from a curated bright preset palette (no free color wheel). Milestone cosmetics earned via Hero Level layer on top of this chosen identity.
+An original anime-style 3D hero with heroic-teen proportions and a chunky, readable arcade-fighter silhouette (no licensed assets). DBZ-*inspired*, not DBZ; the arcade look is 2XKO-*inspired*, never a copy of any Riot champion. At Hero creation the Player picks a name, a **Hair Style**, plus hair color and outfit primary/secondary colors from a curated bright preset palette (no free color wheel). Every Player shares one body.
+
+### Hair Style
+The shape of the hero's own hair, chosen at Hero creation from a small set. It is who the hero is underneath, like the chosen hair color: a Form may reshape or recolor the hair, but the Hair Style is what shows at rest before the first Form is earned. Milestone cosmetics earned via Hero Level layer on top of this chosen identity.
