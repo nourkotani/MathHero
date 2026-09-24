@@ -8,6 +8,7 @@ import { createRenderer } from '../renderer';
 import { App } from '../ui/App';
 import type { BestCelebration } from '../ui/App';
 import { manualClock, realClock } from './clock';
+import { deliverSaveFile, registerHostedWorker } from './install';
 import { blockPageZoom, watchLayout } from './layout';
 import type { ManualClock } from './clock';
 import { createStore } from './store';
@@ -82,21 +83,16 @@ store.subscribe((state, effects) => {
 const audio = createAudio();
 store.subscribe((state, effects) => audio.onStoreUpdate(state, effects));
 
-// The download adapter: hands the exported Save File to the parent as a file.
+// The export adapter: hands the exported Save File to the parent as a file
+// (the share sheet on iPhone and iPad, a download elsewhere).
 store.subscribe((_state, effects) => {
   for (const effect of effects) {
-    if (effect.type === 'EXPORT_READY') {
-      const blob = new Blob([effect.text], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = 'MathHero-save.json';
-      link.click();
-      // Revoking immediately can cut the download short on slow devices.
-      setTimeout(() => URL.revokeObjectURL(url), 10_000);
-    }
+    if (effect.type === 'EXPORT_READY') deliverSaveFile(effect.text, 'MathHero-save.json');
   }
 });
+
+// Offline install for the hosted copy only (ADR 0006).
+registerHostedWorker();
 
 // The family may have the game open twice (a second tab or window). Each
 // copy loads the Save File once at startup, so a stale copy could export —

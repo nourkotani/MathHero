@@ -803,6 +803,69 @@ function bakeHairStrands(size = 256) {
   return encodePng(size, size, pixels);
 }
 
+// ------------------------------------------------------------- site icons
+
+/**
+ * The Home Screen icon for the hosted copy (ADR 0006): an original glowing
+ * power orb — the HUD's score gem — marked with a bold times sign, on the
+ * night-blue panel color. 4× supersampled, so the edges stay clean at 180 px.
+ */
+function bakeIcon(size) {
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const mixRgb = (a, b, t) => [lerp(a[0], b[0], t), lerp(a[1], b[1], t), lerp(a[2], b[2], t)];
+  const smooth = (e0, e1, x) => {
+    const t = Math.min(1, Math.max(0, (x - e0) / (e1 - e0)));
+    return t * t * (3 - 2 * t);
+  };
+  const sample = (u, v) => {
+    const dx = u - 0.5;
+    const dy = v - 0.5;
+    const r = Math.hypot(dx, dy);
+    // Night-blue panel, lighter at the top like the page background.
+    let c = mixRgb([29, 35, 80], [11, 14, 34], Math.min(1, Math.hypot(dx, v - 0.1) * 1.3));
+    // Gold glow around the orb.
+    const glow = Math.exp(-Math.max(0, r - 0.3) * 14) * 0.85;
+    c = mixRgb(c, [255, 190, 60], glow * (r > 0.3 ? 1 : 0));
+    // The orb: a glossy sphere, lit from the upper left.
+    const orb = 1 - smooth(0.33, 0.34, r);
+    if (orb > 0) {
+      const h = Math.hypot(u - 0.4, v - 0.37) / 0.4;
+      let body = h < 0.45 ? mixRgb([255, 243, 196], [255, 179, 0], h / 0.45) : mixRgb([255, 179, 0], [217, 101, 0], (h - 0.45) / 0.55);
+      // A soft rim shade keeps it round.
+      body = mixRgb(body, [150, 60, 0], smooth(0.24, 0.34, r) * 0.5);
+      c = mixRgb(c, body, orb);
+    }
+    // The times sign: two bars at 45°, white with a warm shadow.
+    const bar = (ox, oy) => {
+      const a = (dx - ox + dy - oy) / Math.SQRT2;
+      const b = (dx - ox - (dy - oy)) / Math.SQRT2;
+      const across = Math.min(Math.abs(a), Math.abs(b));
+      const along = Math.max(Math.abs(a), Math.abs(b));
+      return (1 - smooth(0.042, 0.05, across)) * (1 - smooth(0.15, 0.158, along));
+    };
+    c = mixRgb(c, [140, 55, 0], bar(0.012, 0.016) * 0.8);
+    c = mixRgb(c, [255, 255, 255], bar(0, 0));
+    return c;
+  };
+  const n = 4;
+  return encodePng(
+    size,
+    size,
+    paintWide(size, size, 3, (u, v) => {
+      const acc = [0, 0, 0];
+      for (let i = 0; i < n; i++) {
+        for (let j = 0; j < n; j++) {
+          const px = sample(u + (i + 0.5 - n / 2) / (n * size), v + (j + 0.5 - n / 2) / (n * size));
+          acc[0] += px[0];
+          acc[1] += px[1];
+          acc[2] += px[2];
+        }
+      }
+      return acc.map((x) => x / (n * n));
+    }),
+  );
+}
+
 // --------------------------------------------------------------------- main
 
 mkdirSync(OUT_DIR, { recursive: true });
@@ -836,4 +899,13 @@ for (const [name, bake] of bakes) {
   const png = bake();
   writeFileSync(join(OUT_DIR, name), png);
   console.log(`baked ${name} (${(png.length / 1024).toFixed(0)} KB)`);
+}
+
+// The hosted copy's icons live beside its manifest, never in the game.
+const SITE_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'site');
+mkdirSync(SITE_DIR, { recursive: true });
+for (const size of [180, 192, 512]) {
+  const png = bakeIcon(size);
+  writeFileSync(join(SITE_DIR, `icon-${size}.png`), png);
+  console.log(`baked site/icon-${size}.png (${(png.length / 1024).toFixed(0)} KB)`);
 }

@@ -13,7 +13,8 @@
     "test:core": "vitest run",
     "build": "vite build",
     "test:flow": "playwright test",
-    "check": "npm run typecheck && npm run lint && npm run test:core && npm run build && npm run test:flow"
+    "check": "npm run typecheck && npm run lint && npm run test:core && npm run build && npm run test:flow",
+    "deploy": "node scripts/deploy.mjs"
   },
   "dependencies": {
     "postprocessing": "6.39.4",

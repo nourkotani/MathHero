@@ -204,3 +204,26 @@ test('the baked Training Dummy loads from the single file', async ({ page }) => 
   await page.waitForTimeout(3000);
   expect(failures).toEqual([]);
 });
+
+test('the single file registers no service worker (ADR 0006)', async ({ page }) => {
+  // The worker belongs to the hosted copy only. Opened from disk, the game
+  // must stay exactly the single file: it never even tries to register.
+  await page.addInitScript(() => {
+    const w = window as unknown as { __registerCalls: string[] };
+    w.__registerCalls = [];
+    if (typeof ServiceWorkerContainer === 'undefined') return;
+    const original = ServiceWorkerContainer.prototype.register;
+    ServiceWorkerContainer.prototype.register = function (url, options) {
+      w.__registerCalls.push(String(url));
+      return original.call(this, url, options);
+    };
+  });
+  await openGame(page);
+  await createHero(page);
+  await startRound(page);
+  const calls = await page.evaluate(
+    () => (window as unknown as { __registerCalls: string[] }).__registerCalls,
+  );
+  expect(calls).toEqual([]);
+  expect(page.context().serviceWorkers()).toEqual([]);
+});

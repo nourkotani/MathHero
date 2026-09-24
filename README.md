@@ -12,6 +12,14 @@ MathHero is a 3D multiplication game (times tables 1–12) that lives in **one s
 
 Works great on a regular family computer. Keyboard or on-screen number pad — your choice, champ.
 
+### 📱 On an iPhone or iPad
+
+1. Open **https://nourkotani.github.io/MathHero/** in Safari.
+2. Tap the Share button, then **Add to Home Screen**.
+3. Open MathHero from your Home Screen. After the first open, it works with no internet!
+
+Each device keeps its own heroes. To move a hero, tap **Save backup** on one device ("Save to Files"), then **Load backup** on the other.
+
 ## 💥 What happens in there?!
 
 Man, where do I start —
@@ -39,6 +47,7 @@ Man, where do I start —
 npm install
 npm run check   # typecheck → lint → core tests → build → flow tests against the built file
 npm run dev     # live dev server
+npm run deploy  # runs the check, then publishes the hosted copy to GitHub Pages
 ```
 
 `npm run check` must pass before every commit — there's no CI, the discipline IS the pipeline. The build produces the single playable file at `dist/MathHero.html`. Architecture notes live in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), the domain glossary in [`CONTEXT.md`](CONTEXT.md), and decisions in [`docs/adr/`](docs/adr/).

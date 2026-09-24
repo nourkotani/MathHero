@@ -2,7 +2,7 @@ import js from '@eslint/js';
 import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
-  { ignores: ['dist/', 'node_modules/', 'test-results/', 'playwright-report/'] },
+  { ignores: ['dist/', 'build/', 'node_modules/', 'test-results/', 'playwright-report/'] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
@@ -10,6 +10,13 @@ export default tseslint.config(
     files: ['scripts/**'],
     languageOptions: {
       globals: { Buffer: 'readonly', console: 'readonly', process: 'readonly' },
+    },
+  },
+  {
+    // The hosted copy's service worker (ADR 0006) runs in a worker scope.
+    files: ['site/sw.js'],
+    languageOptions: {
+      globals: { self: 'readonly', caches: 'readonly', fetch: 'readonly', URL: 'readonly', Response: 'readonly' },
     },
   },
   {
