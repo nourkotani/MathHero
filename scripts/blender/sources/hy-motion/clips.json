@@ -1,5 +1,5 @@
 {
-  "about": "HY-Motion 1.0 clips (ADR 0010). Each clip has a brief, which `npm run motion -- <clip>` turns into scored candidates, and the chosen candidate, which the bake retargets onto the hero (mocap.py). The HY-Motion license limits use, distribution, and display of its outputs to its Territory (worldwide except the EU, the UK, and South Korea): keep the repo private and the hosted game region-blocked.",
+  "about": "HY-Motion 1.0 clips (ADR 0010). Each clip has a brief, which `npm run motion -- <clip>` turns into scored candidates, and the chosen candidate, which the bake retargets onto the hero (mocap.py). The HY-Motion license limits use, distribution, and display of its outputs to its Territory (worldwide except the EU, the UK, and South Korea); the family publishes on GitHub Pages and accepts that risk (ADR 0010).",
   "model": "HY-Motion-1.0-Lite",
   "clips": {
     "stagger": {

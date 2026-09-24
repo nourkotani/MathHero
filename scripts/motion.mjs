@@ -20,8 +20,8 @@
 // 3. --pick copies a candidate into sources/ and records it as chosen.
 //    Then bake again: `npm run bake:models hero && npm run gen:hero`.
 //
-// HY-Motion's license limits its outputs to its Territory: never push a
-// source while the repo is public.
+// HY-Motion's license limits its outputs to its Territory; the family
+// publishes on GitHub Pages and accepts that risk (ADR 0010).
 
 import { spawnSync } from 'node:child_process';
 import {
