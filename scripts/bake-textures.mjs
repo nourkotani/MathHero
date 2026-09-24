@@ -108,13 +108,6 @@ function fbm(noise, x, y, octaves = 4) {
   return sum / total;
 }
 
-/** Deterministic per-cell hash in 0–1 for tile-to-tile variation. */
-function cellHash(i, j) {
-  let h = Math.imul(i, 374761393) + Math.imul(j, 668265263);
-  h = Math.imul(h ^ (h >>> 13), 1274126177);
-  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
-}
-
 const clamp255 = (v) => Math.max(0, Math.min(255, Math.round(v)));
 const mix = (a, b, t) => a + (b - a) * t;
 
@@ -132,65 +125,6 @@ function paintWide(width, height, channels, shade) {
 }
 
 const paint = (size, shade) => paintWide(size, size, 3, shade);
-
-// ------------------------------------------------------------ arena-top.png
-
-/**
- * The tournament arena's stone top: concentric tile rings split by radial
- * seams, per-tile value shifts, painted mottling, and a dusk-cool wash
- * toward the rim. The cylinder cap maps the inscribed circle; the corners
- * continue the stone so nothing reads as a hard edge from low angles.
- */
-function bakeArenaTop(size = 1024) {
-  const grain = makeNoise(101);
-  const wash = makeNoise(202);
-  const warp = makeNoise(303);
-
-  const rgb = paint(size, (u, v) => {
-    const dx = u * 2 - 1;
-    const dy = v * 2 - 1;
-    // Painted wobble so the tile seams read hand-drawn, not compass-drawn.
-    const wobble = (fbm(warp, u * 6, v * 6, 3) - 0.5) * 0.05;
-    const r = Math.hypot(dx, dy) + wobble;
-    const theta = Math.atan2(dy, dx);
-
-    // Concentric rings of tiles, more segments the further out. The center
-    // ring is one whole disc — no radial joints there.
-    const ring = Math.floor(r * 5.5);
-    const segments = ring === 0 ? 1 : 6 + ring * 4;
-    const segPos = (((theta / (Math.PI * 2) + 0.5) + ring * 0.37) % 1) * segments;
-    const seg = Math.floor(segPos) % segments;
-
-    // Distance to the nearest seam (ring boundary or radial joint).
-    const ringFrac = (r * 5.5) % 1;
-    const segFrac = segPos % 1;
-    const ringSeamDist = Math.min(ringFrac, 1 - ringFrac) / 5.5;
-    const segSeamDist =
-      segments === 1
-        ? 1
-        : (Math.min(segFrac, 1 - segFrac) / segments) * Math.max(r, 0.05) * Math.PI * 2;
-    const seam = Math.max(0, 1 - Math.min(ringSeamDist, segSeamDist) / 0.012);
-
-    // Painted stone value: per-tile shift, brush mottling, fine grain.
-    let value = 0.8;
-    value += (cellHash(ring, seg) - 0.5) * 0.13;
-    value += (fbm(wash, u * 5 + ring, v * 5, 3) - 0.5) * 0.12;
-    value += (fbm(grain, u * 28, v * 28, 4) - 0.5) * 0.07;
-    value -= seam * (0.16 + 0.08 * cellHash(seg, ring));
-    // The arena's heart is sun-warmed; the rim cools into the dusk.
-    const duskCool = Math.min(1, Math.max(0, (r - 0.45) * 1.4));
-    value -= duskCool * 0.06;
-
-    const warm = { r: 216, g: 206, b: 188 };
-    const cool = { r: 188, g: 184, b: 202 };
-    return [
-      mix(warm.r, cool.r, duskCool) * value,
-      mix(warm.g, cool.g, duskCool) * value,
-      mix(warm.b, cool.b, duskCool) * value,
-    ];
-  });
-  return encodePng(size, size, rgb);
-}
 
 // -------------------------------------------------------------- ground.png
 
@@ -225,28 +159,6 @@ function bakeGround(size = 1024) {
       mix(108, 84, cool) * value,
       mix(74, 82, cool) * value,
     ];
-  });
-  return encodePng(size, size, rgb);
-}
-
-// ---------------------------------------------------------------- rock.png
-
-/**
- * Striated spire stone for the rock cones and broken pillars: diagonal
- * sediment bands warped by noise, painted grain, darker feet. The bands run
- * on v so the cone's u-wrap seam stays invisible.
- */
-function bakeRock(size = 512) {
-  const warp = makeNoise(707);
-  const grain = makeNoise(808);
-
-  const rgb = paint(size, (u, v) => {
-    const band = Math.sin((v * 9 + fbm(warp, u * 4, v * 4, 3) * 1.6) * Math.PI * 2);
-    let value = 0.62 + band * 0.09;
-    value += (fbm(grain, u * 18, v * 18, 4) - 0.5) * 0.14;
-    value -= v * 0.18; // darker toward the base (v grows downward on cones)
-
-    return [150 * value, 128 * value, 104 * value];
   });
   return encodePng(size, size, rgb);
 }
@@ -933,9 +845,7 @@ function bakeIcon(size) {
 
 mkdirSync(OUT_DIR, { recursive: true });
 const bakes = [
-  ['arena-top.png', bakeArenaTop],
   ['ground.png', bakeGround],
-  ['rock.png', bakeRock],
   ['sigil.png', bakeSigil],
   ['sky.png', bakeSky],
   ['cloud.png', bakeCloud],

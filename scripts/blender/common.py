@@ -194,6 +194,118 @@ def helix(name, radius, wire, turns, height, z, segments_per_turn=32, sides=10):
     return _from_bmesh(name, bm)
 
 
+def wedge(name, r0, r1, a0, a1, z, depth, bevel, steps=6):
+    """A carved tile: the ring sector r0..r1 between angles a0..a1, standing
+    on z with the given depth, its edges beveled like cut stone."""
+    bm = bmesh.new()
+    top, bottom = [], []
+    arc = [a0 + (a1 - a0) * i / steps for i in range(steps + 1)]
+    outline = [(r1 * math.cos(a), r1 * math.sin(a)) for a in arc]
+    outline += [(r0 * math.cos(a), r0 * math.sin(a)) for a in reversed(arc)] if r0 > 0 else [(0.0, 0.0)]
+    for x, y in outline:
+        bottom.append(bm.verts.new((x, y, z)))
+        top.append(bm.verts.new((x, y, z + depth)))
+    n = len(outline)
+    bm.faces.new(top)
+    bm.faces.new(list(reversed(bottom)))
+    for i in range(n):
+        j = (i + 1) % n
+        bm.faces.new((bottom[i], bottom[j], top[j], top[i]))
+    obj = _from_bmesh(name, bm, smooth=False)
+    add_bevel(obj, bevel, segments=2)
+    obj.data.shade_smooth()
+    return obj
+
+
+def _hash3(x, y, z, seed):
+    h = math.sin(x * 127.1 + y * 311.7 + z * 74.7 + seed * 19.19) * 43758.5453
+    return h - math.floor(h)
+
+
+def _value_noise(p, seed):
+    """Smooth value noise in 3D from a fixed hash: the same input, the same
+    output, on every machine and every run."""
+    xi, yi, zi = math.floor(p[0]), math.floor(p[1]), math.floor(p[2])
+    fx, fy, fz = p[0] - xi, p[1] - yi, p[2] - zi
+    sx, sy, sz = (f * f * (3 - 2 * f) for f in (fx, fy, fz))
+    total = 0.0
+    for dx in (0, 1):
+        for dy in (0, 1):
+            for dz in (0, 1):
+                w = (sx if dx else 1 - sx) * (sy if dy else 1 - sy) * (sz if dz else 1 - sz)
+                total += w * _hash3(xi + dx, yi + dy, zi + dz, seed)
+    return total
+
+
+def roughen(obj, amount, scale, seed):
+    """Push every vertex along its normal by fixed-seed noise: rough rock."""
+    mesh = obj.data
+    for v in mesh.vertices:
+        p = v.co * scale
+        n = _value_noise(p, seed) * 0.65 + _value_noise(p * 2.3, seed + 1) * 0.35
+        v.co += v.normal * (n - 0.5) * 2 * amount
+    mesh.update()
+
+
+def rock(name, radius, height, location, seed, sides=7, rings=5, rough=0.12, taper=0.25):
+    """A rock spire or shard: a tapered, faceted cone, roughened."""
+    bm = bmesh.new()
+    grid = []
+    for r in range(rings + 1):
+        t = r / rings
+        ring_radius = radius * (1 - t * (1 - taper))
+        ring = []
+        for s in range(sides):
+            a = 2 * math.pi * (s + 0.37 * r) / sides
+            ring.append(bm.verts.new((ring_radius * math.cos(a), ring_radius * math.sin(a), height * t)))
+        grid.append(ring)
+    tip = bm.verts.new((0.0, 0.0, height * (1 + taper * 0.4)))
+    for r in range(rings):
+        for s in range(sides):
+            k = (s + 1) % sides
+            bm.faces.new((grid[r][s], grid[r][k], grid[r + 1][k], grid[r + 1][s]))
+    for s in range(sides):
+        bm.faces.new((grid[-1][s], grid[-1][(s + 1) % sides], tip))
+    bm.faces.new(list(reversed(grid[0])))
+    obj = _from_bmesh(name, bm, smooth=False)
+    roughen(obj, rough * radius, 2.2 / radius, seed)
+    obj.location = location
+    apply_transform(obj)
+    return obj
+
+
+def split_group(obj, group, name):
+    """Move the faces of one vertex group into a new object of their own,
+    with its origin at their center. Same UVs, same material, same image."""
+    index = obj.vertex_groups[group].index
+    keep = bmesh.new()
+    keep.from_mesh(obj.data)
+    deform = keep.verts.layers.deform.verify()
+    in_group = [f for f in keep.faces if all(index in v[deform] for v in f.verts)]
+    part = bmesh.new()
+    part.from_mesh(obj.data)
+    part_deform = part.verts.layers.deform.verify()
+    bmesh.ops.delete(
+        part, geom=[f for f in part.faces if not all(index in v[part_deform] for v in f.verts)], context="FACES"
+    )
+    bmesh.ops.delete(keep, geom=in_group, context="FACES")
+    center = Vector((0.0, 0.0, 0.0))
+    for v in part.verts:
+        center += v.co
+    center /= max(1, len(part.verts))
+    bmesh.ops.translate(part, verts=part.verts, vec=-center)
+    keep.to_mesh(obj.data)
+    keep.free()
+    mesh = bpy.data.meshes.new(name)
+    part.to_mesh(mesh)
+    part.free()
+    for mat in obj.data.materials:
+        mesh.materials.append(mat)
+    piece = _link(bpy.data.objects.new(name, mesh))
+    piece.location = center
+    return piece
+
+
 # ---------------------------------------------------------------- modifiers
 
 
@@ -423,7 +535,10 @@ def add_ink_hull(obj, thickness):
     mod.offset = 1.0
     mod.use_flip_normals = True
     mod.use_rim = False
-    mod.use_even_offset = True
+    # Plain offset: each vertex moves at most the thickness along its
+    # normal. Even offset keeps corners thicker but explodes at very sharp
+    # points (the arena's rock tips threw one vertex 2 km away).
+    mod.use_even_offset = False
     mod.material_offset = len(obj.data.materials) - 1
     _apply_modifiers(obj)
 

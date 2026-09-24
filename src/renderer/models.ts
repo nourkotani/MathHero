@@ -20,6 +20,7 @@ let ink: THREE.MeshBasicMaterial | null = null;
 export function loadModel(
   url: string,
   onReady: (root: THREE.Object3D, clips: THREE.AnimationClip[]) => void,
+  options: { rimScale?: number } = {},
 ): void {
   loader ??= new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
   loader.load(
@@ -34,7 +35,7 @@ export function loadModel(
           obj.material = ink;
           obj.userData.outlineHull = true;
         } else {
-          obj.material = painterlySurface(baked.map);
+          obj.material = painterlySurface(baked.map, options.rimScale);
           obj.castShadow = true;
         }
         // A skinned mesh keeps its rest-pose bounds; a clip that flies the

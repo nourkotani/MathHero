@@ -18,6 +18,14 @@ export const STYLE = {
     rim: { color: 0x7fd4ff, strength: 0.75, from: 0.62, to: 0.82 },
   },
 
+  /** The Blender arena floats; the wasteland floor lies this far below
+   * (matches GROUND in scripts/blender/arena.py). */
+  arena: {
+    groundY: -2.4,
+    /** No rim on the stone: the floor is all grazing angles (materials.ts). */
+    rimScale: 0,
+  },
+
   /** How far the Training Dummy turns from the hero toward the camera
    * (radians): a three-quarter view shows its face and chest target. */
   dummyTurn: 0.6,

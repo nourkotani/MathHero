@@ -65,8 +65,11 @@ const rimUniforms = {
  * The shared look of every Blender-baked model (ADR 0007): the baked
  * painted albedo, soft light steps that blend (the cel ramp, but linear-
  * filtered), and a colored rim light on the silhouette edge.
+ *
+ * rimScale: 1 for a figure. A wide floor is all grazing angles to the
+ * camera, so the rim would ice the whole arena: the arena passes 0.
  */
-export function painterlySurface(map: THREE.Texture | null): Surface {
+export function painterlySurface(map: THREE.Texture | null, rimScale = 1): Surface {
   if (softRamp === null) {
     softRamp = createToonRamp(STYLE.painterly.ramp);
     // Linear filtering blends neighbouring steps: painted, not cut.
@@ -75,7 +78,7 @@ export function painterlySurface(map: THREE.Texture | null): Surface {
   }
   const material = new THREE.MeshToonMaterial({ color: 0xffffff, map, gradientMap: softRamp });
   material.onBeforeCompile = (shader) => {
-    Object.assign(shader.uniforms, rimUniforms);
+    Object.assign(shader.uniforms, rimUniforms, { rimScale: { value: rimScale } });
     shader.fragmentShader = shader.fragmentShader
       .replace(
         'void main() {',
@@ -83,12 +86,13 @@ export function painterlySurface(map: THREE.Texture | null): Surface {
 uniform float rimStrength;
 uniform float rimFrom;
 uniform float rimTo;
+uniform float rimScale;
 void main() {`,
       )
       .replace(
         '#include <opaque_fragment>',
         `float rimFacing = 1.0 - clamp(dot(normal, normalize(vViewPosition)), 0.0, 1.0);
-outgoingLight += rimColor * rimStrength * smoothstep(rimFrom, rimTo, rimFacing);
+outgoingLight += rimColor * rimStrength * rimScale * smoothstep(rimFrom, rimTo, rimFacing);
 #include <opaque_fragment>`,
       );
   };
