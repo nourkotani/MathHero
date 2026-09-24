@@ -16,8 +16,11 @@ import { bakedInkSurface, painterlySurface } from './materials';
 let loader: GLTFLoader | null = null;
 let ink: THREE.MeshBasicMaterial | null = null;
 
-/** Load a baked model; onReady receives its root once decoded. */
-export function loadModel(url: string, onReady: (root: THREE.Object3D) => void): void {
+/** Load a baked model; onReady receives its root and its authored clips. */
+export function loadModel(
+  url: string,
+  onReady: (root: THREE.Object3D, clips: THREE.AnimationClip[]) => void,
+): void {
   loader ??= new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
   loader.load(
     url,
@@ -34,9 +37,12 @@ export function loadModel(url: string, onReady: (root: THREE.Object3D) => void):
           obj.material = painterlySurface(baked.map);
           obj.castShadow = true;
         }
+        // A skinned mesh keeps its rest-pose bounds; a clip that flies the
+        // model away (the Dummy's launch) must not be culled mid-air.
+        if (obj instanceof THREE.SkinnedMesh) obj.frustumCulled = false;
         baked.dispose();
       });
-      onReady(root);
+      onReady(root, gltf.animations);
     },
     undefined,
     (error) => {

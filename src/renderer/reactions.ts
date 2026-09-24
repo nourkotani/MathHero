@@ -34,7 +34,6 @@ export interface Reactions {
   setPlayerLook(hair: number, glow: number, palette: FormPalette | null): void;
   /** Re-dress the current rig (after colors change or the hero rebuilds). */
   refreshForm(): void;
-  isStaggering(): boolean;
   update(dt: number, elapsed: number, previewing: boolean): void;
 }
 
@@ -254,6 +253,7 @@ export function createReactions(opts: {
             break;
           case 'ANSWER_WRONG':
             heroChannel.play(staggerClip(), 'stagger');
+            dummy.taunt();
             juice.addShake(0.15);
             break;
           case 'TRANSFORMED':
@@ -308,7 +308,6 @@ export function createReactions(opts: {
     refreshForm() {
       applyForm(currentForm);
     },
-    isStaggering: () => heroChannel.label() === 'stagger',
     update(dt, elapsed, previewing) {
       const hero = getHero();
 

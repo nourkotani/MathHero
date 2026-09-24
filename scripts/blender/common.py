@@ -330,9 +330,13 @@ def join(name, objects):
     """
     bm = bmesh.new()
     materials = []
+    groups = {}  # bone name -> vertex indices, in script order
     for obj in objects:
         start = len(bm.faces)
+        first_vert = len(bm.verts)
         bm.from_mesh(obj.data)
+        if "bone" in obj:
+            groups.setdefault(obj["bone"], []).extend(range(first_vert, len(bm.verts)))
         bm.faces.ensure_lookup_table()
         slot_map = []
         for mat in obj.data.materials:
@@ -351,7 +355,11 @@ def join(name, objects):
         bpy.data.objects.remove(obj, do_unlink=True)
         if old.users == 0:
             bpy.data.meshes.remove(old)
-    return _link(bpy.data.objects.new(name, mesh))
+    joined = _link(bpy.data.objects.new(name, mesh))
+    # Rigid skinning: each part follows exactly one bone.
+    for bone, indices in groups.items():
+        joined.vertex_groups.new(name=bone).add(indices, 1.0, "REPLACE")
+    return joined
 
 
 def bake_painted(obj, size=1024):
@@ -420,13 +428,88 @@ def add_ink_hull(obj, thickness):
     _apply_modifiers(obj)
 
 
+# ---------------------------------------------------------------- rig and clips
+
+FPS = 24
+
+
+def add_rig(obj, bones):
+    """Parent obj to a new armature and skin it by its vertex groups.
+
+    bones: (name, head, tail, parent) tuples, in world coordinates. Every
+    bone stands upright with zero roll, so its local axes are: X = world X,
+    Y = up (along the bone), Z = world -Y. A negative Z rotation leans a
+    bone toward +X.
+    """
+    data = bpy.data.armatures.new(f"{obj.name}Rig")
+    rig = _link(bpy.data.objects.new(f"{obj.name}Rig", data))
+    bpy.ops.object.select_all(action="DESELECT")
+    rig.select_set(True)
+    bpy.context.view_layer.objects.active = rig
+    bpy.ops.object.mode_set(mode="EDIT")
+    for name, head, tail, parent in bones:
+        bone = data.edit_bones.new(name)
+        bone.head = head
+        bone.tail = tail
+        bone.roll = 0.0
+        if parent:
+            bone.parent = data.edit_bones[parent]
+    bpy.ops.object.mode_set(mode="OBJECT")
+    obj.parent = rig
+    mod = obj.modifiers.new("Rig", "ARMATURE")
+    mod.object = rig
+    for pose_bone in rig.pose.bones:
+        pose_bone.rotation_mode = "XYZ"
+    bpy.context.scene.render.fps = FPS
+    return rig
+
+
+def add_clip(rig, name, length, keys):
+    """Author one clip as its own action.
+
+    length: the last frame (the clip runs 0..length at FPS).
+    keys: {bone: [(frame, {"loc": ..., "rot": ..., "scale": ...}), ...]}.
+    Every bone gets keys at frame 0 and at length (rest unless given), so a
+    clip never leaves a bone posed by an earlier clip.
+    """
+    rest = {"loc": (0.0, 0.0, 0.0), "rot": (0.0, 0.0, 0.0), "scale": (1.0, 1.0, 1.0)}
+    rig.animation_data_create()
+    action = bpy.data.actions.new(name)
+    action.use_fake_user = True
+    rig.animation_data.action = action
+    for pose_bone in rig.pose.bones:
+        frames = dict(keys.get(pose_bone.name, []))
+        frames.setdefault(0, {})
+        frames.setdefault(length, {})
+        for frame in sorted(frames):
+            pose = {**rest, **frames[frame]}
+            pose_bone.location = pose["loc"]
+            pose_bone.rotation_euler = pose["rot"]
+            pose_bone.scale = pose["scale"]
+            for path in ("location", "rotation_euler", "scale"):
+                pose_bone.keyframe_insert(path, frame=frame)
+    track = rig.animation_data.nla_tracks.new()
+    track.name = name
+    track.strips.new(name, 0, action)
+    track.mute = True
+    rig.animation_data.action = None
+    for pose_bone in rig.pose.bones:
+        pose_bone.location = rest["loc"]
+        pose_bone.rotation_euler = rest["rot"]
+        pose_bone.scale = rest["scale"]
+
+
 # ---------------------------------------------------------------- export
 
 
 def export_glb(obj, path):
+    """Export obj and its children (a rig exports with its skinned mesh)."""
     bpy.ops.object.select_all(action="DESELECT")
     obj.select_set(True)
+    for child in obj.children_recursive:
+        child.select_set(True)
     bpy.context.view_layer.objects.active = obj
+    animated = obj.animation_data is not None
     bpy.ops.export_scene.gltf(
         filepath=path,
         export_format="GLB",
@@ -439,7 +522,12 @@ def export_glb(obj, path):
         export_materials="EXPORT",
         export_image_format="WEBP",
         export_image_quality=90,
-        export_animations=False,
+        export_animations=animated,
+        export_animation_mode="ACTIONS",
+        export_force_sampling=True,
+        export_frame_step=1,
+        export_def_bones=True,
+        export_optimize_animation_size=False,
         export_cameras=False,
         export_lights=False,
         export_extras=False,

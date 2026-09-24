@@ -44,8 +44,11 @@ def build():
         "tape": c.paint_material("Tape", TAPE, grain=0.1, crevice=0.4),
     }
     parts = []
+    # The bone the next parts follow; each section below sets it.
+    bone = ["root"]
 
     def part(obj, material):
+        obj["bone"] = bone[0]
         parts.append(c.assign(obj, m[material]))
         return obj
 
@@ -60,8 +63,10 @@ def build():
         )
 
     # --- the spring: a fat coil around a short steel stem
+    bone[0] = "spring"
     part(c.cylinder("Stem", 0.12, 1.0, 0.36, segments=20), "steel")
     part(c.helix("Spring", 0.24, 0.055, 4.5, 0.78, 0.44), "brass")
+    bone[0] = "body"
     part(c.cylinder("SpringCap", 0.32, 0.1, 1.2, segments=32, bevel=0.03), "steel_light")
 
     # --- padded barrel torso
@@ -92,6 +97,7 @@ def build():
 
     # --- neck and the stitched sack head
     part(c.cylinder("Neck", 0.17, 0.2, 2.44, segments=20), "steel_light")
+    bone[0] = "head"
     head_z = 2.8
     part(c.sphere("Head", 0.4, (0.0, 0.0, head_z), scale=(0.95, 1.0, 0.92), segments=36, rings=18), "canvas")
     # A seam over the crown, from ear to ear (clear of the face).
@@ -125,4 +131,125 @@ def build():
     c.apply_transform(dummy)
     c.bake_painted(dummy)
     c.add_ink_hull(dummy, INK_WIDTH)
-    return dummy
+
+    rig = c.add_rig(
+        dummy,
+        [
+            ("root", (0, 0, 0), (0, 0, 0.3 * SCALE), None),
+            ("spring", (0, 0, 0.36 * SCALE), (0, 0, 1.2 * SCALE), "root"),
+            ("body", (0, 0, 1.2 * SCALE), (0, 0, 2.44 * SCALE), "spring"),
+            ("head", (0, 0, 2.44 * SCALE), (0, 0, 3.2 * SCALE), "body"),
+        ],
+    )
+    add_clips(rig)
+    return rig
+
+
+# ---------------------------------------------------------------- clips
+#
+# Poses in bone space (see common.add_rig): rot Z < 0 leans away from the
+# hero (+X), rot Y twists, scale Y squashes (< 1) or stretches (> 1), and
+# root loc is (world X, up, world -Y). 24 frames a second.
+
+
+def squash(y):
+    """Scale that keeps the volume: squash down, bulge out."""
+    side = 1 / math.sqrt(y)
+    return (side, y, side)
+
+
+def add_clips(rig):
+    c.add_clip(
+        rig,
+        "Idle",
+        48,
+        {
+            "spring": [(12, {"scale": squash(1.03)}), (36, {"scale": squash(0.98)})],
+            "body": [(12, {"rot": (0, 0, 0.035)}), (36, {"rot": (0, 0, -0.035)})],
+            "head": [(18, {"rot": (0.04, 0, -0.03)}), (42, {"rot": (-0.03, 0, 0.03)})],
+        },
+    )
+    # A correct answer lands: squash on impact, whip back, overshoot, settle.
+    c.add_clip(
+        rig,
+        "HitBack",
+        16,
+        {
+            "spring": [
+                (2, {"rot": (0, 0, -0.42), "scale": squash(0.78)}),
+                (6, {"rot": (0, 0, 0.2), "scale": squash(1.1)}),
+                (10, {"rot": (0, 0, -0.08)}),
+                (13, {"rot": (0, 0, 0.03)}),
+            ],
+            "body": [(2, {"rot": (0, 0, -0.3)}), (6, {"rot": (0, 0, 0.12)}), (10, {"rot": (0, 0, -0.05)})],
+            "head": [(3, {"rot": (0, 0, -0.45)}), (7, {"rot": (0, 0, 0.25)}), (11, {"rot": (0, 0, -0.08)})],
+        },
+    )
+    c.add_clip(
+        rig,
+        "HitTwist",
+        16,
+        {
+            "spring": [(2, {"rot": (0, 0, -0.25), "scale": squash(0.85)}), (7, {"rot": (0, 0, 0.1)})],
+            "body": [(2, {"rot": (0, 0.9, -0.15)}), (6, {"rot": (0, -0.45, 0.05)}), (10, {"rot": (0, 0.15, 0)})],
+            "head": [(3, {"rot": (0.2, 0.6, 0)}), (7, {"rot": (-0.1, -0.35, 0)}), (11, {"rot": (0, 0.1, 0)})],
+        },
+    )
+    # Only a transformed hero's strike spins it all the way round.
+    c.add_clip(
+        rig,
+        "HitSpin",
+        20,
+        {
+            "spring": [(2, {"rot": (0, 0, -0.35), "scale": squash(0.75)}), (8, {"scale": squash(1.12)}), (14, {"rot": (0, 0, 0.08)})],
+            "body": [
+                (2, {"rot": (0, 0, -0.2)}),
+                (6, {"rot": (0, math.pi * 0.7, -0.15)}),
+                (10, {"rot": (0, math.pi * 1.4, -0.1)}),
+                (14, {"rot": (0, math.pi * 2, 0)}),
+                (20, {"rot": (0, math.pi * 2, 0)}),
+            ],
+            "head": [(4, {"rot": (0, 0, -0.4)}), (12, {"rot": (0, 0, 0.3)}), (16, {"rot": (0, 0, -0.1)})],
+        },
+    )
+    # A full-power blast: coil, then fly up and back out of the frame,
+    # flipping head over heels.
+    c.add_clip(
+        rig,
+        "Launch",
+        22,
+        {
+            "root": [
+                (3, {"scale": squash(0.8)}),
+                (6, {"loc": (0.9, 1.4, 0), "rot": (0, 0, -1.2)}),
+                (12, {"loc": (2.4, 3.8, 0), "rot": (0, 0, -3.4)}),
+                (18, {"loc": (3.6, 6.2, 0), "rot": (0, 0, -5.6)}),
+                (22, {"loc": (4.2, 8.0, 0), "rot": (0, 0, -6.6)}),
+            ],
+            "spring": [(3, {"scale": squash(0.6)}), (6, {"scale": squash(1.35)}), (14, {"scale": squash(1.1)})],
+            "head": [(6, {"rot": (0, 0, 0.6)}), (14, {"rot": (0, 0, -0.4)})],
+        },
+    )
+    # Back for the next Question: drop in from above, squash, bounce, settle.
+    c.add_clip(
+        rig,
+        "Recover",
+        20,
+        {
+            "root": [(0, {"loc": (0, 6.5, 0)}), (7, {"loc": (0, 0, 0)}), (10, {"loc": (0, 0.25, 0)}), (13, {"loc": (0, 0, 0)})],
+            "spring": [(7, {"scale": squash(0.55)}), (10, {"scale": squash(1.2)}), (13, {"scale": squash(0.9)}), (16, {"scale": squash(1.04)})],
+            "body": [(7, {"rot": (0, 0, 0.12)}), (11, {"rot": (0, 0, -0.08)})],
+            "head": [(8, {"rot": (0.15, 0, 0)}), (12, {"rot": (-0.1, 0, 0)})],
+        },
+    )
+    # The hero flinched at a wrong answer: a cheeky side-to-side wiggle.
+    taunt = [(f, {"rot": (0, 0, 0.14 if (f // 2) % 2 == 0 else -0.14)}) for f in range(2, 18, 2)]
+    c.add_clip(
+        rig,
+        "Taunt",
+        20,
+        {
+            "body": taunt,
+            "head": [(4, {"rot": (0, 0.35, 0.15)}), (12, {"rot": (0, -0.35, 0.15)}), (17, {"rot": (0, 0, 0.05)})],
+        },
+    )

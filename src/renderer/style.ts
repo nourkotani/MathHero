@@ -21,6 +21,9 @@ export const STYLE = {
   /** How far the Training Dummy turns from the hero toward the camera
    * (radians): a three-quarter view shows its face and chest target. */
   dummyTurn: 0.6,
+  /** Cross-fade between the Dummy's clips (seconds): short, so a hit
+   * lands on the frame it arrives. */
+  dummyBlend: 0.05,
 
   /** Ink outlines on the characters (inverted hull). */
   outline: {

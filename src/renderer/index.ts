@@ -210,7 +210,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       }
 
       reactions.update(dt, elapsed, previewing);
-      dummy.update(dt, elapsed, reactions.isStaggering());
+      dummy.update(dt);
       fx.update(dt, elapsed);
       stage.update(dt, elapsed, urgent);
       rig.update(dt, elapsed);
