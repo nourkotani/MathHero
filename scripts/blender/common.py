@@ -646,6 +646,9 @@ def add_clip(rig, name, length, keys):
     quat = rig.pose.bones[0].rotation_mode == "QUATERNION"
     rot_path = "rotation_quaternion" if quat else "rotation_euler"
     rig.animation_data_create()
+    # Quaternions keep one hemisphere from key to key per bone, so a spin
+    # sampled frame by frame turns the short way between keys.
+    last_quat = {}
     action = bpy.data.actions.new(name)
     action.use_fake_user = True
     rig.animation_data.action = action
@@ -657,7 +660,12 @@ def add_clip(rig, name, length, keys):
             pose = {**rest, **frames[frame]}
             pose_bone.location = pose["loc"]
             if quat:
-                pose_bone.rotation_quaternion = three_rotation(*pose["rot"])
+                q = three_rotation(*pose["rot"])
+                previous = last_quat.get(pose_bone.name)
+                if previous is not None and previous.dot(q) < 0:
+                    q.negate()
+                last_quat[pose_bone.name] = q
+                pose_bone.rotation_quaternion = q
             else:
                 pose_bone.rotation_euler = pose["rot"]
             pose_bone.scale = pose["scale"]

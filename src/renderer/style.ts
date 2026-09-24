@@ -37,6 +37,8 @@ export const STYLE = {
   /** Cross-fade between the Dummy's clips (seconds): short, so a hit
    * lands on the frame it arrives. */
   dummyBlend: 0.05,
+  /** The same for the hero's authored clips. */
+  heroBlend: 0.06,
 
   /** Ink outlines on the characters (inverted hull). */
   outline: {

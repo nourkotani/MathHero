@@ -317,32 +317,271 @@ def build_mane(mane, part):
 
 # ---------------------------------------------------------------- clips
 #
-# Poses in three.js joint terms (the rotations reactions.ts writes), turned
-# into quaternions by common.three_rotation. 24 frames a second.
+# Poses in three.js joint terms (the rotations reactions.ts used to write),
+# turned into quaternions by common.three_rotation. 24 frames a second.
+
+
+FPS = 24
+
+# The guard stance (the renderer posed it in code before these clips):
+# left foot forward, knees soft, fists raised. Rotations in three.js joint
+# terms, as reactions.ts wrote them.
+STANCE = {
+    "torso": (0.06, 0.0, 0.0),
+    "head": (-0.04, 0.0, 0.0),
+    "armL": (-0.55, 0.0, 0.3),
+    "armR": (-0.55, 0.0, -0.3),
+    "elbowL": (-1.55, 0.0, 0.0),
+    "elbowR": (-1.55, 0.0, 0.0),
+    "legL": (-0.22, 0.0, 0.0),
+    "legR": (0.26, 0.0, 0.0),
+    "kneeL": (0.38, 0.0, 0.0),
+    "kneeR": (0.34, 0.0, 0.0),
+}
+
+
+class Pose:
+    """One frame's pose: the stance, then overrides. The root carries the
+    moves the renderer used to make with the whole hero: loc (x, up,
+    forward), rot, and a squash-and-stretch scale."""
+
+    def __init__(self):
+        self.rot = {bone: list(r) for bone, r in STANCE.items()}
+        self.loc = [0.0, 0.0, 0.0]
+        self.root_rot = [0.0, 0.0, 0.0]
+        self.scale = [1.0, 1.0, 1.0]
+
+    def set(self, bone, x=None, y=None, z=None):
+        r = self.rot[bone]
+        for i, v in enumerate((x, y, z)):
+            if v is not None:
+                r[i] = v
+
+    def squash(self, amount):
+        """amount > 0 squashes (shorter, wider); < 0 stretches."""
+        self.scale = [1 + amount * 0.5, 1 - amount, 1 + amount * 0.5]
+
+    def keys(self):
+        out = {bone: {"rot": tuple(r)} for bone, r in self.rot.items()}
+        out["root"] = {"loc": tuple(self.loc), "rot": tuple(self.root_rot), "scale": tuple(self.scale)}
+        return out
+
+
+def sampled_clip(rig, name, seconds, pose_at):
+    """Key every frame of pose_at(t) for t in 0..1: the clip plays exactly
+    the curve the renderer used to compute, now baked into the model."""
+    frames = max(1, round(seconds * FPS))
+    keys = {}
+    for f in range(frames + 1):
+        for bone, pose in pose_at(f / frames).keys().items():
+            keys.setdefault(bone, []).append((f, pose))
+    c.add_clip(rig, name, frames, keys)
+
+
+ATTACK_ANTICIPATION = 0.12
+ATTACK_STRIKE = 0.55
+
+
+def attack_pose(kind):
+    """The four strikes: an anticipation crouch, then the wind-up (w) and
+    the strike (s) that snaps out to the hit and settles home."""
+    total = ATTACK_ANTICIPATION + ATTACK_STRIKE
+
+    def pose_at(tc):
+        p = Pose()
+        t_abs = tc * total
+        if t_abs < ATTACK_ANTICIPATION:
+            k = t_abs / ATTACK_ANTICIPATION
+            p.loc[1] = -k * 0.16
+            p.squash(k * 0.08)
+            p.set("torso", x=0.06 + k * 0.3)
+            p.set("legL", x=-0.22 - k * 0.5)
+            p.set("legR", x=0.26 - k * 0.35)
+            p.set("kneeL", x=0.38 + k * 0.85)
+            p.set("kneeR", x=0.34 + k * 0.85)
+            p.set("armL", x=-0.55 - k * 0.4)
+            p.set("armR", x=-0.55 - k * 0.4)
+            return p
+        t = (t_abs - ATTACK_ANTICIPATION) / ATTACK_STRIKE
+        w = t / 0.3 if t < 0.3 else max(0.0, 1 - (t - 0.3) / 0.2)
+        s = 0.0 if t < 0.3 else math.sin(((t - 0.3) / 0.7) * math.pi)
+        # A little squash while coiled, a stretch into the strike.
+        p.squash(w * 0.05 - s * 0.07)
+        if kind == 0:  # dash punch: coil back, lunge in with a straight right
+            p.loc[2] = -w * 0.35 + s * 1.7
+            p.set("torso", s * 0.2, w * 0.5 - s * 0.55, 0)
+            p.set("armR", 0.6 * w - 1.62 * s, 0, -0.15)
+            p.set("elbowR", x=-1.55 + 1.5 * s)
+            p.set("armL", -0.4, 0, 0.35)
+        elif kind == 1:  # flying kick: crouch, launch, right leg pistons out
+            p.loc[2] = -w * 0.3 + s * 2.0
+            p.loc[1] = s * 0.9
+            p.set("torso", x=w * 0.3 - s * 0.55)
+            p.set("legR", x=0.4 * w - 1.5 * s)
+            p.set("kneeR", x=1.3 * w + 0.08)
+            p.set("legL", x=0.3)
+            p.set("kneeL", x=0.38 + 1.2 * s)
+            p.set("armL", 0.8 * s, 0, 0.5)
+            p.set("armR", 0.8 * s, 0, -0.5)
+        elif kind == 2:  # spin strike: wind opposite, whirl through with arms wide
+            p.loc[2] = -w * 0.3 + s * 1.4
+            p.root_rot[1] = -w * 0.6 + (0.0 if t < 0.3 else (t - 0.3) / 0.7) * 2 * math.pi
+            p.set("torso", y=-w * 0.5)
+            p.set("armL", -0.2, 0, 0.3 + 1.1 * s)
+            p.set("armR", -0.2, 0, -0.3 - 1.1 * s)
+            p.set("elbowL", x=-1.55 + 1.4 * s)
+            p.set("elbowR", x=-1.55 + 1.4 * s)
+        else:  # rising uppercut: deep crouch, then the fist drives skyward
+            p.loc[2] = s * 1.1
+            p.loc[1] = -w * 0.22 + s * 1.2
+            p.set("torso", x=w * 0.45 - s * 0.3)
+            p.set("legL", x=-0.22 - w * 0.5)
+            p.set("legR", x=0.26 - w * 0.3 - s * 0.7)
+            p.set("kneeL", x=0.38 + w * 0.9)
+            p.set("kneeR", x=0.34 + w * 0.9)
+            p.set("armR", 0.7 * w - 2.5 * s, 0, -0.1)
+            p.set("elbowR", x=-1.0 + 0.9 * s)
+            p.set("armL", x=-0.3 + s * 0.5)
+        return p
+
+    return pose_at
+
+
+STAGGER = 0.6
+
+
+def stagger_pose(t):
+    """A wrong answer: knocked off balance, stumbling back, arms
+    windmilling, head rattling, front leg up. A gentle flinch, never scary."""
+    p = Pose()
+    recoil = math.sin(t * math.pi)
+    seconds = t * STAGGER
+    p.loc[2] = -recoil * 0.7
+    p.root_rot[2] = recoil * 0.22
+    p.set("torso", x=-recoil * 0.5)
+    p.set("head", y=math.sin(seconds * 30) * 0.35 * recoil)
+    p.set("armL", -2.3 * recoil - 0.3, 0, 0.3 + math.sin(seconds * 24) * 0.5 * recoil)
+    p.set("armR", -2.3 * recoil - 0.3, 0, -0.3 - math.cos(seconds * 24) * 0.5 * recoil)
+    p.set("elbowL", x=-0.4)
+    p.set("elbowR", x=-0.4)
+    p.set("legL", x=-0.9 * recoil)
+    p.set("kneeL", x=1.2 * recoil + 0.2)
+    return p
+
+
+TRANSFORM = 2.0
+
+
+def transform_pose(t):
+    """The Landmark transformation: coil low gathering light, then erupt
+    skyward, arms thrown wide, easing home over the tail."""
+    p = Pose()
+    if t < 0.4:
+        k = t / 0.4
+        p.loc[1] = -k * 0.2
+        p.squash(k * 0.1)
+        p.set("torso", x=0.06 + k * 0.35)
+        p.set("kneeL", x=0.38 + k * 0.9)
+        p.set("kneeR", x=0.34 + k * 0.9)
+        p.set("armL", -0.2, 0, 0.75)
+        p.set("armR", -0.2, 0, -0.75)
+        return p
+    e = min(1.0, (t - 0.4) / 0.25)
+    settle = (t - 0.8) / 0.2 if t > 0.8 else 0.0
+    lift = math.sin(e * math.pi * 0.5) * (1 - settle)
+    p.loc[1] = lift * 0.55
+    p.squash(-lift * 0.08)
+    p.set("torso", x=0.06 - lift * 0.3)
+    p.set("head", x=-lift * 0.35)
+    p.set("armL", -2.6 * lift - 0.2, 0, 0.9 * lift + 0.3)
+    p.set("armR", -2.6 * lift - 0.2, 0, -0.9 * lift - 0.3)
+    p.set("elbowL", x=-0.3 * (1 - lift) - 1.55 * (1 - lift))
+    p.set("elbowR", x=-0.3 * (1 - lift) - 1.55 * (1 - lift))
+    return p
+
+
+def charge_pose(t):
+    """Powering up as the Power Streak climbs: a low crouch, fists pulled
+    to the hips, chest out, head back, then home to the guard."""
+    p = Pose()
+    k = math.sin(t * math.pi)
+    p.loc[1] = -k * 0.14
+    p.squash(k * 0.07)
+    p.set("torso", x=0.06 - k * 0.28)
+    p.set("head", x=-0.04 - k * 0.3)
+    p.set("armL", -0.55 + k * 0.85, 0, 0.3 + k * 0.25)
+    p.set("armR", -0.55 + k * 0.85, 0, -0.3 - k * 0.25)
+    p.set("elbowL", x=-1.55 + k * 0.6)
+    p.set("elbowR", x=-1.55 + k * 0.6)
+    p.set("kneeL", x=0.38 + k * 0.5)
+    p.set("kneeR", x=0.34 + k * 0.5)
+    return p
+
+
+def blast_pose(t):
+    """A full-power blast: both fists drawn to one side, then both palms
+    thrust forward, the body leaning in, stretched long."""
+    p = Pose()
+    if t < 0.3:
+        k = math.sin(t / 0.3 * math.pi * 0.5)
+        p.squash(k * 0.08)
+        p.loc[1] = -k * 0.1
+        p.set("torso", y=-k * 0.6)
+        p.set("armL", -0.9 * k - 0.55 * (1 - k), 0, 0.3 - 0.5 * k)
+        p.set("armR", -0.9 * k - 0.55 * (1 - k), 0, -0.3 + 0.1 * k)
+        p.set("elbowL", x=-1.55 - 0.3 * k)
+        p.set("elbowR", x=-1.55 - 0.3 * k)
+        return p
+    k = min(1.0, (t - 0.3) / 0.15)
+    back = max(0.0, (t - 0.75) / 0.25)
+    out = k * (1 - back)
+    p.squash(-out * 0.08)
+    p.loc[2] = out * 0.3
+    p.set("torso", out * 0.25, -0.6 * (1 - k), 0)
+    p.set("armL", -1.55 * out - 0.55 * (1 - out), 0, 0.3 - 0.25 * out)
+    p.set("armR", -1.55 * out - 0.55 * (1 - out), 0, -0.3 + 0.25 * out)
+    p.set("elbowL", x=-1.55 * (1 - out))
+    p.set("elbowR", x=-1.55 * (1 - out))
+    p.set("legL", x=-0.22 - 0.3 * out)
+    p.set("kneeL", x=0.38 + 0.3 * out)
+    return p
+
+
+def victory_pose(t):
+    """Results: a hop and a fist punched to the sky, then a proud stance."""
+    p = Pose()
+    hop = math.sin(min(1.0, t / 0.45) * math.pi)
+    up = min(1.0, t / 0.25)
+    p.loc[1] = hop * 0.35
+    p.squash(-hop * 0.06)
+    p.set("torso", x=0.06 - 0.15 * up)
+    p.set("head", x=-0.04 - 0.2 * up)
+    p.set("armR", -0.55 - 2.35 * up, 0, -0.3 + 0.1 * up)
+    p.set("elbowR", x=-1.55 + 1.35 * up)
+    p.set("armL", -0.2, 0, 0.55)
+    p.set("elbowL", x=-1.8)
+    return p
 
 
 def add_clips(rig):
-    # The guard stance with breathing: left foot forward, knees soft, fists
-    # raised. Matches the stance the renderer poses between actions.
-    def arms(breath):
-        return {
-            "armL": (-0.55 + breath * 0.04, 0, 0.3),
-            "armR": (-0.55 + breath * 0.04, 0, -0.3),
-        }
-
-    stance = {
-        "elbowL": {"rot": (-1.55, 0, 0)},
-        "elbowR": {"rot": (-1.55, 0, 0)},
-        "legL": {"rot": (-0.22, 0, 0)},
-        "legR": {"rot": (0.26, 0, 0)},
-        "kneeL": {"rot": (0.38, 0, 0)},
-        "kneeR": {"rot": (0.34, 0, 0)},
-    }
-    keys = {bone: [(f, pose) for f in (0, 12, 24, 36, 48)] for bone, pose in stance.items()}
-    breath = {0: 0.0, 12: 1.0, 24: 0.0, 36: -1.0, 48: 0.0}
-    look = {0: 0.0, 12: 0.05, 24: 0.0, 36: -0.05, 48: 0.0}
-    keys["torso"] = [(f, {"rot": (0.06 + b * 0.02, 0, 0)}) for f, b in breath.items()]
-    keys["head"] = [(f, {"rot": (-0.04, look[f], 0)}) for f in breath]
-    keys["armL"] = [(f, {"rot": arms(b)["armL"]}) for f, b in breath.items()]
-    keys["armR"] = [(f, {"rot": arms(b)["armR"]}) for f, b in breath.items()]
+    """Idle loops; every other clip plays once, started by an effect
+    (ADR 0003)."""
+    keys = {}
+    breaths = {0: 0.0, 12: 1.0, 24: 0.0, 36: -1.0, 48: 0.0}
+    looks = {0: 0.0, 12: 0.05, 24: 0.0, 36: -0.05, 48: 0.0}
+    for f, breath in breaths.items():
+        p = Pose()
+        p.set("torso", x=0.06 + breath * 0.02)
+        p.set("head", y=looks[f])
+        p.set("armL", x=-0.55 + breath * 0.04)
+        p.set("armR", x=-0.55 + breath * 0.04)
+        for bone, pose in p.keys().items():
+            keys.setdefault(bone, []).append((f, pose))
     c.add_clip(rig, "Idle", 48, keys)
+    for kind in range(4):
+        sampled_clip(rig, f"Attack{kind}", ATTACK_ANTICIPATION + ATTACK_STRIKE, attack_pose(kind))
+    sampled_clip(rig, "Stagger", STAGGER, stagger_pose)
+    sampled_clip(rig, "Transform", TRANSFORM, transform_pose)
+    sampled_clip(rig, "Charge", 0.5, charge_pose)
+    sampled_clip(rig, "Blast", 0.8, blast_pose)
+    sampled_clip(rig, "Victory", 1.2, victory_pose)

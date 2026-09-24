@@ -243,6 +243,11 @@ export interface HeroRig {
   hairBefore: string;
   hairNow: string;
   showHair(name: string): void;
+  /**
+   * Play an authored clip once, then return to Idle. queued: wait for the
+   * clip already playing to end first (a charge never cuts off a strike).
+   */
+  play(name: string, queued?: boolean): void;
   hairMaterials: Surface[];
   bodyMaterial: Surface;
   trimMaterial: Surface;
@@ -396,6 +401,15 @@ export function buildHero(
   const joints = heroJoints(group);
   let mixer: THREE.AnimationMixer | null = null;
   let idle: THREE.AnimationAction | null = null;
+  const actions = new Map<string, THREE.AnimationAction>();
+  let current: THREE.AnimationAction | null = null;
+  let next: string | null = null;
+  const blend = STYLE.heroBlend;
+  const fadeTo = (action: THREE.AnimationAction) => {
+    if (current && current !== action) current.fadeOut(blend);
+    action.reset().fadeIn(blend).play();
+    current = action;
+  };
   if (heroTemplate) {
     const body = girl ? 'BodyGirl' : 'BodyBoy';
     const garment = GARMENT_MESHES[appearance.garment];
@@ -435,8 +449,25 @@ export function buildHero(
     // the head pivot, so a powered-up hero's hair visibly rises.
     model.getObjectByName('hair')?.scale.setScalar(palette?.hairScale ?? 1);
     mixer = new THREE.AnimationMixer(model);
-    const idleClip = heroTemplate.clips.find((clip: THREE.AnimationClip) => clip.name === 'Idle');
-    if (idleClip) idle = mixer.clipAction(idleClip).play();
+    for (const clip of heroTemplate.clips) {
+      const action = mixer.clipAction(clip);
+      if (clip.name !== 'Idle') {
+        action.setLoop(THREE.LoopOnce, 1);
+        action.clampWhenFinished = true;
+      }
+      actions.set(clip.name, action);
+    }
+    idle = actions.get('Idle') ?? null;
+    if (idle) {
+      idle.play();
+      current = idle;
+    }
+    // A one-shot clip hands on to the queued one, or back to Idle.
+    mixer.addEventListener('finished', () => {
+      const then = (next !== null ? actions.get(next) : undefined) ?? idle;
+      next = null;
+      if (then) fadeTo(then);
+    });
   }
   // The face and the hair stay in code for now, riding the head bone
   // (the Hair Style ticket moves the hair into Blender).
@@ -543,6 +574,16 @@ export function buildHero(
     idle,
     hairBefore,
     hairNow: hairMesh,
+    play(name, queued = false) {
+      const action = actions.get(name);
+      if (!action) return;
+      if (queued && current && current !== idle && current.isRunning()) {
+        next = name;
+        return;
+      }
+      next = null;
+      fadeTo(action);
+    },
     showHair(name) {
       for (const [owner, meshes] of hairParts) {
         for (const mesh of meshes) mesh.visible = owner === name;

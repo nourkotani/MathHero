@@ -69,38 +69,21 @@ export function createReactions(opts: {
   applyForm('base');
 
   /**
-   * One of four DBZ-style strikes: an anticipation crouch, then the original
-   * wind-up/strike curve — w coils and releases, s snaps out to the hit and
-   * settles home. The impact burst (and hitstop at high streaks) fires at
-   * the exact moment the strike lands.
+   * One of four strikes. The pose is an authored Blender clip (Attack0–3:
+   * an anticipation crouch, the wind-up, the strike, and home); this clip
+   * only times the impact, so the burst (and hitstop at high streaks) fires
+   * at the exact moment the strike lands.
    */
   function attackClip(kind: number): Clip {
     let hitPending = true;
     const { duration, anticipation } = STYLE.juice.attack;
     const total = anticipation + duration;
+    getHero().play(`Attack${kind}`);
     return {
       duration: total,
-      apply(tc, elapsed) {
-        const hero = getHero();
-        const j = hero.joints;
-        const bobY = heroBob(elapsed);
+      apply(tc) {
         const tAbs = tc * total;
-        if (tAbs < anticipation) {
-          // Anticipation: a coiled crouch, fists drawn, before the release.
-          const c = tAbs / anticipation;
-          hero.group.position.y = bobY - c * 0.16;
-          j.torso.rotation.x = 0.06 + c * 0.3;
-          j.legL.rotation.x = -0.22 - c * 0.5;
-          j.legR.rotation.x = 0.26 - c * 0.35;
-          j.kneeL.rotation.x = 0.38 + c * 0.85;
-          j.kneeR.rotation.x = 0.34 + c * 0.85;
-          j.armL.rotation.x = -0.55 - c * 0.4;
-          j.armR.rotation.x = -0.55 - c * 0.4;
-          return;
-        }
         const t = (tAbs - anticipation) / duration;
-        const w = t < 0.3 ? t / 0.3 : Math.max(0, 1 - (t - 0.3) / 0.2);
-        const s = t < 0.3 ? 0 : Math.sin(((t - 0.3) / 0.7) * Math.PI);
         // The exact moment the strike lands: impact sparks fly off the dummy.
         if (hitPending && t >= 0.62) {
           hitPending = false;
@@ -126,73 +109,21 @@ export function createReactions(opts: {
             juice.impactFrame();
           }
         }
-        switch (kind) {
-          case 0: // dash punch: coil back, lunge in with a straight right
-            hero.group.position.x = HERO_X - w * 0.35 + s * 1.7;
-            j.torso.rotation.set(s * 0.2, w * 0.5 - s * 0.55, 0);
-            j.armR.rotation.set(0.6 * w - 1.62 * s, 0, -0.15);
-            j.elbowR.rotation.x = -1.55 + 1.5 * s;
-            j.armL.rotation.set(-0.4, 0, 0.35);
-            break;
-          case 1: // flying kick: crouch, launch, right leg pistons out
-            hero.group.position.x = HERO_X - w * 0.3 + s * 2.0;
-            hero.group.position.y = bobY + s * 0.9;
-            j.torso.rotation.x = w * 0.3 - s * 0.55;
-            j.legR.rotation.x = 0.4 * w - 1.5 * s;
-            j.kneeR.rotation.x = 1.3 * w + 0.08;
-            j.legL.rotation.x = 0.3;
-            j.kneeL.rotation.x = 0.38 + 1.2 * s;
-            j.armL.rotation.set(0.8 * s, 0, 0.5);
-            j.armR.rotation.set(0.8 * s, 0, -0.5);
-            break;
-          case 2: // spin strike: wind opposite, whirl through with arms wide
-            hero.group.position.x = HERO_X - w * 0.3 + s * 1.4;
-            hero.group.rotation.y =
-              Math.PI / 2 - w * 0.6 + (t < 0.3 ? 0 : (t - 0.3) / 0.7) * Math.PI * 2;
-            j.torso.rotation.y = -w * 0.5;
-            j.armL.rotation.set(-0.2, 0, 0.3 + 1.1 * s);
-            j.armR.rotation.set(-0.2, 0, -0.3 - 1.1 * s);
-            j.elbowL.rotation.x = -1.55 + 1.4 * s;
-            j.elbowR.rotation.x = -1.55 + 1.4 * s;
-            break;
-          default: // rising uppercut: deep crouch, then fist drives skyward
-            hero.group.position.x = HERO_X + s * 1.1;
-            hero.group.position.y = bobY - w * 0.22 + s * 1.2;
-            j.torso.rotation.x = w * 0.45 - s * 0.3;
-            j.legL.rotation.x = -0.22 - w * 0.5;
-            j.legR.rotation.x = 0.26 - w * 0.3 - s * 0.7;
-            j.kneeL.rotation.x = 0.38 + w * 0.9;
-            j.kneeR.rotation.x = 0.34 + w * 0.9;
-            j.armR.rotation.set(0.7 * w - 2.5 * s, 0, -0.1);
-            j.elbowR.rotation.x = -1.0 + 0.9 * s;
-            j.armL.rotation.x = -0.3 + s * 0.5;
-            break;
-        }
       },
     };
   }
 
   /**
-   * Wrong answer: knocked off balance — stumbling back, arms windmilling,
-   * head rattling, front leg up, with a red wince that fades on recovery.
+   * Wrong answer: the authored Stagger clip knocks the hero off balance;
+   * this clip adds the red wince on the outfit that fades on recovery.
    */
   function staggerClip(): Clip {
+    getHero().play('Stagger');
     return {
       duration: STYLE.juice.stagger.duration,
-      apply(t, elapsed) {
+      apply(t) {
         const hero = getHero();
-        const j = hero.joints;
         const recoil = Math.sin(t * Math.PI);
-        hero.group.position.x = HERO_X - recoil * 0.7;
-        hero.group.rotation.z = recoil * 0.22;
-        j.torso.rotation.x = -recoil * 0.5;
-        j.head.rotation.y = Math.sin(elapsed * 30) * 0.35 * recoil;
-        j.armL.rotation.set(-2.3 * recoil - 0.3, 0, 0.3 + Math.sin(elapsed * 24) * 0.5 * recoil);
-        j.armR.rotation.set(-2.3 * recoil - 0.3, 0, -0.3 - Math.cos(elapsed * 24) * 0.5 * recoil);
-        j.elbowL.rotation.x = -0.4;
-        j.elbowR.rotation.x = -0.4;
-        j.legL.rotation.x = -0.9 * recoil;
-        j.kneeL.rotation.x = 1.2 * recoil + 0.2;
         hero.bodyMaterial.emissive.setHex(0xff3b3b);
         hero.bodyMaterial.emissiveIntensity = recoil * 0.5;
       },
@@ -203,9 +134,9 @@ export function createReactions(opts: {
   }
 
   /**
-   * The Landmark transformation: a two-second power-up on the spot — coil
-   * low gathering light, then erupt skyward, arms thrown wide, gold energy
-   * pouring off in three staged waves as the new form ignites.
+   * The Landmark transformation: the authored Transform clip coils low and
+   * erupts skyward; this clip pours the gold energy off in three staged
+   * waves and swaps the hair at the moment of ascension.
    */
   function landmarkClip(): Clip {
     const waves = [0.15, 0.5, 0.8];
@@ -214,13 +145,13 @@ export function createReactions(opts: {
     // (a shared mane from Wild Mane on) takes over as the hero erupts.
     let ascended = false;
     getHero().showHair(getHero().hairBefore);
+    getHero().play('Transform');
     return {
       duration: 2.0,
       // However the scene ends, the hero leaves it wearing the new hair.
       onDone: () => getHero().showHair(getHero().hairNow),
-      apply(t, elapsed) {
+      apply(t) {
         const hero = getHero();
-        const j = hero.joints;
         if (nextWave < waves.length && t >= (waves[nextWave] ?? 1)) {
           nextWave += 1;
           const count = 14 + nextWave * 8;
@@ -229,36 +160,14 @@ export function createReactions(opts: {
           fx.chargeRing(0xffd700, hero.group.position.clone().setY(1.3), true);
           juice.addShake(0.18 + nextWave * 0.08);
         }
-        if (t < 0.4) {
-          // Gathering: a deep coil, fists drawn to the sides.
-          const c = t / 0.4;
-          hero.group.position.y = heroBob(elapsed) - c * 0.2;
-          j.torso.rotation.x = 0.06 + c * 0.35;
-          j.kneeL.rotation.x = 0.38 + c * 0.9;
-          j.kneeR.rotation.x = 0.34 + c * 0.9;
-          j.armL.rotation.set(-0.2, 0, 0.75);
-          j.armR.rotation.set(-0.2, 0, -0.75);
-          return;
-        }
-        if (!ascended) {
+        if (!ascended && t >= 0.4) {
           ascended = true;
           hero.showHair(hero.hairNow);
         }
-        // Eruption: rise past standing, arch back, arms thrown wide to the
-        // sky, easing home over the tail of the clip.
-        const e = Math.min(1, (t - 0.4) / 0.25);
-        const settle = t > 0.8 ? (t - 0.8) / 0.2 : 0;
-        const lift = Math.sin(e * Math.PI * 0.5) * (1 - settle);
-        hero.group.position.y = heroBob(elapsed) + lift * 0.55;
-        j.torso.rotation.x = 0.06 - lift * 0.3;
-        j.head.rotation.x = -lift * 0.35;
-        j.armL.rotation.set(-2.6 * lift - 0.2, 0, 0.9 * lift + 0.3);
-        j.armR.rotation.set(-2.6 * lift - 0.2, 0, -0.9 * lift - 0.3);
-        j.elbowL.rotation.x = -0.3 * (1 - lift) - 1.55 * (1 - lift);
-        j.elbowR.rotation.x = -0.3 * (1 - lift) - 1.55 * (1 - lift);
       },
     };
   }
+
 
   return {
     handleEffects(effects) {
@@ -291,13 +200,24 @@ export function createReactions(opts: {
             );
             juice.addShake(0.25);
             juice.speedLines();
+            // The hero powers up once the strike that earned it has landed.
+            hero.play('Charge', true);
             break;
           case 'STREAK_BROKEN':
-          case 'ROUND_ENDED':
-          case 'ROUND_ABANDONED':
             applyForm('base');
             break;
+          case 'ROUND_ENDED':
+            applyForm('base');
+            // Results: a hop and a fist to the sky (a Landmark scene that
+            // follows in the same effects takes over).
+            hero.play('Victory');
+            break;
+          case 'ROUND_ABANDONED':
+            applyForm('base');
+            hero.play('Idle');
+            break;
           case 'BLAST_FIRED':
+            hero.play('Blast');
             fx.fireBlast(true);
             juice.punchCamera();
             juice.speedLines();
@@ -381,27 +301,9 @@ export function createReactions(opts: {
         }
       }
 
-      // At rest the authored Idle clip (Blender) holds the guard stance and
-      // breathes. An action poses from the same stance in code, so nothing
-      // is left mid-swing when it is interrupted (the hero clips ticket
-      // replaces these code actions with authored ones).
-      if (hero.idle && !heroChannel.playing()) {
-        hero.mixer?.update(dt);
-      } else {
-        // Guard stance: left foot forward, knees soft, fists raised.
-        const j = hero.joints;
-        const breathe = Math.sin(elapsed * 2.2);
-        j.torso.rotation.set(0.06 + breathe * 0.02, 0, 0);
-        j.head.rotation.set(-0.04, Math.sin(elapsed * 0.7) * 0.08, 0);
-        j.armL.rotation.set(-0.55 + breathe * 0.04, 0, 0.3);
-        j.armR.rotation.set(-0.55 + breathe * 0.04, 0, -0.3);
-        j.elbowL.rotation.set(-1.55, 0, 0);
-        j.elbowR.rotation.set(-1.55, 0, 0);
-        j.legL.rotation.set(-0.22, 0, 0);
-        j.legR.rotation.set(0.26, 0, 0);
-        j.kneeL.rotation.set(0.38, 0, 0);
-        j.kneeR.rotation.set(0.34, 0, 0);
-      }
+      // Every pose is an authored Blender clip (Idle between actions); the
+      // code clips below only time effects (impacts, the wince, the waves).
+      hero.mixer?.update(dt);
 
       heroChannel.update(dt, elapsed);
 
