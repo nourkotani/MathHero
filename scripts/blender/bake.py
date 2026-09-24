@@ -22,6 +22,7 @@ import common  # noqa: E402
 MODELS = {
     "training-dummy": "training_dummy",
     "arena": "arena",
+    "hero": "hero",
 }
 
 

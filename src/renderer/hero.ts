@@ -3,8 +3,9 @@
 // looks that transform it.
 
 import * as THREE from 'three';
-import { presetHex, SKIN_PRESETS } from '../core';
-import type { HairStyle, HeroAppearance, StreakForm } from '../core';
+import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
+import { COSMETIC_MILESTONES, presetHex, SKIN_PRESETS } from '../core';
+import type { CosmeticSlot, Garment, HairStyle, HeroAppearance, StreakForm } from '../core';
 import {
   characterSurface,
   cosmeticPanel,
@@ -12,11 +13,13 @@ import {
   faceDecal,
   glowSurface,
   markBloom,
+  painterlySurface,
 } from './materials';
+import { loadModel } from './models';
+import heroModelUrl from './models/hero.glb';
 import { STYLE } from './style';
 import type { Surface } from './materials';
 import { applyCelTreatment } from './cel';
-import clothUrl from './textures/cloth.png';
 import faceBoyUrl from './textures/face-boy.png';
 import faceGirlUrl from './textures/face-girl.png';
 import featherUrl from './textures/feather.png';
@@ -151,22 +154,90 @@ export const FORM_LOOKS: Record<
 };
 
 /** Joint pivots the frame loop poses every frame. Limb meshes hang inside. */
+/** The joints the poses drive: the Blender rig's bones, or placeholder
+ *  pivots at the same places until the model decodes. */
 export interface HeroJoints {
-  torso: THREE.Group;
-  head: THREE.Group;
-  armL: THREE.Group;
-  armR: THREE.Group;
-  elbowL: THREE.Group;
-  elbowR: THREE.Group;
-  legL: THREE.Group;
-  legR: THREE.Group;
-  kneeL: THREE.Group;
-  kneeR: THREE.Group;
+  torso: THREE.Object3D;
+  head: THREE.Object3D;
+  armL: THREE.Object3D;
+  armR: THREE.Object3D;
+  elbowL: THREE.Object3D;
+  elbowR: THREE.Object3D;
+  legL: THREE.Object3D;
+  legR: THREE.Object3D;
+  kneeL: THREE.Object3D;
+  kneeR: THREE.Object3D;
+}
+
+/** Where each joint pivots, relative to its parent joint (the hero root
+ *  for torso and legs) — the same pivots as the rig's bones. */
+const PIVOTS: Record<keyof HeroJoints, [number, number, number, keyof HeroJoints | null]> = {
+  torso: [0, 1.0, 0, null],
+  head: [0, 0.88, 0, 'torso'],
+  armL: [-0.52, 0.7, 0, 'torso'],
+  elbowL: [0, -0.36, 0, 'armL'],
+  armR: [0.52, 0.7, 0, 'torso'],
+  elbowR: [0, -0.36, 0, 'armR'],
+  legL: [-0.2, 0.88, 0, null],
+  kneeL: [0, -0.44, 0, 'legL'],
+  legR: [0.2, 0.88, 0, null],
+  kneeR: [0, -0.44, 0, 'legR'],
+};
+
+/** Placeholder pivots, used only until the Blender hero decodes. */
+function heroJoints(root: THREE.Object3D): HeroJoints {
+  const joints = {} as HeroJoints;
+  for (const [name, [x, y, z, parent]] of Object.entries(PIVOTS) as Array<
+    [keyof HeroJoints, [number, number, number, keyof HeroJoints | null]]
+  >) {
+    const pivot = new THREE.Group();
+    pivot.position.set(x, y, z);
+    (parent ? joints[parent] : root).add(pivot);
+    joints[name] = pivot;
+  }
+  return joints;
+}
+
+/** The garment mesh in the hero model for each garment choice. */
+const GARMENT_MESHES: Record<Garment, string> = {
+  gi: 'GarmentGi',
+  cape: 'GarmentCape',
+  armor: 'GarmentArmor',
+};
+
+/** Which named model part (body or garment) a mesh belongs to. */
+function meshOwner(mesh: THREE.Object3D): string | null {
+  for (let node: THREE.Object3D | null = mesh; node; node = node.parent) {
+    if (/^(Body|Garment)/.test(node.name)) return node.name.replace(/_\d+$/, '');
+  }
+  return null;
+}
+
+/** Cosmetic slots worn on a bone: crowns and halos on the head, wings and
+ *  trails on the back. Rings, wisps, and Legend circle the whole hero. */
+const SLOT_BONE: Partial<Record<CosmeticSlot, keyof HeroJoints>> = {
+  crown: 'head',
+  halo: 'head',
+  wings: 'torso',
+  trail: 'torso',
+};
+
+let heroTemplate: { scene: THREE.Object3D; clips: THREE.AnimationClip[] } | null = null;
+
+/** Decode the Blender hero once; onReady fires when heroes can wear it. */
+export function loadHeroModel(onReady: () => void): void {
+  loadModel(heroModelUrl, (scene, clips) => {
+    heroTemplate = { scene, clips };
+    onReady();
+  });
 }
 
 export interface HeroRig {
   group: THREE.Group;
   joints: HeroJoints;
+  /** Plays the authored Idle clip; null until the Blender hero decodes. */
+  mixer: THREE.AnimationMixer | null;
+  idle: THREE.AnimationAction | null;
   hairMaterials: Surface[];
   bodyMaterial: Surface;
   trimMaterial: Surface;
@@ -289,85 +360,59 @@ export function buildHero(
   const group = new THREE.Group();
   const girl = appearance.body === 'girl';
 
-  const bodyMaterial = characterSurface(0x3a6fd8, clothUrl);
-  const trimMaterial = characterSurface(0xff9f1c, clothUrl);
-  const skinMaterial = characterSurface(presetHex(SKIN_PRESETS, appearance.skinTone));
+  // The body is baked in Blender (scripts/blender/hero.py, ADR 0007/0008):
+  // both bodies and the three garments on one rig whose bones sit on the
+  // joint pivots with identity rests, so the poses below drive them as
+  // they drove the old code joints. Until the model decodes (a moment at
+  // boot) the joints are plain pivots and the body is simply not there;
+  // the renderer rebuilds the hero once it arrives.
+  const bodyMaterial = painterlySurface(null) as THREE.MeshToonMaterial;
+  const trimMaterial = painterlySurface(null) as THREE.MeshToonMaterial;
+  const skinMaterial = painterlySurface(null) as THREE.MeshToonMaterial;
+  skinMaterial.color.setHex(presetHex(SKIN_PRESETS, appearance.skinTone));
+  const regionMaterials: Record<string, THREE.MeshToonMaterial> = {
+    PaintedOutfit: bodyMaterial,
+    PaintedTrim: trimMaterial,
+    PaintedSkin: skinMaterial,
+  };
 
-  // Pelvis: the gi's trousers. Girls get wider hips, boys a blockier seat.
-  const pelvis = new THREE.Mesh(new THREE.SphereGeometry(0.3, 14, 10), bodyMaterial);
-  pelvis.position.y = 0.92;
-  pelvis.scale.set(girl ? 1.2 : 1.05, 0.55, girl ? 0.85 : 0.8);
-  group.add(pelvis);
-
-  const belt = new THREE.Mesh(
-    new THREE.CylinderGeometry(girl ? 0.37 : 0.42, girl ? 0.37 : 0.42, 0.14, 16),
-    trimMaterial,
-  );
-  belt.position.y = 1.03;
-  belt.scale.z = 0.78;
-  group.add(belt);
-
-  // The martial-arts sash: a tied knot at the front with two hanging tails.
-  const knot = new THREE.Mesh(new THREE.SphereGeometry(0.08, 8, 6), trimMaterial);
-  knot.position.set(0, 1.0, girl ? 0.26 : 0.3);
-  knot.scale.set(1.2, 0.8, 0.7);
-  group.add(knot);
-  for (const side of [-1, 1]) {
-    const tail = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.2, 0.025), trimMaterial);
-    tail.position.set(side * 0.07, 0.88, girl ? 0.25 : 0.29);
-    tail.rotation.z = side * 0.18;
-    group.add(tail);
-  }
-
-  // The gi's lower flap over the trousers (armor wears a solid suit instead).
-  if (appearance.garment !== 'armor') {
-    const flap = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.24, 0.05), bodyMaterial);
-    flap.position.set(0, 0.84, girl ? 0.2 : 0.24);
-    flap.rotation.x = 0.14;
-    group.add(flap);
-  }
-
-  // Torso pivot: leaning and twisting happen here; arms and head ride along.
-  const torso = new THREE.Group();
-  torso.position.y = 1.0;
-  group.add(torso);
-
-  const chest = new THREE.Mesh(new THREE.CapsuleGeometry(0.36, 0.3, 6, 12), bodyMaterial);
-  chest.position.y = 0.35;
-  chest.scale.set(girl ? 0.85 : 1.05, 1, girl ? 0.72 : 0.8);
-  torso.add(chest);
-
-  if (girl) {
-    // A modest chest contour under the gi — silhouette, nothing more.
-    const contour = new THREE.Mesh(new THREE.SphereGeometry(0.24, 12, 10), bodyMaterial);
-    contour.position.set(0, 0.5, 0.16);
-    contour.scale.set(1.15, 0.7, 0.75);
-    torso.add(contour);
-  }
-
-  // The gi's crossed collar: two trim bands meeting in a V at the chest
-  // (battle armor's plate covers the same spot, so it goes without).
-  if (appearance.garment !== 'armor') {
-    for (const side of [-1, 1]) {
-      const lapel = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.055, 0.03), trimMaterial);
-      lapel.position.set(side * 0.1, 0.56, girl ? 0.24 : 0.29);
-      lapel.rotation.z = side * 0.55;
-      torso.add(lapel);
+  const joints = heroJoints(group);
+  let mixer: THREE.AnimationMixer | null = null;
+  let idle: THREE.AnimationAction | null = null;
+  if (heroTemplate) {
+    const body = girl ? 'BodyGirl' : 'BodyBoy';
+    const garment = GARMENT_MESHES[appearance.garment];
+    const model = cloneSkinned(heroTemplate.scene);
+    model.traverse((obj: THREE.Object3D) => {
+      if (!(obj instanceof THREE.Mesh)) return;
+      // The geometry belongs to the template, shared by every rebuild.
+      obj.userData.sharedGeometry = true;
+      const owner = meshOwner(obj);
+      obj.visible = owner === body || owner === garment;
+      if (obj.userData.outlineHull) return;
+      const region = (obj.material as THREE.Material).name;
+      const tinted = regionMaterials[region];
+      if (tinted) {
+        // One tint material per region per hero, wearing the baked light
+        // and shade of the template's painted atlas.
+        tinted.map = (obj.material as THREE.MeshToonMaterial).map;
+        tinted.needsUpdate = true;
+        obj.material = tinted;
+      }
+    });
+    group.add(model);
+    // The template's bones replace the placeholder pivots.
+    for (const name of Object.keys(joints) as Array<keyof HeroJoints>) {
+      const bone = model.getObjectByName(name);
+      if (bone) joints[name] = bone;
     }
+    mixer = new THREE.AnimationMixer(model);
+    const idleClip = heroTemplate.clips.find((clip: THREE.AnimationClip) => clip.name === 'Idle');
+    if (idleClip) idle = mixer.clipAction(idleClip).play();
   }
-
-  const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.095, 0.11, 0.16, 10), skinMaterial);
-  neck.position.y = 0.78;
-  torso.add(neck);
-
-  // Head pivot: nods, shakes, and the hair all swing together.
-  const head = new THREE.Group();
-  head.position.y = 0.88;
-  torso.add(head);
-
-  const skull = new THREE.Mesh(new THREE.SphereGeometry(0.34, 20, 16), skinMaterial);
-  skull.position.y = 0.16;
-  head.add(skull);
+  // The face and the hair stay in code for now, riding the head bone
+  // (the Hair Style ticket moves the hair into Blender).
+  const headPivot = joints.head;
 
   // The painted anime face: a transparent decal on a sphere segment just
   // off the skull, so every skin tone shows through around the features.
@@ -377,7 +422,7 @@ export function buildHero(
   const face = new THREE.Mesh(faceShape(), faceDecal(girl ? faceGirlUrl : faceBoyUrl));
   face.position.y = 0.16;
   face.renderOrder = 1;
-  head.add(face);
+  headPivot.add(face);
 
   // The irises ride their own sheet so a Form can change the hero's eyes
   // without rebaking a whole face per Form.
@@ -386,7 +431,7 @@ export function buildHero(
   const irises = new THREE.Mesh(faceShape(), irisMaterial);
   irises.position.y = 0.16;
   irises.renderOrder = 2;
-  head.add(irises);
+  headPivot.add(irises);
 
   // The catchlights sit on their own untinted sheet above the iris. On the
   // tinted sheet they took the Form's color, and an eye whose highlight
@@ -394,7 +439,7 @@ export function buildHero(
   const sparks = new THREE.Mesh(faceShape(), faceDecal(girl ? sparkGirlUrl : sparkBoyUrl));
   sparks.position.y = 0.16;
   sparks.renderOrder = 3;
-  head.add(sparks);
+  headPivot.add(sparks);
 
   // Anime hair from the chosen style; every strand shares the swappable
   // hair materials so streak forms and player colors recolor them all.
@@ -409,95 +454,13 @@ export function buildHero(
   // pivot is what makes a powered-up hero's hair visibly rise.
   const hairGroup = new THREE.Group();
   hairGroup.scale.setScalar(palette?.hairScale ?? 1);
-  head.add(hairGroup);
+  headPivot.add(hairGroup);
   buildHair(
     hairGroup,
     appearance.hairStyle,
     appearance.hairLength === 'long' || palette?.mane === true,
     hairMat,
   );
-
-  // Arms: shoulder pivot → upper arm → elbow pivot → forearm, band, fist.
-  const shoulderX = girl ? 0.47 : 0.55;
-  const armW = girl ? 0.11 : 0.12;
-  const buildArm = (side: number): [THREE.Group, THREE.Group] => {
-    const shoulder = new THREE.Group();
-    shoulder.position.set(side * shoulderX, 0.7, 0);
-    torso.add(shoulder);
-
-    const upper = new THREE.Mesh(new THREE.CapsuleGeometry(armW, 0.26, 4, 8), bodyMaterial);
-    upper.position.y = -0.17;
-    shoulder.add(upper);
-
-    const elbow = new THREE.Group();
-    elbow.position.y = -0.36;
-    shoulder.add(elbow);
-
-    const forearm = new THREE.Mesh(new THREE.CapsuleGeometry(armW - 0.015, 0.24, 4, 8), skinMaterial);
-    forearm.position.y = -0.15;
-    elbow.add(forearm);
-
-    // Martial-artist wristbands in the outfit's trim color.
-    const wristband = new THREE.Mesh(new THREE.CylinderGeometry(0.125, 0.125, 0.12, 10), trimMaterial);
-    wristband.position.y = -0.28;
-    elbow.add(wristband);
-
-    const fist = new THREE.Mesh(new THREE.SphereGeometry(0.13, 10, 8), skinMaterial);
-    fist.position.y = -0.4;
-    elbow.add(fist);
-
-    return [shoulder, elbow];
-  };
-  const [armL, elbowL] = buildArm(-1);
-  const [armR, elbowR] = buildArm(1);
-
-  // Legs: hip pivot → thigh → knee pivot → shin and boot.
-  const hipX = girl ? 0.21 : 0.2;
-  const legW = girl ? 0.15 : 0.16;
-  const buildLeg = (side: number): [THREE.Group, THREE.Group] => {
-    const hip = new THREE.Group();
-    hip.position.set(side * hipX, 0.88, 0);
-    group.add(hip);
-
-    const thigh = new THREE.Mesh(new THREE.CapsuleGeometry(legW, 0.3, 4, 8), bodyMaterial);
-    thigh.position.y = -0.21;
-    hip.add(thigh);
-
-    const knee = new THREE.Group();
-    knee.position.y = -0.44;
-    hip.add(knee);
-
-    const shin = new THREE.Mesh(new THREE.CapsuleGeometry(legW - 0.025, 0.26, 4, 8), bodyMaterial);
-    shin.position.y = -0.17;
-    knee.add(shin);
-
-    const boot = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.19, 0.22, 10), trimMaterial);
-    boot.position.set(0, -0.36, 0.03);
-    knee.add(boot);
-
-    return [hip, knee];
-  };
-  const [legL, kneeL] = buildLeg(-1);
-  const [legR, kneeR] = buildLeg(1);
-
-  // Garments beyond the basic gi.
-  if (appearance.garment === 'cape') {
-    const cape = new THREE.Mesh(new THREE.BoxGeometry(0.95, 1.4, 0.05), trimMaterial);
-    cape.position.set(0, 0.05, -0.38);
-    cape.rotation.x = 0.12;
-    torso.add(cape);
-  } else if (appearance.garment === 'armor') {
-    const plate = new THREE.Mesh(new THREE.CapsuleGeometry(0.44, 0.34, 6, 12), trimMaterial);
-    plate.position.y = 0.38;
-    plate.scale.set(girl ? 0.92 : 1.1, 0.85, girl ? 0.8 : 0.9);
-    torso.add(plate);
-    for (const shoulder of [armL, armR]) {
-      const pad = new THREE.Mesh(new THREE.SphereGeometry(0.18, 10, 8), trimMaterial);
-      pad.position.y = 0.02;
-      pad.scale.set(1.2, 0.8, 1.1);
-      shoulder.add(pad);
-    }
-  }
 
   // Front faces only: with two nested shells, double-sided rendering would
   // stack four color layers and wall the hero off inside the flame.
@@ -549,9 +512,28 @@ export function buildHero(
 
   applyCelTreatment(group);
 
+  // Worn cosmetics ride their bone: the crown turns with the head, the
+  // wings lean with the torso. attach() keeps each piece where it was
+  // built (the rig is at rest here), so the tuned anchors still hold, and
+  // every motor re-reads its rest pose relative to the new parent.
+  group.updateMatrixWorld(true);
+  for (const tier of COSMETIC_MILESTONES) {
+    const bone = SLOT_BONE[tier.slot];
+    const piece = cosmetics.get(tier.id);
+    if (bone && piece) joints[bone].attach(piece);
+  }
+  for (const motor of cosmeticMotors) {
+    motor.restY = motor.object.position.y;
+    motor.restRoll = motor.object.rotation.z;
+    motor.restPitch = motor.object.rotation.x;
+    motor.restScale = motor.object.scale.x;
+  }
+
   return {
     group,
-    joints: { torso, head, armL, armR, elbowL, elbowR, legL, legR, kneeL, kneeR },
+    joints,
+    mixer,
+    idle,
     hairMaterials,
     bodyMaterial,
     trimMaterial,

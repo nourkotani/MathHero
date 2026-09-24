@@ -371,19 +371,27 @@ export function createReactions(opts: {
         }
       }
 
-      // Guard stance: left foot forward, knees soft, fists raised.
-      const j = hero.joints;
-      const breathe = Math.sin(elapsed * 2.2);
-      j.torso.rotation.set(0.06 + breathe * 0.02, 0, 0);
-      j.head.rotation.set(-0.04, Math.sin(elapsed * 0.7) * 0.08, 0);
-      j.armL.rotation.set(-0.55 + breathe * 0.04, 0, 0.3);
-      j.armR.rotation.set(-0.55 + breathe * 0.04, 0, -0.3);
-      j.elbowL.rotation.set(-1.55, 0, 0);
-      j.elbowR.rotation.set(-1.55, 0, 0);
-      j.legL.rotation.set(-0.22, 0, 0);
-      j.legR.rotation.set(0.26, 0, 0);
-      j.kneeL.rotation.set(0.38, 0, 0);
-      j.kneeR.rotation.set(0.34, 0, 0);
+      // At rest the authored Idle clip (Blender) holds the guard stance and
+      // breathes. An action poses from the same stance in code, so nothing
+      // is left mid-swing when it is interrupted (the hero clips ticket
+      // replaces these code actions with authored ones).
+      if (hero.idle && !heroChannel.playing()) {
+        hero.mixer?.update(dt);
+      } else {
+        // Guard stance: left foot forward, knees soft, fists raised.
+        const j = hero.joints;
+        const breathe = Math.sin(elapsed * 2.2);
+        j.torso.rotation.set(0.06 + breathe * 0.02, 0, 0);
+        j.head.rotation.set(-0.04, Math.sin(elapsed * 0.7) * 0.08, 0);
+        j.armL.rotation.set(-0.55 + breathe * 0.04, 0, 0.3);
+        j.armR.rotation.set(-0.55 + breathe * 0.04, 0, -0.3);
+        j.elbowL.rotation.set(-1.55, 0, 0);
+        j.elbowR.rotation.set(-1.55, 0, 0);
+        j.legL.rotation.set(-0.22, 0, 0);
+        j.legR.rotation.set(0.26, 0, 0);
+        j.kneeL.rotation.set(0.38, 0, 0);
+        j.kneeR.rotation.set(0.34, 0, 0);
+      }
 
       heroChannel.update(dt, elapsed);
 

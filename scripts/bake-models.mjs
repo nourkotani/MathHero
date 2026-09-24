@@ -62,7 +62,13 @@ for (const file of readdirSync(RAW_DIR).filter((f) => f.endsWith('.raw.glb')).so
   const name = file.replace(/\.raw\.glb$/, '');
   if (only.length > 0 && !only.includes(name)) continue;
   const document = await io.read(join(RAW_DIR, file));
-  await document.transform(dedup(), prune(), meshopt({ encoder: MeshoptEncoder, level: 'medium' }));
+  // keepUniqueNames: the hero's tint regions (PaintedSkin, PaintedOutfit,
+  // PaintedTrim) differ only by name, and the renderer tints them by name.
+  await document.transform(
+    dedup({ keepUniqueNames: true }),
+    prune(),
+    meshopt({ encoder: MeshoptEncoder, level: 'medium' }),
+  );
   const out = join(OUT_DIR, `${name}.glb`);
   await io.write(out, document);
   console.log(`wrote ${out}`);

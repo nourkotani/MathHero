@@ -36,6 +36,8 @@ export function loadModel(
           obj.userData.outlineHull = true;
         } else {
           obj.material = painterlySurface(baked.map, options.rimScale);
+          // The name carries the tint region (PaintedSkin, PaintedOutfit…).
+          obj.material.name = baked.name;
           obj.castShadow = true;
         }
         // A skinned mesh keeps its rest-pose bounds; a clip that flies the

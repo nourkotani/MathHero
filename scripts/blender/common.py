@@ -17,7 +17,7 @@ import math
 
 import bmesh
 import bpy
-from mathutils import Vector
+from mathutils import Matrix, Vector
 
 INK = "Ink"
 PAINTED = "Painted"
@@ -30,7 +30,16 @@ def reset_scene():
     """Start from an empty scene with fixed render settings."""
     for obj in list(bpy.data.objects):
         bpy.data.objects.remove(obj, do_unlink=True)
-    for collection in (bpy.data.meshes, bpy.data.materials, bpy.data.images, bpy.data.curves):
+    # Actions and armatures too: the bake builds several models in one
+    # session, and a leftover "Idle" would rename the next one "Idle.001".
+    for collection in (
+        bpy.data.meshes,
+        bpy.data.materials,
+        bpy.data.images,
+        bpy.data.curves,
+        bpy.data.actions,
+        bpy.data.armatures,
+    ):
         for block in list(collection):
             collection.remove(block)
     scene = bpy.context.scene
@@ -274,7 +283,7 @@ def rock(name, radius, height, location, seed, sides=7, rings=5, rough=0.12, tap
     return obj
 
 
-def split_group(obj, group, name):
+def split_group(obj, group, name, center=True):
     """Move the faces of one vertex group into a new object of their own,
     with its origin at their center. Same UVs, same material, same image."""
     index = obj.vertex_groups[group].index
@@ -289,11 +298,12 @@ def split_group(obj, group, name):
         part, geom=[f for f in part.faces if not all(index in v[part_deform] for v in f.verts)], context="FACES"
     )
     bmesh.ops.delete(keep, geom=in_group, context="FACES")
-    center = Vector((0.0, 0.0, 0.0))
-    for v in part.verts:
-        center += v.co
-    center /= max(1, len(part.verts))
-    bmesh.ops.translate(part, verts=part.verts, vec=-center)
+    middle = Vector((0.0, 0.0, 0.0))
+    if center:
+        for v in part.verts:
+            middle += v.co
+        middle /= max(1, len(part.verts))
+        bmesh.ops.translate(part, verts=part.verts, vec=-middle)
     keep.to_mesh(obj.data)
     keep.free()
     mesh = bpy.data.meshes.new(name)
@@ -302,11 +312,30 @@ def split_group(obj, group, name):
     for mat in obj.data.materials:
         mesh.materials.append(mat)
     piece = _link(bpy.data.objects.new(name, mesh))
-    piece.location = center
+    piece.location = middle
+    # Same group names in the same order: the mesh's deform weights still
+    # point at the right bones.
+    for vg in obj.vertex_groups:
+        piece.vertex_groups.new(name=vg.name)
     return piece
 
 
 # ---------------------------------------------------------------- modifiers
+
+
+def scale_about(obj, scale, center):
+    """Scale the mesh by (x, y, z) around a world point."""
+    c = Matrix.Translation(Vector(center))
+    s = Matrix.Diagonal((*scale, 1.0))
+    obj.data.transform(c @ s @ c.inverted())
+    return obj
+
+
+def remove(obj):
+    mesh = obj.data
+    bpy.data.objects.remove(obj, do_unlink=True)
+    if mesh.users == 0:
+        bpy.data.meshes.remove(mesh)
 
 
 def apply_transform(obj):
@@ -447,8 +476,10 @@ def join(name, objects):
         start = len(bm.faces)
         first_vert = len(bm.verts)
         bm.from_mesh(obj.data)
-        if "bone" in obj:
-            groups.setdefault(obj["bone"], []).extend(range(first_vert, len(bm.verts)))
+        # "bone" skins the part; "part" marks which object it splits into.
+        for key in ("bone", "part"):
+            if key in obj:
+                groups.setdefault(obj[key], []).extend(range(first_vert, len(bm.verts)))
         bm.faces.ensure_lookup_table()
         slot_map = []
         for mat in obj.data.materials:
@@ -474,11 +505,16 @@ def join(name, objects):
     return joined
 
 
-def bake_painted(obj, size=1024):
+def bake_painted(obj, size=1024, regions=None):
     """Bake the parts' paint materials into one albedo, then wear it.
 
     After the bake, every face wears the single "Painted" material with the
     baked image as its base color — the only material the runtime reads.
+
+    regions: {paint material name: region}. Faces of those materials wear
+    "Painted<Region>" instead (same image), so the runtime can tint each
+    region with a chosen color. Paint tintable regions near white: the bake
+    then holds only their light and shade.
     """
     bpy.ops.object.select_all(action="DESELECT")
     obj.select_set(True)
@@ -501,18 +537,29 @@ def bake_painted(obj, size=1024):
 
     bpy.ops.object.bake(type="EMIT", margin=8, use_clear=True)
 
-    painted = bpy.data.materials.new(PAINTED)
-    painted.use_nodes = True
-    bsdf = painted.node_tree.nodes["Principled BSDF"]
-    tex = painted.node_tree.nodes.new("ShaderNodeTexImage")
-    tex.image = image
-    painted.node_tree.links.new(tex.outputs["Color"], bsdf.inputs["Base Color"])
-    bsdf.inputs["Roughness"].default_value = 1.0
+    def wearing(name):
+        painted = bpy.data.materials.new(name)
+        painted.use_nodes = True
+        bsdf = painted.node_tree.nodes["Principled BSDF"]
+        tex = painted.node_tree.nodes.new("ShaderNodeTexImage")
+        tex.image = image
+        painted.node_tree.links.new(tex.outputs["Color"], bsdf.inputs["Base Color"])
+        bsdf.inputs["Roughness"].default_value = 1.0
+        return painted
+
+    regions = regions or {}
     old = list(obj.data.materials)
+    targets = [PAINTED] + sorted(set(regions.values()))
+    slot = {name: i for i, name in enumerate(targets)}
+    old_to_new = [slot[regions.get(mat.name, PAINTED)] for mat in old]
+    # Read every face's new index before clearing: clearing the slots resets
+    # the faces' indices to 0.
+    new_index = [old_to_new[poly.material_index] for poly in obj.data.polygons]
     obj.data.materials.clear()
-    obj.data.materials.append(painted)
-    for poly in obj.data.polygons:
-        poly.material_index = 0
+    for name in targets:
+        obj.data.materials.append(wearing(name if name == PAINTED else PAINTED + name))
+    for poly, index in zip(obj.data.polygons, new_index):
+        poly.material_index = index
     for mat in old:
         bpy.data.materials.remove(mat)
     return image
@@ -548,16 +595,23 @@ def add_ink_hull(obj, thickness):
 FPS = 24
 
 
-def add_rig(obj, bones):
-    """Parent obj to a new armature and skin it by its vertex groups.
+def add_rig(obj, bones, name=None, rotation="XYZ"):
+    """Parent obj (one mesh or a list) to a new armature, skinned by the
+    meshes' vertex groups.
 
-    bones: (name, head, tail, parent) tuples, in world coordinates. Every
-    bone stands upright with zero roll, so its local axes are: X = world X,
-    Y = up (along the bone), Z = world -Y. A negative Z rotation leans a
-    bone toward +X.
+    bones: (name, head, tail, parent) tuples, in world coordinates. A bone
+    standing upright with zero roll has local axes X = world X, Y = up
+    (along the bone), Z = world -Y: a negative Z rotation leans it toward
+    +X. After the Y-up glTF export those are exactly three.js's X, Y, Z,
+    and a rig of upright bones has identity rests: in three.js each bone
+    behaves like a plain joint (the hero's rig uses this).
+
+    rotation: the pose rotation mode, "XYZ" or "QUATERNION".
     """
-    data = bpy.data.armatures.new(f"{obj.name}Rig")
-    rig = _link(bpy.data.objects.new(f"{obj.name}Rig", data))
+    meshes = obj if isinstance(obj, list) else [obj]
+    name = name or f"{meshes[0].name}Rig"
+    data = bpy.data.armatures.new(name)
+    rig = _link(bpy.data.objects.new(name, data))
     bpy.ops.object.select_all(action="DESELECT")
     rig.select_set(True)
     bpy.context.view_layer.objects.active = rig
@@ -570,11 +624,12 @@ def add_rig(obj, bones):
         if parent:
             bone.parent = data.edit_bones[parent]
     bpy.ops.object.mode_set(mode="OBJECT")
-    obj.parent = rig
-    mod = obj.modifiers.new("Rig", "ARMATURE")
-    mod.object = rig
+    for mesh in meshes:
+        mesh.parent = rig
+        mod = mesh.modifiers.new("Rig", "ARMATURE")
+        mod.object = rig
     for pose_bone in rig.pose.bones:
-        pose_bone.rotation_mode = "XYZ"
+        pose_bone.rotation_mode = rotation
     bpy.context.scene.render.fps = FPS
     return rig
 
@@ -588,6 +643,8 @@ def add_clip(rig, name, length, keys):
     clip never leaves a bone posed by an earlier clip.
     """
     rest = {"loc": (0.0, 0.0, 0.0), "rot": (0.0, 0.0, 0.0), "scale": (1.0, 1.0, 1.0)}
+    quat = rig.pose.bones[0].rotation_mode == "QUATERNION"
+    rot_path = "rotation_quaternion" if quat else "rotation_euler"
     rig.animation_data_create()
     action = bpy.data.actions.new(name)
     action.use_fake_user = True
@@ -599,9 +656,12 @@ def add_clip(rig, name, length, keys):
         for frame in sorted(frames):
             pose = {**rest, **frames[frame]}
             pose_bone.location = pose["loc"]
-            pose_bone.rotation_euler = pose["rot"]
+            if quat:
+                pose_bone.rotation_quaternion = three_rotation(*pose["rot"])
+            else:
+                pose_bone.rotation_euler = pose["rot"]
             pose_bone.scale = pose["scale"]
-            for path in ("location", "rotation_euler", "scale"):
+            for path in ("location", rot_path, "scale"):
                 pose_bone.keyframe_insert(path, frame=frame)
     track = rig.animation_data.nla_tracks.new()
     track.name = name
@@ -611,7 +671,23 @@ def add_clip(rig, name, length, keys):
     for pose_bone in rig.pose.bones:
         pose_bone.location = rest["loc"]
         pose_bone.rotation_euler = rest["rot"]
+        pose_bone.rotation_quaternion = (1.0, 0.0, 0.0, 0.0)
         pose_bone.scale = rest["scale"]
+
+
+def three_rotation(x, y, z):
+    """A three.js Euler (order XYZ) as the pose quaternion of an upright
+    bone. Its local axes are three's X, Y, Z (see add_rig), and three
+    applies the matrix Rx·Ry·Rz."""
+    rx = Matrix.Rotation(x, 4, "X")
+    ry = Matrix.Rotation(y, 4, "Y")
+    rz = Matrix.Rotation(z, 4, "Z")
+    return (rx @ ry @ rz).to_quaternion()
+
+
+def three_point(x, y, z):
+    """A point in three.js hero space (Y up, facing +Z) in Blender space."""
+    return (x, -z, y)
 
 
 # ---------------------------------------------------------------- export

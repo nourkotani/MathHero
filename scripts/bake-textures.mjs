@@ -743,28 +743,14 @@ function bakeFace(girl, part = 'face') {
   return encodePng(size, size, pixels, 4);
 }
 
-// ------------------------------------------------------------ cloth / hair
+// ------------------------------------------------------------ hair strands
 
 /**
- * Multiply-maps for the toon materials: white where the player's chosen
- * color must stay full, gently darker where fabric weave or hair strands
- * shade it. They can only darken — that is the whole contract. (The
- * Training Dummy's padding is painted in Blender now, ADR 0007.)
+ * The multiply-map for the code-built hair: white where the player's chosen
+ * color must stay full, gently darker where the strands shade it. It can
+ * only darken — that is the whole contract. (The body, the garments, and
+ * the Training Dummy are painted in Blender now, ADR 0007.)
  */
-function bakeCloth(size = 256) {
-  const weave = makeNoise(1313, 32);
-  const wash = makeNoise(1414, 8);
-  const pixels = paintWide(size, size, 3, (u, v) => {
-    let value = 1;
-    value -= Math.abs(fbm(weave, u * 32, v * 32, 3) - 0.5) * 0.1;
-    value -= (fbm(wash, u * 8, v * 8, 2) - 0.5) * 0.06;
-    value -= Math.max(0, Math.sin(v * Math.PI * 40)) * 0.015; // faint weft
-    const c = 255 * Math.min(1, value);
-    return [c, c, c];
-  });
-  return encodePng(size, size, pixels);
-}
-
 function bakeHairStrands(size = 256) {
   const strand = makeNoise(1515, 64);
   const pixels = paintWide(size, size, 3, (u, v) => {
@@ -867,7 +853,6 @@ const bakes = [
   ['iris-girl.png', () => bakeFace(true, 'iris')],
   ['spark-boy.png', () => bakeFace(false, 'spark')],
   ['spark-girl.png', () => bakeFace(true, 'spark')],
-  ['cloth.png', bakeCloth],
   ['hair-strands.png', bakeHairStrands],
 ];
 for (const [name, bake] of bakes) {

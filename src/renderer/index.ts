@@ -21,7 +21,7 @@ import type { Focus } from './framing';
 import { DUMMY_X, HERO_X } from './constants';
 import { createDummy } from './dummy';
 import { createFx, freeMesh } from './fx';
-import { applyLevelToRig, buildHero, FORM_PALETTES } from './hero';
+import { applyLevelToRig, buildHero, FORM_PALETTES, loadHeroModel } from './hero';
 import type { FormPalette } from './hero';
 import { createPipeline } from './pipeline';
 import { initialImpactGate, tryImpactFrame } from './impactFrame';
@@ -101,6 +101,13 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     placeHero();
     scene.add(hero.group);
   }
+
+  // The Blender hero decodes a moment after boot: wear it at once.
+  let lastState: GameState | null = null;
+  loadHeroModel(() => {
+    appearanceKey = '';
+    if (lastState) applyLook(lastState);
+  });
 
   const dummy = createDummy();
   scene.add(dummy.group);
@@ -188,6 +195,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
 
   return {
     onStoreUpdate(state, effects) {
+      lastState = state;
       applyLook(state);
       urgent = isFinalTenSeconds(state);
       previewing = state.phase === 'hero-creation';

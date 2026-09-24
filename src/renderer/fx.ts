@@ -51,7 +51,9 @@ export function freeMesh(mesh: THREE.Mesh): void {
   // Outline hulls borrow their parent's geometry and a shared ink material —
   // the parent's own disposal covers them.
   if (isOutlineHull(mesh)) return;
-  mesh.geometry.dispose();
+  // A Blender model's geometry belongs to its template, shared by every
+  // rebuild; only the per-hero materials are this mesh's own.
+  if (mesh.userData.sharedGeometry !== true) mesh.geometry.dispose();
   (mesh.material as THREE.Material).dispose();
 }
 
