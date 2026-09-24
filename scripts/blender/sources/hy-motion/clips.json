@@ -1,0 +1,33 @@
+{
+  "about": "HY-Motion 1.0 clips (ADR 0010). Each clip has a brief, which `npm run motion -- <clip>` turns into scored candidates, and the chosen candidate, which the bake retargets onto the hero (mocap.py). The HY-Motion license limits use, distribution, and display of its outputs to its Territory (worldwide except the EU, the UK, and South Korea): keep the repo private and the hosted game region-blocked.",
+  "model": "HY-Motion-1.0-Lite",
+  "clips": {
+    "stagger": {
+      "used_by": "hero.py: the Stagger clip (a wrong answer)",
+      "prompts": [
+        "A cartoon fighter gets bumped, stumbles two steps backward with arms windmilling for balance, then regains a fighting stance.",
+        "A person loses balance, wobbles backward with arms flailing, then steadies into a ready stance."
+      ],
+      "frames": 45,
+      "samples": 4,
+      "master_seed": 20260925,
+      "window": [
+        0,
+        1.2
+      ],
+      "length": 1,
+      "score": {
+        "profile": -3,
+        "hunch": -2,
+        "drift": -0.5,
+        "back": 1,
+        "motion": 0.2
+      },
+      "chosen": {
+        "file": "stagger.npz",
+        "candidate": "p0s0",
+        "by": "npm run motion (score -1.734), 2026-09-24"
+      }
+    }
+  }
+}

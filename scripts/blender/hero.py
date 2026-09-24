@@ -459,9 +459,8 @@ def attack_pose(kind):
 
 # A wrong answer: knocked off balance, stumbling back with the arms
 # windmilling, then back into the guard. A gentle flinch, never scary. The
-# motion is HY-Motion's (mocap.py, ADR 0010); the prompt and the seed of the
-# source are in sources/hy-motion/manifest.json.
-STAGGER = {"source": "hy-motion/stagger.npz", "window": (0.0, 1.2), "length": 1.0}
+# motion is HY-Motion's (mocap.py, ADR 0010): the brief and the chosen
+# candidate are "stagger" in sources/hy-motion/clips.json.
 
 
 def stance():
@@ -581,7 +580,7 @@ def add_clips(rig):
     c.add_clip(rig, "Idle", 48, keys)
     for kind in range(4):
         sampled_clip(rig, f"Attack{kind}", ATTACK_ANTICIPATION + ATTACK_STRIKE, attack_pose(kind))
-    mocap.smplh_clip(rig, "Stagger", STAGGER["source"], STAGGER["window"], STAGGER["length"], stance())
+    mocap.hy_clip(rig, "Stagger", "stagger", stance())
     sampled_clip(rig, "Transform", TRANSFORM, transform_pose)
     sampled_clip(rig, "Charge", 0.5, charge_pose)
     sampled_clip(rig, "Blast", 0.8, blast_pose)

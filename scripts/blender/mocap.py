@@ -1,7 +1,7 @@
 """Clips from a text-to-motion model, retargeted onto the hero rig (ADR 0010).
 
 The source is an SMPL-H motion from HY-Motion 1.0 (scripts/blender/sources/
-hy-motion/, with the prompt and seed of each file in manifest.json): 52
+hy-motion/; clips.json holds each clip's brief and chosen candidate): 52
 joints of local axis-angle rotations (`poses`, F x 156; only joints 0-21
 move), a root translation in meters (`trans`), Y-up, facing +Z, 30 fps.
 SMPL's rest pose is a T-pose, arms along +/-X.
@@ -15,6 +15,7 @@ to the game: a window of the source, time-scaled to the clip's length,
 the root eased back home, and blends in from and out to the stance.
 """
 
+import json
 import math
 import os
 
@@ -24,6 +25,7 @@ from mathutils import Matrix, Vector
 import common as c
 
 SOURCES = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sources")
+HY_CLIPS = os.path.join(SOURCES, "hy-motion", "clips.json")
 SOURCE_FPS = 30
 
 PARENTS = [-1, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 9, 9, 12, 13, 14, 16, 17, 18, 19]
@@ -92,16 +94,29 @@ def _retarget(poses, trans):
     return frames
 
 
-def smplh_clip(rig, name, source, window, length, stance, blend_in=0.1, blend_out=0.3):
-    """Add one clip from an SMPL-H source file.
+def hy_clips():
+    """The HY-Motion briefs and chosen candidates, by clip."""
+    with open(HY_CLIPS, encoding="utf-8") as f:
+        return json.load(f)["clips"]
 
-    source: a file in sources/, e.g. "hy-motion/stagger.npz".
+
+def hy_clip(rig, name, clip, stance):
+    """Add the chosen HY-Motion candidate of a clip in clips.json."""
+    brief = hy_clips()[clip]
+    path = os.path.join(SOURCES, "hy-motion", brief["chosen"]["file"])
+    smplh_clip(rig, name, path, brief["window"], brief["length"], stance)
+
+
+def smplh_clip(rig, name, path, window, length, stance, blend_in=0.1, blend_out=0.3):
+    """Add one clip from an SMPL-H .npz file; return its raw root drift.
+
     window: (start, end) seconds of the source to keep.
     length: seconds the clip plays; the window is time-scaled to fit.
     stance: {bone: three.js Euler} the pose the clip blends in from and out to.
     blend_in, blend_out: fractions of the clip spent blending.
+    The drift is how far (meters) the root had to be eased back home.
     """
-    data = np.load(os.path.join(SOURCES, source))
+    data = np.load(path)
     poses = data["poses"].reshape(len(data["poses"]), -1, 3)[:, :22].astype(np.float64)
     trans = data["trans"].astype(np.float64)
     first = int(round(window[0] * SOURCE_FPS))
@@ -131,3 +146,4 @@ def smplh_clip(rig, name, source, window, length, stance, blend_in=0.1, blend_ou
                 pose["loc"] = (location.x, location.y, location.z)
             keys[bone].append((u * end_frame, pose))
     c.add_clip(rig, name, end_frame, keys)
+    return drift.length
