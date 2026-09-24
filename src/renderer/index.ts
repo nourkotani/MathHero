@@ -17,6 +17,7 @@ import {
 } from '../core';
 import type { GameEffect, GameState, HeroAppearance } from '../core';
 import { createCameraRig } from './cameraRig';
+import type { Focus } from './framing';
 import { DUMMY_X, HERO_X } from './constants';
 import { createDummy } from './dummy';
 import { createFx, freeMesh } from './fx';
@@ -57,6 +58,8 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     100,
   );
   const rig = createCameraRig(camera);
+  let focus: Focus = 'fight';
+  rig.setView(camera.aspect, focus);
   const pipeline = createPipeline(renderer, scene, camera, stage.sunDisc);
 
   // The quality tier degrades itself on weak devices — no settings UI. The
@@ -124,6 +127,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
         hitstopTimer = Math.max(hitstopTimer, STYLE.juice.hitstop.duration);
       },
       punchCamera: () => rig.punch(),
+      nudgeCamera: () => rig.nudge(),
       speedLines: () => pipeline.flashSpeedLines(),
       impactFrame,
     },
@@ -178,6 +182,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     if (width === 0 || height === 0) return;
     camera.aspect = width / height;
     camera.updateProjectionMatrix();
+    rig.setView(camera.aspect, focus);
     pipeline.setSize(width, height);
   }).observe(canvas);
 
@@ -186,6 +191,13 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       applyLook(state);
       urgent = isFinalTenSeconds(state);
       previewing = state.phase === 'hero-creation';
+      // The fight in the side view; the hero alone where the hero is the
+      // show: creation, and Results with its level-up ceremonies.
+      const nextFocus = previewing || state.phase === 'results' ? 'hero' : 'fight';
+      if (nextFocus !== focus) {
+        focus = nextFocus;
+        rig.setView(camera.aspect, focus);
+      }
       inRound = state.phase === 'in-round';
       reactions.handleEffects(effects);
     },

@@ -18,6 +18,11 @@ export const STYLE = {
     rim: { color: 0x7fd4ff, strength: 0.75, from: 0.62, to: 0.82 },
   },
 
+  /** The 2.5D side view (framing.ts): field of view in degrees, the
+   * margin around the fighters, and how far above their middle the camera
+   * stands (a slight look down, still a side view). */
+  camera: { fov: 36, margin: 1.12, lift: 0.9, ease: 4 },
+
   /** The Blender arena floats; the wasteland floor lies this far below
    * (matches GROUND in scripts/blender/arena.py). */
   arena: {
@@ -177,6 +182,8 @@ export const STYLE = {
     hitstop: { duration: 0.07, timeScale: 0.02 },
     /** Camera punch-in on Super-mode blasts. */
     punch: { dolly: 1.5, drop: 0.12, duration: 0.5, shake: 0.3 },
+    /** A strike's small punch-in, as a share of the full punch. */
+    nudge: 0.3,
     /** Blasts stretch along their flight and squash across it. */
     smear: { along: 1.7, across: 0.72 },
   },

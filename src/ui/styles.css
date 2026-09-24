@@ -1467,6 +1467,12 @@ html[data-layout='stacked'] .creation-layout {
   overflow: hidden;
 }
 
+/* The canvas takes the space above the panel, so the hero framing shows
+   the whole hero there instead of behind the options. */
+html[data-layout='stacked'][data-screen='hero-creation'] #scene {
+  height: 38%;
+}
+
 html[data-layout='stacked'] .creation-panel {
   max-height: 62%;
   padding: 1rem;
