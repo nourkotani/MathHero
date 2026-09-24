@@ -6,7 +6,7 @@ A self-contained, offline 3D multiplication game (times tables 1–12) for two k
 
 - **`CONTEXT.md`** — the domain glossary. Use its terms **verbatim** in code, tests, commits, and issues (Player, Round, Fact, Power Streak, Hero Level, Adaptive Selection, Save File, Training Dummy, …).
 - **`docs/ARCHITECTURE.md`** — stack, module map, unidirectional event flow, determinism rules, single-file constraints, perf budget.
-- **`docs/adr/`** — 0001 packaging (single HTML file, localStorage, manual export), 0002 stack (TypeScript strict, Preact, no CI), 0003 core contract (effects, never state-diffing), 0004–0005 bloom tiers and baked textures, 0006 hosted install alongside the single file, 0007 scripted Blender models, 0008 the Blender hero keeps every appearance choice, 0009 the React Three Fiber character pipeline (R3F owns the 3D scene; sourced characters and Mixamo clips are bake inputs). Do not contradict an ADR; write a new one if a decision must change.
+- **`docs/adr/`** — 0001 packaging (single HTML file, localStorage, manual export), 0002 stack (TypeScript strict, Preact, no CI), 0003 core contract (effects, never state-diffing), 0004–0005 bloom tiers and baked textures, 0006 hosted install alongside the single file, 0007 scripted Blender models, 0008 the Blender hero keeps every appearance choice, 0009 the React Three Fiber character pipeline (R3F owns the 3D scene; sourced characters and Mixamo clips are bake inputs), 0010 HY-Motion clips as bake inputs, which keeps the repo private and the hosted copy region-blocked (never push HY-Motion output while the repo is public). Do not contradict an ADR; write a new one if a decision must change.
 
 ## Work model
 

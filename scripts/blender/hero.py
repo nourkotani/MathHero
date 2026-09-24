@@ -20,6 +20,7 @@ GarmentCape, and GarmentArmor; the renderer shows one body and one garment.
 import math
 
 import common as c
+import mocap
 
 P = c.three_point
 
@@ -456,26 +457,17 @@ def attack_pose(kind):
     return pose_at
 
 
-STAGGER = 0.6
+# A wrong answer: knocked off balance, stumbling back with the arms
+# windmilling, then back into the guard. A gentle flinch, never scary. The
+# motion is HY-Motion's (mocap.py, ADR 0010); the prompt and the seed of the
+# source are in sources/hy-motion/manifest.json.
+STAGGER = {"source": "hy-motion/stagger.npz", "window": (0.0, 1.2), "length": 1.0}
 
 
-def stagger_pose(t):
-    """A wrong answer: knocked off balance, stumbling back, arms
-    windmilling, head rattling, front leg up. A gentle flinch, never scary."""
-    p = Pose()
-    recoil = math.sin(t * math.pi)
-    seconds = t * STAGGER
-    p.loc[2] = -recoil * 0.7
-    p.root_rot[2] = recoil * 0.22
-    p.set("torso", x=-recoil * 0.5)
-    p.set("head", y=math.sin(seconds * 30) * 0.35 * recoil)
-    p.set("armL", -2.3 * recoil - 0.3, 0, 0.3 + math.sin(seconds * 24) * 0.5 * recoil)
-    p.set("armR", -2.3 * recoil - 0.3, 0, -0.3 - math.cos(seconds * 24) * 0.5 * recoil)
-    p.set("elbowL", x=-0.4)
-    p.set("elbowR", x=-0.4)
-    p.set("legL", x=-0.9 * recoil)
-    p.set("kneeL", x=1.2 * recoil + 0.2)
-    return p
+def stance():
+    """The fighting stance as {bone: three.js Euler}: mocap clips blend
+    from it and back to it, so Idle takes over without a pop."""
+    return {bone: pose["rot"] for bone, pose in Pose().keys().items()}
 
 
 TRANSFORM = 2.0
@@ -589,7 +581,7 @@ def add_clips(rig):
     c.add_clip(rig, "Idle", 48, keys)
     for kind in range(4):
         sampled_clip(rig, f"Attack{kind}", ATTACK_ANTICIPATION + ATTACK_STRIKE, attack_pose(kind))
-    sampled_clip(rig, "Stagger", STAGGER, stagger_pose)
+    mocap.smplh_clip(rig, "Stagger", STAGGER["source"], STAGGER["window"], STAGGER["length"], stance())
     sampled_clip(rig, "Transform", TRANSFORM, transform_pose)
     sampled_clip(rig, "Charge", 0.5, charge_pose)
     sampled_clip(rig, "Blast", 0.8, blast_pose)
