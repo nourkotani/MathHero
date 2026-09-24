@@ -86,7 +86,8 @@ One versioned Save File document (schema-version field + forward migrations) hol
 ## Module map
 
 - `core` — pure Game Core: state, events, effects, question selection, scoring, streaks, XP/levels, mastery, save-document (de)serialization.
-- `renderer` — three.js scene: arena, hero, Training Dummy, transformation and blast effects.
+- `scene` — the React Three Fiber root on the `#scene` canvas (ADR 0009): renderer, camera, frame loop, and the React components of the 3D scene.
+- `renderer` — three.js scene parts that the R3F root mounts: arena, hero, Training Dummy, transformation and blast effects.
 - `ui` — Preact screens (Title, Hero creation, Pre-round, HUD, Results, Mastery Grid) and the number pad.
 - `audio` — WebAudio synthesizers keyed on effects.
 - `persistence` — localStorage adapter, export/import, migrations.

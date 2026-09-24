@@ -35,28 +35,46 @@ export interface Renderer {
   frame(dtMs: number): void;
 }
 
-export function createRenderer(canvas: HTMLCanvasElement): Renderer {
+/** The parts of the frame that the R3F root owns (src/scene/mount.tsx). */
+export interface RenderTarget {
+  gl: THREE.WebGLRenderer;
+  scene: THREE.Scene;
+  camera: THREE.PerspectiveCamera;
+}
+
+/** A WebGL renderer set up for the arena, handed to the R3F root. */
+export function createGl(canvas: HTMLCanvasElement): THREE.WebGLRenderer {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   // The CSS owns the canvas box (the arena region of the Layout); the
-  // drawing buffer follows it. updateStyle=false everywhere: an inline px
-  // size would pin the box and the observer below would never fire again.
-  renderer.setSize(canvas.clientWidth || 1, canvas.clientHeight || 1, false);
+  // drawing buffer follows it. R3F sizes with updateStyle=true, and an
+  // inline px size would pin the box, so every resize keeps the style.
+  const setSize = renderer.setSize.bind(renderer);
+  renderer.setSize = (width, height) => setSize(width, height, false);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setSize(canvas.clientWidth || 1, canvas.clientHeight || 1);
+  return renderer;
+}
+
+/** The arena camera, handed to the R3F root. */
+export function createCamera(canvas: HTMLCanvasElement): THREE.PerspectiveCamera {
+  return new THREE.PerspectiveCamera(
+    50,
+    (canvas.clientWidth || 1) / (canvas.clientHeight || 1),
+    0.1,
+    CAMERA_FAR,
+  );
+}
+
+export function createRenderer({ gl: renderer, scene, camera }: RenderTarget): Renderer {
+  const canvas = renderer.domElement;
   // One directional shadow grounds the characters (see stage.ts).
   renderer.shadowMap.enabled = true;
   // PCF with a blur radius on the sun (stage.ts): three r185 deprecated
   // PCFSoftShadowMap, so softness comes from the light's shadow.radius.
   renderer.shadowMap.type = THREE.PCFShadowMap;
 
-  const scene = new THREE.Scene();
   const stage = createStage(scene);
 
-  const camera = new THREE.PerspectiveCamera(
-    50,
-    (canvas.clientWidth || 1) / (canvas.clientHeight || 1),
-    0.1,
-    CAMERA_FAR,
-  );
   const rig = createCameraRig(camera);
   let focus: Focus = 'fight';
   rig.setView(camera.aspect, focus);

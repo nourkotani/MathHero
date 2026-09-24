@@ -4,7 +4,7 @@ import { initialState } from '../core';
 import type { GameEvent } from '../core';
 import { createAudio } from '../audio';
 import { loadSaveFile, localStorageAdapter, persistenceSubscriber, STORAGE_KEY } from '../persistence';
-import { createRenderer } from '../renderer';
+import { mountScene } from '../scene/mount';
 import { App } from '../ui/App';
 import type { BestCelebration } from '../ui/App';
 import { manualClock, realClock } from './clock';
@@ -40,10 +40,10 @@ const persistence = localStorageAdapter();
 const store = createStore(initialState({ seed, save: loadSaveFile(persistence) }));
 store.subscribe(persistenceSubscriber(persistence));
 
-// Renderer subscribes for effects; its frame loop runs below.
+// React Three Fiber owns the 3D scene and its frame loop (ADR 0009); the
+// scene subscribes for effects once it has mounted.
 const canvas = document.getElementById('scene') as HTMLCanvasElement;
-const renderer = createRenderer(canvas);
-store.subscribe((state, effects) => renderer.onStoreUpdate(state, effects));
+void mountScene(canvas, store);
 
 // Preact owns the DOM overlay; it re-renders from core state on every dispatch.
 // The Results ceremonies are effect-driven: banners show while the Results
@@ -138,22 +138,19 @@ window.addEventListener('keydown', (e) => {
   }
 });
 
-// Animation loop. Game time enters the core only as TICK events stamped from
-// the injected clock; rendering time stays wall-clock so animations play even
-// under the manual test clock. Ticks are throttled — the countdown only needs
-// a few updates a second, and re-rendering the UI every frame is pure waste.
+// Tick loop. Game time enters the core only as TICK events stamped from the
+// injected clock; the R3F frame loop animates on wall-clock time, so
+// animations play even under the manual test clock. Ticks are throttled —
+// the countdown only needs a few updates a second, and re-rendering the UI
+// every frame is pure waste.
 const TICK_INTERVAL_MS = 250;
-let lastFrame = performance.now();
 let lastTickAt = Number.NEGATIVE_INFINITY;
-function loop(now: number) {
-  const dt = now - lastFrame;
-  lastFrame = now;
+function loop() {
   const gameNow = clock.now();
   if (gameNow - lastTickAt >= TICK_INTERVAL_MS) {
     lastTickAt = gameNow;
     store.dispatch({ type: 'TICK', now: gameNow });
   }
-  renderer.frame(dt);
   requestAnimationFrame(loop);
 }
 requestAnimationFrame(loop);
