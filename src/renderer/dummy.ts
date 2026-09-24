@@ -68,7 +68,11 @@ export function createDummy(): Dummy {
       actions.set(clip.name, action);
     }
     // One-shot clips hand back to idle; a launch hands on to the recover.
+    // Only the clip that is playing may hand on: a clip that was already
+    // fading out can still reach its end during the blend, and must not
+    // cut off the clip that replaced it (a Launch cut off by a Recover).
     mixer.addEventListener('finished', (event) => {
+      if (event.action !== current) return;
       play(event.action.getClip().name === 'Launch' ? 'Recover' : 'Idle');
     });
     play('Idle');

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
-import { DUMMY_X, HERO_X } from './constants';
+import { CAMERA_FAR, DUMMY_X, HERO_X, SKY_RADIUS } from './constants';
 import { sideViewFraming } from './framing';
 
 /** Where a world point lands on screen, in normalized device coordinates. */
@@ -61,4 +61,17 @@ describe('the side-view framing', () => {
       }
     });
   }
+});
+
+describe('the far plane', () => {
+  it('always reaches past the sky dome, even on a phone held upright at full screen', () => {
+    for (const aspect of [0.4, 0.46, 0.6, 1, 16 / 9, 2.4]) {
+      for (const focus of ['fight', 'hero'] as const) {
+        const [x, y, z] = sideViewFraming(aspect, focus).position;
+        // The farthest point of the dome seen from the camera.
+        const farthest = Math.hypot(x, y, z) + SKY_RADIUS;
+        expect(farthest, `${focus} at ${aspect}`).toBeLessThan(CAMERA_FAR);
+      }
+    }
+  });
 });

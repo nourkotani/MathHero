@@ -201,6 +201,8 @@ export function createReactions(opts: {
             juice.addShake(0.25);
             juice.speedLines();
             // The hero powers up once the strike that earned it has landed.
+            // (Reaching Super fires a Blast in the same moment: the Blast
+            // takes over at once, and the Charge yields to it.)
             hero.play('Charge', true);
             break;
           case 'STREAK_BROKEN':
@@ -217,6 +219,9 @@ export function createReactions(opts: {
             hero.play('Idle');
             break;
           case 'BLAST_FIRED':
+            // A full-power blast replaces the strike pose at once, so the
+            // pose matches the blast leaving the hero's hands; it also
+            // drops a queued Charge.
             hero.play('Blast');
             fx.fireBlast(true);
             juice.punchCamera();
@@ -303,7 +308,7 @@ export function createReactions(opts: {
 
       // Every pose is an authored Blender clip (Idle between actions); the
       // code clips below only time effects (impacts, the wince, the waves).
-      hero.mixer?.update(dt);
+      hero.animate(dt);
 
       heroChannel.update(dt, elapsed);
 

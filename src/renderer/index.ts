@@ -18,7 +18,7 @@ import {
 import type { GameEffect, GameState, HeroAppearance } from '../core';
 import { createCameraRig } from './cameraRig';
 import type { Focus } from './framing';
-import { DUMMY_X, HERO_X } from './constants';
+import { CAMERA_FAR, DUMMY_X, HERO_X } from './constants';
 import { createDummy } from './dummy';
 import { createFx, freeMesh } from './fx';
 import { applyLevelToRig, buildHero, FORM_PALETTES, loadHeroModel } from './hero';
@@ -55,7 +55,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     50,
     (canvas.clientWidth || 1) / (canvas.clientHeight || 1),
     0.1,
-    100,
+    CAMERA_FAR,
   );
   const rig = createCameraRig(camera);
   let focus: Focus = 'fight';

@@ -16,6 +16,7 @@ import {
 import type { Surface } from './materials';
 import { loadModel } from './models';
 import arenaModelUrl from './models/arena.glb';
+import { SKY_RADIUS } from './constants';
 import { STYLE } from './style';
 import cloudUrl from './textures/cloud.png';
 import groundUrl from './textures/ground.png';
@@ -187,7 +188,7 @@ export function createStage(scene: THREE.Scene): Stage {
 function buildBackdrop(scene: THREE.Scene): THREE.Mesh {
   // Sky dome: one inverted sphere wearing the baked painted sky — nebula
   // drifts, mottling, and the warm horizon all live in the texture.
-  const dome = new THREE.SphereGeometry(80, 32, 18);
+  const dome = new THREE.SphereGeometry(SKY_RADIUS, 32, 18);
   scene.add(new THREE.Mesh(dome, backdropSurface(0xffffff, { backSide: true, mapUrl: skyUrl })));
 
   // A low dusk sun, half-sunk behind the ridges.

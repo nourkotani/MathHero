@@ -235,8 +235,11 @@ export function loadHeroModel(onReady: () => void): void {
 export interface HeroRig {
   group: THREE.Group;
   joints: HeroJoints;
-  /** Plays the authored Idle clip; null until the Blender hero decodes. */
+  /** Plays the authored clips; null until the Blender hero decodes. */
   mixer: THREE.AnimationMixer | null;
+  /** Advance the clips, then keep the Form's hair scale: every clip keys
+   *  the hair bone at scale 1, so the scale is set again after the mixer. */
+  animate(dt: number): void;
   idle: THREE.AnimationAction | null;
   /** The hair this hero wore before its current Form, and wears now: the
    *  Landmark scene shows the first, then swaps at the moment of ascension. */
@@ -402,6 +405,8 @@ export function buildHero(
   let mixer: THREE.AnimationMixer | null = null;
   let idle: THREE.AnimationAction | null = null;
   const actions = new Map<string, THREE.AnimationAction>();
+  let hairBone: THREE.Object3D | null = null;
+  const hairScale = palette?.hairScale ?? 1;
   let current: THREE.AnimationAction | null = null;
   let next: string | null = null;
   const blend = STYLE.heroBlend;
@@ -447,7 +452,7 @@ export function buildHero(
     }
     // Hair grows and stiffens with the Form: the hair bone scales it from
     // the head pivot, so a powered-up hero's hair visibly rises.
-    model.getObjectByName('hair')?.scale.setScalar(palette?.hairScale ?? 1);
+    hairBone = model.getObjectByName('hair') ?? null;
     mixer = new THREE.AnimationMixer(model);
     for (const clip of heroTemplate.clips) {
       const action = mixer.clipAction(clip);
@@ -463,7 +468,10 @@ export function buildHero(
       current = idle;
     }
     // A one-shot clip hands on to the queued one, or back to Idle.
-    mixer.addEventListener('finished', () => {
+    // Only the clip that is playing may hand on (a clip still fading out
+    // must not cut off its replacement).
+    mixer.addEventListener('finished', (event) => {
+      if (event.action !== current) return;
       const then = (next !== null ? actions.get(next) : undefined) ?? idle;
       next = null;
       if (then) fadeTo(then);
@@ -574,6 +582,10 @@ export function buildHero(
     idle,
     hairBefore,
     hairNow: hairMesh,
+    animate(dt) {
+      mixer?.update(dt);
+      hairBone?.scale.setScalar(hairScale);
+    },
     play(name, queued = false) {
       const action = actions.get(name);
       if (!action) return;
