@@ -20,10 +20,13 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = join(ROOT, 'build', 'site');
 const dryRun = process.argv.includes('--dry-run');
 
+// Only npm needs a shell on Windows (it is npm.cmd). git runs without one:
+// a shell splits a commit message with spaces into separate arguments.
+const shell = (command) => process.platform === 'win32' && command === 'npm';
 const run = (command, args, cwd = ROOT) =>
-  execFileSync(command, args, { cwd, stdio: 'inherit', shell: process.platform === 'win32' });
+  execFileSync(command, args, { cwd, stdio: 'inherit', shell: shell(command) });
 const read = (command, args, cwd = ROOT) =>
-  execFileSync(command, args, { cwd, encoding: 'utf8', shell: process.platform === 'win32' }).trim();
+  execFileSync(command, args, { cwd, encoding: 'utf8', shell: shell(command) }).trim();
 
 if (!dryRun) {
   if (read('git', ['status', '--porcelain']) !== '') {
