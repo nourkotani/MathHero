@@ -22,7 +22,8 @@ There is no CI: `npm run check` (typecheck → lint → core tests → build →
 
 | Gate fact | Value |
 |---|---|
-| Duration (2026-09-23) | About 21 minutes, most of it the flow suite on software WebGL |
+| Duration (2026-09-24) | About 3 minutes; the flow suite takes about 2 minutes on the GPU |
+| GPU | Chromium projects run the full Chromium build with WebGL on the GPU (ANGLE on Direct3D 11); the gate needs a computer with a usable GPU |
 | Flow projects | Desktop Chromium (every spec); Chromium touch at iPhone 17 Pro portrait, iPad portrait, and iPad landscape (layout and screen specs); WebKit at iPhone 17 Pro portrait and iPad landscape (smoke spec) |
 | One-time setup | `npx playwright install chromium webkit` |
 
