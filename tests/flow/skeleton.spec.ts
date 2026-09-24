@@ -196,6 +196,8 @@ test('the baked Training Dummy loads from the single file', async ({ page }) => 
     if (message.type() === 'error' && /baked model/.test(message.text())) failures.push(message.text());
   });
   page.on('pageerror', (error) => failures.push(error.message));
+  // The single file forbids web workers; the decoder must not start one.
+  page.on('worker', (worker) => failures.push(`worker: ${worker.url()}`));
   await openGame(page);
   await createHero(page);
   await startRound(page);
