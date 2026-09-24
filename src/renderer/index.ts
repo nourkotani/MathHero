@@ -17,12 +17,13 @@ import {
 } from '../core';
 import type { GameEffect, GameState, HeroAppearance } from '../core';
 import { createCameraRig } from './cameraRig';
-import { HERO_X } from './constants';
+import { DUMMY_X, HERO_X } from './constants';
 import { createDummy } from './dummy';
 import { createFx, freeMesh } from './fx';
 import { applyLevelToRig, buildHero, FORM_PALETTES } from './hero';
 import type { FormPalette } from './hero';
 import { createPipeline } from './pipeline';
+import { initialImpactGate, tryImpactFrame } from './impactFrame';
 import { initialTierState, nextTier } from './qualityTier';
 import { createReactions } from './reactions';
 import { createStage } from './stage';
@@ -67,6 +68,14 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
   // Hitstop: a render-time freeze on big hits, applied at the dt pipeline.
   let hitstopTimer = 0;
 
+  // Impact frames flash only as often as the safety gate allows.
+  let impactGate = initialImpactGate;
+  function impactFrame() {
+    const result = tryImpactFrame(impactGate, elapsed, tierState.tier);
+    impactGate = result.gate;
+    if (result.fire) pipeline.flashImpactFrame();
+  }
+
   let hero = buildHero(DEFAULT_APPEARANCE, null);
   // The build key covers the Form too: hair length, hair scale, eye color
   // and aura shape are all baked in at construction.
@@ -97,6 +106,8 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     if (big) {
       dummy.launch();
       rig.addShake(0.4);
+      fx.comicBurst(new THREE.Vector3(DUMMY_X - 0.3, 1.7, 0));
+      impactFrame();
     } else {
       // Small blasts only exist while transformed — always a strong hit.
       dummy.hit(true);
@@ -114,6 +125,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       },
       punchCamera: () => rig.punch(),
       speedLines: () => pipeline.flashSpeedLines(),
+      impactFrame,
     },
   });
 

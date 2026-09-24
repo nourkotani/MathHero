@@ -122,7 +122,16 @@ export const STYLE = {
   },
 
   /** Impact flipbooks: shockwave ring and anime impact star. */
+  /** The impact frame on big hits and blasts (ticket #56): two-tone ink
+   * and warm paper, held very briefly. The gap between two frames is a
+   * safety rule, not a look, so it lives in impactFrame.ts. */
+  impactFrame: { duration: 0.08, strength: 0.85, threshold: 0.33, ink: 0x14101f, paper: 0xfff1d6 },
+
   impact: {
+    /** A hand-drawn slash arc on every strike; the angle cycles by attack. */
+    slash: { duration: 0.24, from: 1.7, to: 2.1, angles: [-0.5, 0.65, -1.15, 0.25] as const },
+    /** The bold comic burst on big hits and big blasts. */
+    comicBurst: { duration: 0.3, from: 1.3, to: 3.4, color: 0xfff0b8 },
     shockwave: { duration: 0.32, from: 0.7, to: 2.6, bigDuration: 0.5, bigFrom: 1.1, bigTo: 4.6 },
     star: { duration: 0.26, from: 1.0, to: 2.2, color: 0xffffff },
     /** Height the flat ground ring floats above the arena stone. */

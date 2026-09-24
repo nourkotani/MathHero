@@ -452,6 +452,69 @@ function bakeImpactStar(frames = 6, size = 128) {
   });
 }
 
+// -------------------------------------------------------------- slash.png
+
+/**
+ * A hand-drawn slash arc (ticket #56): one brush crescent, drawn across the
+ * first frames and then wiped away tail-first. The edge is rough with
+ * seeded noise, like ink from a dry brush. White, tinted at scene level.
+ * 6 frames.
+ */
+function bakeSlash(frames = 6, size = 128) {
+  const grain = makeNoise(2121, 32);
+  return bakeFlipbook(frames, size, (u, v, t) => {
+    const dx = u * 2 - 1;
+    const dy = v * 2 - 1;
+    const r = Math.hypot(dx, dy);
+    // The arc runs from -110° to +110° around the center.
+    const angle = Math.atan2(dy, dx);
+    const span = (110 * Math.PI) / 180;
+    const along = (angle + span) / (2 * span); // 0 at the tail end, 1 at the head
+    if (along < 0 || along > 1) return [255, 255, 255, 0];
+    // Drawn head-first over the first half, wiped tail-first after.
+    const head = Math.min(1, 0.35 + t * 2);
+    const tail = Math.max(0, (t - 0.45) * 1.9);
+    if (along > head || along < tail) return [255, 255, 255, 0];
+    // A brush stroke: fat in the middle, pointed at both ends.
+    const width = 0.13 * Math.sin(Math.PI * along) ** 0.7;
+    const rough = (fbm(grain, u * 18, v * 18, 3) - 0.5) * 0.05;
+    const edge = Math.abs(r - 0.68) - width - rough;
+    const alpha = Math.max(0, Math.min(1, -edge / 0.012));
+    return [255, 255, 255, 255 * alpha];
+  });
+}
+
+// -------------------------------------------------------------- burst.png
+
+/**
+ * A bold comic burst (ticket #56): a jagged star of uneven spikes, solid
+ * and flat like a panel in a comic, with no text. It punches out, then a
+ * hole opens in its middle and it breaks apart. 6 frames.
+ */
+function bakeBurst(frames = 6, size = 128) {
+  // Fixed, uneven spike lengths: the burst reads hand-cut, not stamped.
+  const spikes = [1, 0.72, 0.93, 0.66, 0.98, 0.7, 0.9, 0.62, 1, 0.75, 0.88, 0.68];
+  return bakeFlipbook(frames, size, (u, v, t) => {
+    const dx = u * 2 - 1;
+    const dy = v * 2 - 1;
+    const r = Math.hypot(dx, dy);
+    const a = ((Math.atan2(dy, dx) + Math.PI) / (2 * Math.PI)) * spikes.length;
+    const i = Math.floor(a) % spikes.length;
+    const f = a - Math.floor(a);
+    // Between two spike tips, the edge dips into a notch.
+    const tipA = spikes[i];
+    const tipB = spikes[(i + 1) % spikes.length];
+    const notch = 0.42;
+    const outline = f < 0.5 ? tipA + (notch - tipA) * (f / 0.5) : notch + (tipB - notch) * ((f - 0.5) / 0.5);
+    const grow = Math.min(1, 0.55 + t * 1.6);
+    const outer = outline * 0.95 * grow;
+    const hole = Math.max(0, (t - 0.35) * 1.3) * outline;
+    const inside = Math.min((outer - r) / 0.02, (r - hole) / 0.02);
+    const alpha = Math.max(0, Math.min(1, inside)) * (t < 0.7 ? 1 : 1 - (t - 0.7) / 0.3);
+    return [255, 250, 225, 255 * alpha];
+  });
+}
+
 // --------------------------------------------------------------- spark.png
 
 /**
@@ -879,6 +942,8 @@ const bakes = [
   ['spark.png', bakeSpark],
   ['shockwave.png', bakeShockwave],
   ['impact-star.png', bakeImpactStar],
+  ['slash.png', bakeSlash],
+  ['burst.png', bakeBurst],
   ['blast-core.png', bakeBlastCore],
   ['charge-ring.png', bakeChargeRing],
   ['lightning.png', bakeLightning],

@@ -26,6 +26,8 @@ export interface Juice {
   punchCamera(): void;
   /** Anime speed-lines flash on transformations and Super blasts. */
   speedLines(): void;
+  /** One impact frame on a big hit, if the safety gate allows it. */
+  impactFrame(): void;
 }
 
 export interface Reactions {
@@ -107,10 +109,19 @@ export function createReactions(opts: {
           // Every strike lands with the anime flash frame; transformed
           // heroes also punch a shockwave through the air.
           fx.impactStar(impact);
+          // A hand-drawn slash across every strike, its angle set by the
+          // attack, colored by the Form once the hero has transformed.
+          const angles = STYLE.impact.slash.angles;
+          fx.slash(transformed ? hit.hitColor : 0xffffff, impact, angles[kind % angles.length] ?? 0);
           if (transformed) fx.shockwave(hit.hitColor, impact, false);
           juice.addShake(transformed ? 0.2 : 0.12);
-          // High-streak hits freeze the frame for a beat — weight, not lag.
-          if (hit.hitstop) juice.hitstop();
+          // High-streak hits freeze the frame for a beat — weight, not lag —
+          // and land as a big hit: a comic burst and an impact frame.
+          if (hit.hitstop) {
+            juice.hitstop();
+            fx.comicBurst(impact);
+            juice.impactFrame();
+          }
         }
         switch (kind) {
           case 0: // dash punch: coil back, lunge in with a straight right

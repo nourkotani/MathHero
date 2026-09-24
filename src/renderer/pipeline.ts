@@ -8,6 +8,7 @@ import * as THREE from 'three';
 import { EffectComposer, EffectPass, GodRaysEffect, RenderPass, SelectiveBloomEffect } from 'postprocessing';
 import { BLOOM_LAYER } from './materials';
 import type { VisualTier } from './qualityTier';
+import { ImpactFrameEffect } from './impactFrameEffect';
 import { SpeedLinesEffect } from './speedLines';
 import { STYLE } from './style';
 
@@ -17,6 +18,8 @@ export interface Pipeline {
   setSize(width: number, height: number): void;
   /** One anime speed-lines flash (full tier only; a no-op when shed). */
   flashSpeedLines(): void;
+  /** One impact frame. Ask the gate in impactFrame.ts first. */
+  flashImpactFrame(): void;
 }
 
 export function createPipeline(
@@ -52,7 +55,12 @@ export function createPipeline(
   });
   bloom.selection.layer = BLOOM_LAYER;
   bloom.ignoreBackground = true;
-  composer.addPass(new EffectPass(camera, bloom));
+  // The impact frame rides the bloom pass: merged into the same shader, it
+  // costs almost nothing while idle (a pass of its own cost weak devices a
+  // full-screen draw every frame), and it shows on every tier that has the
+  // composer — never on the sprite tier.
+  const impactFrame = new ImpactFrameEffect();
+  composer.addPass(new EffectPass(camera, bloom, impactFrame));
 
   // Speed-lines flash last, over the bloomed frame — hits read arcade-crisp.
   const speedLines = new SpeedLinesEffect();
@@ -76,6 +84,9 @@ export function createPipeline(
     },
     flashSpeedLines() {
       if (tier === 'full') speedLines.flash();
+    },
+    flashImpactFrame() {
+      if (tier !== 'sprites') impactFrame.flash();
     },
   };
 }

@@ -8,10 +8,12 @@ import { isOutlineHull } from './cel';
 import { DUMMY_X, HERO_X } from './constants';
 import { STYLE } from './style';
 import blastCoreUrl from './textures/blast-core.png';
+import burstUrl from './textures/burst.png';
 import chargeRingUrl from './textures/charge-ring.png';
 import impactStarUrl from './textures/impact-star.png';
 import lightningUrl from './textures/lightning.png';
 import shockwaveUrl from './textures/shockwave.png';
+import slashUrl from './textures/slash.png';
 
 interface Particle {
   sprite: THREE.Sprite;
@@ -68,6 +70,10 @@ export interface Fx {
   shockwave(color: number, origin: THREE.Vector3, big: boolean, ground?: boolean): void;
   /** The classic anime four-point impact flash. */
   impactStar(origin: THREE.Vector3): void;
+  /** A hand-drawn slash arc across the strike, at an angle in radians. */
+  slash(color: number, origin: THREE.Vector3, angle: number): void;
+  /** A bold comic burst shape for big hits and big blasts. */
+  comicBurst(origin: THREE.Vector3): void;
   /** Power rushing inward: a collapsing ring while a transformation gathers. */
   chargeRing(color: number, origin: THREE.Vector3, big: boolean): void;
   /** A short crackling arc, re-striking every frame. */
@@ -88,6 +94,8 @@ export function createFx(scene: THREE.Scene, onBlastImpact: (big: boolean) => vo
   warmFlipbook(blastCoreUrl);
   warmFlipbook(chargeRingUrl);
   warmFlipbook(lightningUrl);
+  warmFlipbook(slashUrl);
+  warmFlipbook(burstUrl);
 
   /** Start one flipbook instance; it owns its texture window until it dies. */
   function playFlip(
@@ -99,8 +107,10 @@ export function createFx(scene: THREE.Scene, onBlastImpact: (big: boolean) => vo
     from: number,
     to: number,
     ground = false,
+    rotation = 0,
   ) {
     const { material, map } = flipbookMaterial(url, frames, color, ground ? 'flat' : 'sprite');
+    if (material instanceof THREE.SpriteMaterial) material.rotation = rotation;
     let object: THREE.Object3D;
     if (ground) {
       const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), material);
@@ -133,6 +143,16 @@ export function createFx(scene: THREE.Scene, onBlastImpact: (big: boolean) => vo
   function impactStar(origin: THREE.Vector3) {
     const s = STYLE.impact.star;
     playFlip(impactStarUrl, 6, s.color, origin, s.duration, s.from, s.to);
+  }
+
+  function slash(color: number, origin: THREE.Vector3, angle: number) {
+    const s = STYLE.impact.slash;
+    playFlip(slashUrl, 6, color, origin, s.duration, s.from, s.to, false, angle);
+  }
+
+  function comicBurst(origin: THREE.Vector3) {
+    const s = STYLE.impact.comicBurst;
+    playFlip(burstUrl, 6, s.color, origin, s.duration, s.from, s.to);
   }
 
   function lightning(color: number, origin: THREE.Vector3, size: number) {
@@ -210,6 +230,8 @@ export function createFx(scene: THREE.Scene, onBlastImpact: (big: boolean) => vo
     spark,
     shockwave,
     impactStar,
+    slash,
+    comicBurst,
     chargeRing,
     lightning,
     fireBlast,
