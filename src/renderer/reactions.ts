@@ -34,6 +34,8 @@ export interface Juice {
 
 export interface Reactions {
   handleEffects(effects: GameEffect[]): void;
+  /** A hero fist or boot touched the Dummy's hurtbox. */
+  strikeContact(): void;
   /** The Player's permanent identity: chosen hair, level glow, earned Form. */
   setPlayerLook(hair: number, glow: number, palette: FormPalette | null): void;
   /** Re-dress the current rig (after colors change or the hero rebuilds). */
@@ -68,47 +70,71 @@ export function createReactions(opts: {
   const look = () => composeLook(currentForm, palette);
   applyForm('base');
 
+  /** The strike in the air: it lands once, on contact or at the fallback. */
+  let pendingStrike: { kind: number; landed: boolean; active: boolean } | null = null;
+
+  /**
+   * The moment a strike lands: impact sparks fly off the dummy and the
+   * Dummy recoils. A hero fist or boot touching the Dummy's hurtbox
+   * (src/scene/HeroHitboxes.tsx) calls this; so does the fallback in
+   * attackClip, so no strike ever goes without its hit.
+   */
+  function landStrike() {
+    const strike = pendingStrike;
+    if (!strike || strike.landed || !strike.active) return;
+    strike.landed = true;
+    const kind = strike.kind;
+    const hit = look();
+    const transformed = currentForm !== 'base';
+    dummy.hit(transformed);
+    const impact = new THREE.Vector3(DUMMY_X - 0.55, 1.7, 0);
+    fx.burst(hit.hitColor, transformed ? 18 : 12, impact, 3.2);
+    // Every strike lands with the anime flash frame; transformed
+    // heroes also punch a shockwave through the air.
+    fx.impactStar(impact);
+    // A hand-drawn slash across every strike, its angle set by the
+    // attack, colored by the Form once the hero has transformed.
+    const angles = STYLE.impact.slash.angles;
+    fx.slash(transformed ? hit.hitColor : 0xffffff, impact, angles[kind % angles.length] ?? 0);
+    if (transformed) fx.shockwave(hit.hitColor, impact, false);
+    juice.addShake(transformed ? 0.2 : 0.12);
+    juice.nudgeCamera();
+    // High-streak hits freeze the frame for a beat — weight, not lag —
+    // and land as a big hit: a comic burst and an impact frame.
+    if (hit.hitstop) {
+      juice.hitstop();
+      fx.comicBurst(impact);
+      juice.impactFrame();
+    }
+  }
+
   /**
    * One of four strikes. The pose is an authored Blender clip (Attack0–3:
-   * an anticipation crouch, the wind-up, the strike, and home); this clip
-   * only times the impact, so the burst (and hitstop at high streaks) fires
-   * at the exact moment the strike lands.
+   * an anticipation crouch, the wind-up, the dash-in strike, and home).
+   * The strike lands when a fist or boot touches the Dummy (landStrike);
+   * this clip opens the contact window and lands it late if nothing touched.
    */
   function attackClip(kind: number): Clip {
-    let hitPending = true;
+    // A new strike cuts off the old one's clip; the old hit still lands.
+    if (pendingStrike && !pendingStrike.landed) {
+      pendingStrike.active = true;
+      landStrike();
+    }
+    const strike = { kind, landed: false, active: false };
+    pendingStrike = strike;
     const { duration, anticipation } = STYLE.juice.attack;
     const total = anticipation + duration;
     getHero().play(`Attack${kind}`);
     return {
       duration: total,
       apply(tc) {
-        const tAbs = tc * total;
-        const t = (tAbs - anticipation) / duration;
-        // The exact moment the strike lands: impact sparks fly off the dummy.
-        if (hitPending && t >= 0.62) {
-          hitPending = false;
-          const hit = look();
-          const transformed = currentForm !== 'base';
-          const impact = new THREE.Vector3(DUMMY_X - 0.55, 1.7, 0);
-          fx.burst(hit.hitColor, transformed ? 18 : 12, impact, 3.2);
-          // Every strike lands with the anime flash frame; transformed
-          // heroes also punch a shockwave through the air.
-          fx.impactStar(impact);
-          // A hand-drawn slash across every strike, its angle set by the
-          // attack, colored by the Form once the hero has transformed.
-          const angles = STYLE.impact.slash.angles;
-          fx.slash(transformed ? hit.hitColor : 0xffffff, impact, angles[kind % angles.length] ?? 0);
-          if (transformed) fx.shockwave(hit.hitColor, impact, false);
-          juice.addShake(transformed ? 0.2 : 0.12);
-          juice.nudgeCamera();
-          // High-streak hits freeze the frame for a beat — weight, not lag —
-          // and land as a big hit: a comic burst and an impact frame.
-          if (hit.hitstop) {
-            juice.hitstop();
-            fx.comicBurst(impact);
-            juice.impactFrame();
-          }
-        }
+        const t = (tc * total - anticipation) / duration;
+        // The wind-up never lands: contact counts from the strike on.
+        if (t >= STYLE.juice.attack.contactFrom) strike.active = true;
+        if (t >= STYLE.juice.attack.landBy && pendingStrike === strike) landStrike();
+      },
+      onDone() {
+        if (pendingStrike === strike) pendingStrike = null;
       },
     };
   }
@@ -170,6 +196,7 @@ export function createReactions(opts: {
 
 
   return {
+    strikeContact: landStrike,
     handleEffects(effects) {
       const hero = getHero();
       for (const effect of effects) {
@@ -177,7 +204,6 @@ export function createReactions(opts: {
           case 'ANSWER_CORRECT':
             // Cycle through different attacks so every strike feels fresh.
             heroChannel.play(attackClip(attackCycle++ % 4), 'attack');
-            dummy.hit(currentForm !== 'base');
             // A crackle of charge energy as the hero coils to strike.
             fx.burst(look().hitColor, 6, new THREE.Vector3(HERO_X + 0.4, 1.5, 0), 1.2);
             // Any transformed hero throws visible energy with each strike,

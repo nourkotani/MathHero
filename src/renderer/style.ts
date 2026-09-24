@@ -177,7 +177,10 @@ export const STYLE = {
   /** Motion feel: action timings, hitstop, camera punch, blast smear. */
   juice: {
     /** A strike: coiled anticipation, then the wind-up/release curve. */
-    attack: { duration: 0.55, anticipation: 0.12 },
+    // contactFrom: the strike phase (after the wind-up) where a fist or boot
+    // on the Dummy's hurtbox lands the hit; landBy: the latest it lands
+    // without contact (the strike peaks at 0.65 in hero.py).
+    attack: { duration: 0.55, anticipation: 0.12, contactFrom: 0.3, landBy: 0.75 },
     /** The wrong-answer stumble. */
     stagger: { duration: 0.6 },
     /** Render freeze on high-streak hits: duration and how frozen it is. */

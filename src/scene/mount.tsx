@@ -4,10 +4,14 @@
 // #ui. Both read the same store; the scene reacts to effects[] only
 // (ADR 0003), through the Arena component's subscription.
 
-import { createRoot } from '@react-three/fiber';
+import { createRoot, extend } from '@react-three/fiber';
+import * as THREE from 'three';
 import type { Store } from '../app/store';
 import { createCamera, createGl } from '../renderer';
 import { Arena } from './Arena';
+
+// JSX elements such as <skinnedMesh> need their three.js classes registered.
+extend(THREE as unknown as Parameters<typeof extend>[0]);
 
 export async function mountScene(canvas: HTMLCanvasElement, store: Store): Promise<void> {
   const root = createRoot(canvas);

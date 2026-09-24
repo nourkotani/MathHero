@@ -380,6 +380,11 @@ def sampled_clip(rig, name, seconds, pose_at):
 
 ATTACK_ANTICIPATION = 0.12
 ATTACK_STRIKE = 0.55
+# The dash-in: how far forward the root travels at the strike's peak. The
+# hero stands 4.8 m from the Training Dummy (renderer/constants.ts), and a
+# fist or boot must enter the Dummy's hurtbox (src/scene/TrainingDummy.tsx)
+# for the strike to land on contact (ADR 0009).
+DASH = (3.5, 3.75, 4.2, 3.95)
 
 
 def attack_pose(kind):
@@ -408,13 +413,13 @@ def attack_pose(kind):
         # A little squash while coiled, a stretch into the strike.
         p.squash(w * 0.05 - s * 0.07)
         if kind == 0:  # dash punch: coil back, lunge in with a straight right
-            p.loc[2] = -w * 0.35 + s * 1.7
+            p.loc[2] = -w * 0.35 + s * DASH[0]
             p.set("torso", s * 0.2, w * 0.5 - s * 0.55, 0)
             p.set("armR", 0.6 * w - 1.62 * s, 0, -0.15)
             p.set("elbowR", x=-1.55 + 1.5 * s)
             p.set("armL", -0.4, 0, 0.35)
         elif kind == 1:  # flying kick: crouch, launch, right leg pistons out
-            p.loc[2] = -w * 0.3 + s * 2.0
+            p.loc[2] = -w * 0.3 + s * DASH[1]
             p.loc[1] = s * 0.9
             p.set("torso", x=w * 0.3 - s * 0.55)
             p.set("legR", x=0.4 * w - 1.5 * s)
@@ -424,7 +429,7 @@ def attack_pose(kind):
             p.set("armL", 0.8 * s, 0, 0.5)
             p.set("armR", 0.8 * s, 0, -0.5)
         elif kind == 2:  # spin strike: wind opposite, whirl through with arms wide
-            p.loc[2] = -w * 0.3 + s * 1.4
+            p.loc[2] = -w * 0.3 + s * DASH[2]
             p.root_rot[1] = -w * 0.6 + (0.0 if t < 0.3 else (t - 0.3) / 0.7) * 2 * math.pi
             p.set("torso", y=-w * 0.5)
             p.set("armL", -0.2, 0, 0.3 + 1.1 * s)
@@ -432,7 +437,7 @@ def attack_pose(kind):
             p.set("elbowL", x=-1.55 + 1.4 * s)
             p.set("elbowR", x=-1.55 + 1.4 * s)
         else:  # rising uppercut: deep crouch, then the fist drives skyward
-            p.loc[2] = s * 1.1
+            p.loc[2] = s * DASH[3]
             p.loc[1] = -w * 0.22 + s * 1.2
             p.set("torso", x=w * 0.45 - s * 0.3)
             p.set("legL", x=-0.22 - w * 0.5)

@@ -19,10 +19,10 @@ import type { GameEffect, GameState, HeroAppearance } from '../core';
 import { createCameraRig } from './cameraRig';
 import type { Focus } from './framing';
 import { CAMERA_FAR, DUMMY_X, HERO_X } from './constants';
-import { createDummy } from './dummy';
+import type { Dummy } from './dummy';
 import { createFx, freeMesh } from './fx';
 import { applyLevelToRig, buildHero, FORM_PALETTES, loadHeroModel } from './hero';
-import type { FormPalette } from './hero';
+import type { FormPalette, HeroRig } from './hero';
 import { createPipeline } from './pipeline';
 import { initialImpactGate, tryImpactFrame } from './impactFrame';
 import { initialTierState, nextTier } from './qualityTier';
@@ -33,13 +33,30 @@ import { STYLE } from './style';
 export interface Renderer {
   onStoreUpdate(state: GameState, effects: GameEffect[]): void;
   frame(dtMs: number): void;
+  /** World positions of the hero's fists and boots (the hitboxes follow). */
+  strikePoints(): THREE.Vector3[];
+  /** A hero fist or boot touched the Dummy's hurtbox. */
+  strikeContact(): void;
+  /** The render time scale: below 1 while a hitstop freezes the frame. */
+  timeScale(): number;
 }
+
+/** Each strike point: a bone, and the offset from it to the fist or boot
+ *  centre in the bone's space (scripts/blender/hero.py). */
+const STRIKE_BONES: ReadonlyArray<[keyof HeroRig['joints'], [number, number, number]]> = [
+  ['elbowL', [0, -0.46, 0.02]],
+  ['elbowR', [0, -0.46, 0.02]],
+  ['kneeL', [0, -0.32, 0.07]],
+  ['kneeR', [0, -0.32, 0.07]],
+];
 
 /** The parts of the frame that the R3F root owns (src/scene/mount.tsx). */
 export interface RenderTarget {
   gl: THREE.WebGLRenderer;
   scene: THREE.Scene;
   camera: THREE.PerspectiveCamera;
+  /** The Training Dummy's director; the Dummy itself is a React component. */
+  dummy: Dummy;
 }
 
 /** A WebGL renderer set up for the arena, handed to the R3F root. */
@@ -65,7 +82,7 @@ export function createCamera(canvas: HTMLCanvasElement): THREE.PerspectiveCamera
   );
 }
 
-export function createRenderer({ gl: renderer, scene, camera }: RenderTarget): Renderer {
+export function createRenderer({ gl: renderer, scene, camera, dummy }: RenderTarget): Renderer {
   const canvas = renderer.domElement;
   // One directional shadow grounds the characters (see stage.ts).
   renderer.shadowMap.enabled = true;
@@ -126,9 +143,6 @@ export function createRenderer({ gl: renderer, scene, camera }: RenderTarget): R
     appearanceKey = '';
     if (lastState) applyLook(lastState);
   });
-
-  const dummy = createDummy();
-  scene.add(dummy.group);
 
   const fx = createFx(scene, (big) => {
     if (big) {
@@ -211,6 +225,8 @@ export function createRenderer({ gl: renderer, scene, camera }: RenderTarget): R
     pipeline.setSize(width, height);
   }).observe(canvas);
 
+  const strikePointCache: THREE.Vector3[] = [];
+
   return {
     onStoreUpdate(state, effects) {
       lastState = state;
@@ -226,6 +242,18 @@ export function createRenderer({ gl: renderer, scene, camera }: RenderTarget): R
       }
       inRound = state.phase === 'in-round';
       reactions.handleEffects(effects);
+    },
+    strikePoints() {
+      return STRIKE_BONES.map(([bone, offset], i) => {
+        const point = (strikePointCache[i] ??= new THREE.Vector3());
+        return hero.joints[bone].localToWorld(point.set(...offset));
+      });
+    },
+    strikeContact() {
+      reactions.strikeContact();
+    },
+    timeScale() {
+      return hitstopTimer > 0 ? STYLE.juice.hitstop.timeScale : 1;
     },
     frame(dtMs) {
       // The single point all render-time flows through: everything below
@@ -260,7 +288,6 @@ export function createRenderer({ gl: renderer, scene, camera }: RenderTarget): R
       }
 
       reactions.update(dt, elapsed, previewing);
-      dummy.update(dt);
       fx.update(dt, elapsed);
       stage.update(dt, elapsed, urgent);
       rig.update(dt, elapsed);

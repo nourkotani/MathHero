@@ -9,6 +9,11 @@ import { advanceClock, openGame, readCorrectAnswer } from './helpers';
 test('boot, one Round by touch, then Results, with no page errors', async ({ page }, testInfo) => {
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
+  // R3F reports a failed scene component on the console, not as a page
+  // error (ADR 0009): a missing JSX element blanks the Dummy silently.
+  page.on('console', (message) => {
+    if (message.type() === 'error') errors.push(message.text());
+  });
   const press = (target: Locator) => (testInfo.project.use.hasTouch ? target.tap() : target.click());
 
   await openGame(page, '?testClock=1&seed=701');
