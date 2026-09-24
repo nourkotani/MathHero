@@ -92,12 +92,12 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
   }
 
   /** Swap the character model when the appearance or the Form changes. */
-  function rebuildHero(appearance: HeroAppearance, palette: FormPalette | null) {
+  function rebuildHero(appearance: HeroAppearance, palette: FormPalette | null, form: string | null) {
     scene.remove(hero.group);
     hero.group.traverse((obj) => {
       if (obj instanceof THREE.Mesh) freeMesh(obj);
     });
-    hero = buildHero(appearance, palette);
+    hero = buildHero(appearance, palette, form);
     placeHero();
     scene.add(hero.group);
   }
@@ -162,7 +162,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     const key = JSON.stringify([appearance, form?.id ?? null]);
     if (key !== appearanceKey) {
       appearanceKey = key;
-      rebuildHero(appearance, palette);
+      rebuildHero(appearance, palette, form?.id ?? null);
     }
     reactions.setPlayerLook(
       presetHex(HAIR_PRESETS, colors.hair),

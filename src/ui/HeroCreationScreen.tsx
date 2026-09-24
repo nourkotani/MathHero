@@ -59,7 +59,7 @@ interface OptionRowProps<T extends string> {
   onPick: (id: T) => void;
 }
 
-function OptionRow<T extends string>({ title, options, prefix, selected, onPick }: OptionRowProps<T>) {
+export function OptionRow<T extends string>({ title, options, prefix, selected, onPick }: OptionRowProps<T>) {
   return (
     <div class="swatch-row">
       <span class="swatch-title">{title}</span>

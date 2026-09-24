@@ -5,9 +5,8 @@
 import * as THREE from 'three';
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { COSMETIC_MILESTONES, presetHex, SKIN_PRESETS } from '../core';
-import type { CosmeticSlot, Garment, HairStyle, HeroAppearance, StreakForm } from '../core';
+import type { CosmeticSlot, Garment, HeroAppearance, StreakForm } from '../core';
 import {
-  characterSurface,
   cosmeticPanel,
   cosmeticSprite,
   faceDecal,
@@ -17,6 +16,7 @@ import {
 } from './materials';
 import { loadModel } from './models';
 import heroModelUrl from './models/hero.glb';
+import { hairMeshFor } from './hairLook';
 import { STYLE } from './style';
 import type { Surface } from './materials';
 import { applyCelTreatment } from './cel';
@@ -27,7 +27,6 @@ import irisBoyUrl from './textures/iris-boy.png';
 import irisGirlUrl from './textures/iris-girl.png';
 import sparkBoyUrl from './textures/spark-boy.png';
 import sparkGirlUrl from './textures/spark-girl.png';
-import hairStrandsUrl from './textures/hair-strands.png';
 import haloRingUrl from './textures/halo-ring.png';
 import streakUrl from './textures/streak.png';
 import wispUrl from './textures/wisp.png';
@@ -208,7 +207,8 @@ const GARMENT_MESHES: Record<Garment, string> = {
 /** Which named model part (body or garment) a mesh belongs to. */
 function meshOwner(mesh: THREE.Object3D): string | null {
   for (let node: THREE.Object3D | null = mesh; node; node = node.parent) {
-    if (/^(Body|Garment)/.test(node.name)) return node.name.replace(/_\d+$/, '');
+    // A mesh with several materials loads as parts named Name, Name_1…
+    if (/^(Body|Garment|Hair_)/.test(node.name)) return node.name.replace(/_\d+$/, '');
   }
   return null;
 }
@@ -356,6 +356,7 @@ export function applyLevelToRig(rig: HeroRig, level: number): void {
 export function buildHero(
   appearance: HeroAppearance,
   palette: FormPalette | null = null,
+  form: string | null = null,
 ): HeroRig {
   const group = new THREE.Group();
   const girl = appearance.body === 'girl';
@@ -370,7 +371,13 @@ export function buildHero(
   const trimMaterial = painterlySurface(null) as THREE.MeshToonMaterial;
   const skinMaterial = painterlySurface(null) as THREE.MeshToonMaterial;
   skinMaterial.color.setHex(presetHex(SKIN_PRESETS, appearance.skinTone));
+  // The hair: one tint material, recolored by the chosen hair color and by
+  // every Form; the look table picks which Hair Style mesh shows.
+  const hairMaterial = painterlySurface(null) as THREE.MeshToonMaterial;
+  const hairMaterials: Surface[] = [hairMaterial];
+  const hairMesh = hairMeshFor(form, appearance.hairStyle, appearance.hairLength);
   const regionMaterials: Record<string, THREE.MeshToonMaterial> = {
+    PaintedHair: hairMaterial,
     PaintedOutfit: bodyMaterial,
     PaintedTrim: trimMaterial,
     PaintedSkin: skinMaterial,
@@ -388,7 +395,10 @@ export function buildHero(
       // The geometry belongs to the template, shared by every rebuild.
       obj.userData.sharedGeometry = true;
       const owner = meshOwner(obj);
-      obj.visible = owner === body || owner === garment;
+      obj.visible = owner === body || owner === garment || owner === hairMesh;
+      // Glowing hair is a Power Streak reward: dark at rest (under the bloom
+      // pass's floor), radiant gold in surge and Super mode.
+      if (owner === hairMesh && !obj.userData.outlineHull) markBloom(obj);
       if (obj.userData.outlineHull) return;
       const region = (obj.material as THREE.Material).name;
       const tinted = regionMaterials[region];
@@ -406,6 +416,9 @@ export function buildHero(
       const bone = model.getObjectByName(name);
       if (bone) joints[name] = bone;
     }
+    // Hair grows and stiffens with the Form: the hair bone scales it from
+    // the head pivot, so a powered-up hero's hair visibly rises.
+    model.getObjectByName('hair')?.scale.setScalar(palette?.hairScale ?? 1);
     mixer = new THREE.AnimationMixer(model);
     const idleClip = heroTemplate.clips.find((clip: THREE.AnimationClip) => clip.name === 'Idle');
     if (idleClip) idle = mixer.clipAction(idleClip).play();
@@ -440,27 +453,6 @@ export function buildHero(
   sparks.position.y = 0.16;
   sparks.renderOrder = 3;
   headPivot.add(sparks);
-
-  // Anime hair from the chosen style; every strand shares the swappable
-  // hair materials so streak forms and player colors recolor them all.
-  const hairMaterials: Surface[] = [];
-  const hairMat = () => {
-    const material = characterSurface(0x2b2b2b, hairStrandsUrl);
-    hairMaterials.push(material);
-    return material;
-  };
-  // Hair grows and stiffens with the Form; the maned Form takes the full
-  // mane whatever length was chosen. Scaling the whole do from the head
-  // pivot is what makes a powered-up hero's hair visibly rise.
-  const hairGroup = new THREE.Group();
-  hairGroup.scale.setScalar(palette?.hairScale ?? 1);
-  headPivot.add(hairGroup);
-  buildHair(
-    hairGroup,
-    appearance.hairStyle,
-    appearance.hairLength === 'long' || palette?.mane === true,
-    hairMat,
-  );
 
   // Front faces only: with two nested shells, double-sided rendering would
   // stack four color layers and wall the hero off inside the flame.
@@ -582,90 +574,11 @@ function buildAuraGeometry(lobeAmplitude = BASE_LOBES): THREE.BufferGeometry {
   return geometry;
 }
 
-type HairMat = () => Surface;
 
 /**
  * Anime hair styles, each in a short and a long variant, built in head-pivot
  * space so the whole do swings with every nod and shake.
  */
-function buildHair(head: THREE.Object3D, style: HairStyle, long: boolean, hairMat: HairMat): void {
-  const spike = (
-    x: number,
-    y: number,
-    z: number,
-    tiltX: number,
-    tiltZ: number,
-    radius = 0.14,
-    height = 0.55,
-  ) => {
-    const cone = new THREE.Mesh(new THREE.ConeGeometry(radius, height, 6), hairMat());
-    // Glowing hair is a Power Streak reward: dark at rest (under the bloom
-    // pass's luminance floor), radiant gold in surge and Super mode.
-    markBloom(cone);
-    cone.position.set(x, y, z);
-    cone.rotation.x = tiltX;
-    cone.rotation.z = tiltZ;
-    head.add(cone);
-  };
-  const cap = (radiusScale: number, flatten: number, y: number) => {
-    const mesh = new THREE.Mesh(new THREE.SphereGeometry(0.37 * radiusScale, 16, 12), hairMat());
-    markBloom(mesh);
-    mesh.scale.set(1, flatten, 1);
-    mesh.position.y = y;
-    head.add(mesh);
-  };
-
-  switch (style) {
-    case 'spiky': {
-      spike(0, 0.74, 0, 0, 0);
-      spike(0.18, 0.67, 0.05, 0, -0.5);
-      spike(-0.18, 0.67, 0.05, 0, 0.5);
-      spike(0.1, 0.62, -0.18, 0.5, -0.25);
-      spike(-0.1, 0.62, -0.18, 0.5, 0.25);
-      spike(0.05, 0.64, 0.2, -0.45, -0.15);
-      spike(-0.05, 0.64, 0.2, -0.45, 0.15);
-      // Temple spikes flaring past the ears widen the classic silhouette.
-      spike(0.28, 0.42, 0.03, 0.1, -1.05, 0.1, 0.42);
-      spike(-0.28, 0.42, 0.03, 0.1, 1.05, 0.1, 0.42);
-      spike(0.16, 0.52, 0.22, -0.55, -0.55, 0.09, 0.34);
-      spike(-0.16, 0.52, 0.22, -0.55, 0.55, 0.09, 0.34);
-      if (long) {
-        // A wild mane cascading down the back.
-        spike(0.14, 0.12, -0.34, 2.7, -0.1, 0.13, 0.85);
-        spike(-0.14, 0.12, -0.34, 2.7, 0.1, 0.13, 0.85);
-        spike(0, 0.02, -0.38, 2.8, 0, 0.15, 1.0);
-      }
-      break;
-    }
-    case 'flame': {
-      // One big swept-back flame of hair, with a defiant front lick.
-      spike(0, 0.67, -0.05, -0.55, 0, 0.24, long ? 1.1 : 0.75);
-      spike(0.14, 0.57, -0.12, -0.7, -0.2, 0.18, long ? 0.9 : 0.6);
-      spike(-0.14, 0.57, -0.12, -0.7, 0.2, 0.18, long ? 0.9 : 0.6);
-      spike(0.06, 0.56, 0.18, -1.0, -0.3, 0.1, 0.4);
-      spike(-0.1, 0.53, 0.16, -0.9, 0.35, 0.08, 0.32);
-      break;
-    }
-    case 'ponytail': {
-      // High and flat enough that the hairline sits above the brows.
-      cap(1.0, 0.6, 0.34);
-      // Side bangs hug the temples — they frame the face, never cover it.
-      spike(0.3, 0.34, 0.1, -0.1, -1.15, 0.07, 0.3);
-      spike(-0.3, 0.34, 0.1, -0.1, 1.15, 0.07, 0.3);
-      spike(0, 0.47, -0.3, 2.45, 0, 0.12, long ? 0.9 : 0.5);
-      if (long) spike(0, -0.13, -0.42, 2.9, 0, 0.1, 0.7);
-      break;
-    }
-    case 'buzz': {
-      cap(long ? 1.06 : 1.0, long ? 0.75 : 0.6, long ? 0.3 : 0.34);
-      // A short widow's-peak fringe so the cut reads on purpose, not bald.
-      spike(0, 0.4, 0.3, -1.25, 0, 0.09, 0.22);
-      spike(0.12, 0.38, 0.27, -1.2, -0.3, 0.07, 0.18);
-      spike(-0.12, 0.38, 0.27, -1.2, 0.3, 0.07, 0.18);
-      break;
-    }
-  }
-}
 
 /**
  * The milestone cosmetics: one entry per tier id in the core's table.

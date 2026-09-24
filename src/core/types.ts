@@ -1,7 +1,7 @@
 // The Game Core's public vocabulary. Later tickets extend these unions —
 // they never add a second entry point (ADR 0003, docs/ARCHITECTURE.md).
 
-import type { HeroAppearance } from './appearance';
+import type { HairLength, HairStyle, HeroAppearance } from './appearance';
 import type { Difficulty } from './difficulty';
 import type { CosmeticTier, HeroForm } from './level';
 import type { PlayerColors, PlayerRecord } from './players';
@@ -98,6 +98,8 @@ export type GameEvent =
   | { type: 'PLAYER_CREATED'; name: string; colors: PlayerColors; appearance: HeroAppearance }
   | { type: 'PLAYER_SELECTED'; id: string }
   | { type: 'PLAYER_RENAMED'; id: string; name: string }
+  /** A new Hair Style for a Player, chosen on the Title screen (ADR 0008). */
+  | { type: 'HAIR_STYLE_CHANGED'; id: string; hairStyle: HairStyle; hairLength: HairLength }
   | { type: 'PLAYER_DELETED'; id: string }
   | { type: 'TITLE_OPENED' }
   | { type: 'SAVE_EXPORTED' }

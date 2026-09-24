@@ -743,27 +743,6 @@ function bakeFace(girl, part = 'face') {
   return encodePng(size, size, pixels, 4);
 }
 
-// ------------------------------------------------------------ hair strands
-
-/**
- * The multiply-map for the code-built hair: white where the player's chosen
- * color must stay full, gently darker where the strands shade it. It can
- * only darken — that is the whole contract. (The body, the garments, and
- * the Training Dummy are painted in Blender now, ADR 0007.)
- */
-function bakeHairStrands(size = 256) {
-  const strand = makeNoise(1515, 64);
-  const pixels = paintWide(size, size, 3, (u, v) => {
-    // Vertical strand streaks: high frequency across, stretched along.
-    const s = fbm(strand, u * 64, v * 6, 3);
-    let value = 1 - Math.max(0, 0.55 - Math.abs(s - 0.5)) * 0.28;
-    value -= (fbm(strand, u * 10 + 30, v * 3, 2) - 0.5) * 0.08;
-    const c = 255 * Math.min(1, value);
-    return [c, c, c];
-  });
-  return encodePng(size, size, pixels);
-}
-
 // ------------------------------------------------------------- site icons
 
 /**
@@ -853,7 +832,6 @@ const bakes = [
   ['iris-girl.png', () => bakeFace(true, 'iris')],
   ['spark-boy.png', () => bakeFace(false, 'spark')],
   ['spark-girl.png', () => bakeFace(true, 'spark')],
-  ['hair-strands.png', bakeHairStrands],
 ];
 for (const [name, bake] of bakes) {
   const png = bake();

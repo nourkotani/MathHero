@@ -3,6 +3,8 @@ import {
   backupReminderDue,
   factKey,
   familyLeaderboard,
+  HAIR_LENGTH_OPTIONS,
+  HAIR_STYLE_OPTIONS,
   levelForXp,
   masteryOf,
   parseSaveFile,
@@ -11,6 +13,7 @@ import {
 } from '../core';
 import type { PlayerRecord, Skill } from '../core';
 import type { AppProps } from './App';
+import { OptionRow } from './HeroCreationScreen';
 
 const TABLE_RANGE = Array.from({ length: 12 }, (_, i) => i + 1);
 
@@ -113,11 +116,13 @@ export function TitleScreen({ state, dispatch }: AppProps) {
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameText, setRenameText] = useState('');
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [hairId, setHairId] = useState<string | null>(null);
   const [gridId, setGridId] = useState<string | null>(null);
   const [pendingImport, setPendingImport] = useState<string | null>(null);
   const [importError, setImportError] = useState(false);
 
   const deleting = state.players.find((p) => p.id === deletingId);
+  const styling = state.players.find((p) => p.id === hairId);
   const gridPlayer = state.players.find((p) => p.id === gridId);
 
   // The file-upload edge: read the chosen file, pre-check it with the same
@@ -187,6 +192,14 @@ export function TitleScreen({ state, dispatch }: AppProps) {
                 }}
               >
                 ✏️
+              </button>
+              <button
+                class="pad-key row-button"
+                aria-label={`New hair for ${player.name}`}
+                data-testid={`hair-${player.id}`}
+                onClick={() => setHairId(player.id)}
+              >
+                ✂️
               </button>
               <button
                 class="pad-key row-button"
@@ -290,6 +303,46 @@ export function TitleScreen({ state, dispatch }: AppProps) {
 
       {gridPlayer && (
         <MasteryGrid player={gridPlayer} initialSkill={state.skill} onClose={() => setGridId(null)} />
+      )}
+      {styling && (
+        <div class="confirm-overlay" data-testid="hair-picker">
+          <div class="confirm-box">
+            <p class="confirm-text">New hair for {styling.name}!</p>
+            <OptionRow
+              title="Hair"
+              options={HAIR_STYLE_OPTIONS}
+              prefix="new-hairstyle"
+              selected={styling.appearance.hairStyle}
+              onPick={(hairStyle) =>
+                dispatch({
+                  type: 'HAIR_STYLE_CHANGED',
+                  id: styling.id,
+                  hairStyle,
+                  hairLength: styling.appearance.hairLength,
+                })
+              }
+            />
+            <OptionRow
+              title="Length"
+              options={HAIR_LENGTH_OPTIONS}
+              prefix="new-hairlength"
+              selected={styling.appearance.hairLength}
+              onPick={(hairLength) =>
+                dispatch({
+                  type: 'HAIR_STYLE_CHANGED',
+                  id: styling.id,
+                  hairStyle: styling.appearance.hairStyle,
+                  hairLength,
+                })
+              }
+            />
+            <div class="confirm-actions">
+              <button class="big-button" data-testid="hair-done" onClick={() => setHairId(null)}>
+                Looks great!
+              </button>
+            </div>
+          </div>
+        </div>
       )}
       {deleting && (
         <div class="confirm-overlay" data-testid="delete-confirm">

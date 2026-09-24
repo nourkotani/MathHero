@@ -244,6 +244,20 @@ export function update(state: GameState, event: GameEvent): UpdateResult {
       };
     }
 
+    case 'HAIR_STYLE_CHANGED': {
+      const player = state.players.find((p) => p.id === event.id);
+      if (!player) return noop(state);
+      const appearance = { ...player.appearance, hairStyle: event.hairStyle, hairLength: event.hairLength };
+      if (!validAppearance(appearance)) return noop(state);
+      return {
+        state: {
+          ...state,
+          players: state.players.map((p) => (p.id === event.id ? { ...p, appearance } : p)),
+        },
+        effects: [{ type: 'SAVE_FILE_CHANGED' }],
+      };
+    }
+
     case 'PLAYER_DELETED': {
       if (!state.players.some((p) => p.id === event.id)) return noop(state);
       const players = state.players.filter((p) => p.id !== event.id);

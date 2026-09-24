@@ -7,6 +7,7 @@ import {
   serializeSaveFile,
   update,
 } from './index';
+import type { GameEvent } from './index';
 import { dispatchAll, perSkill, preRound, TEST_APPEARANCE, TEST_COLORS } from './test-helpers';
 
 describe('hero creation', () => {
@@ -149,5 +150,49 @@ describe('Save File serialization', () => {
     ]) {
       expect(text).not.toContain(`"${transient}"`);
     }
+  });
+});
+
+describe('changing a Hair Style (ADR 0008)', () => {
+  const twoHeroes = () => {
+    const opened = update(initialState({ seed: 1 }), { type: 'HERO_CREATION_OPENED' }).state;
+    const one = update(opened, { type: 'PLAYER_CREATED', name: 'Zara', colors: TEST_COLORS, appearance: TEST_APPEARANCE }).state;
+    const reopened = dispatchAll(one, [{ type: 'TITLE_OPENED' }, { type: 'HERO_CREATION_OPENED' }]);
+    const two = update(reopened, { type: 'PLAYER_CREATED', name: 'Kai', colors: TEST_COLORS, appearance: TEST_APPEARANCE }).state;
+    expect(two.players.map((p) => p.name)).toEqual(['Zara', 'Kai']);
+    return two;
+  };
+
+  it('changes only that Player, keeps all their other data, and saves', () => {
+    const before = twoHeroes();
+    const result = update(before, { type: 'HAIR_STYLE_CHANGED', id: 'p1', hairStyle: 'ponytail', hairLength: 'long' });
+    const [zara, kai] = result.state.players;
+    expect(zara).toEqual({
+      ...before.players[0],
+      appearance: { ...TEST_APPEARANCE, hairStyle: 'ponytail', hairLength: 'long' },
+    });
+    expect(kai).toEqual(before.players[1]);
+    expect(result.effects).toEqual([{ type: 'SAVE_FILE_CHANGED' }]);
+  });
+
+  it('ignores an unknown Player or an unknown style', () => {
+    const before = twoHeroes();
+    expect(update(before, { type: 'HAIR_STYLE_CHANGED', id: 'p9', hairStyle: 'buzz', hairLength: 'short' }).state).toBe(before);
+    const bad = { type: 'HAIR_STYLE_CHANGED', id: 'p1', hairStyle: 'mohawk', hairLength: 'short' } as unknown as GameEvent;
+    expect(update(before, bad).state).toBe(before);
+    const badLength = { type: 'HAIR_STYLE_CHANGED', id: 'p1', hairStyle: 'buzz', hairLength: 'huge' } as unknown as GameEvent;
+    expect(update(before, badLength).state).toBe(before);
+  });
+
+  it('survives a save and a load', () => {
+    const changed = update(twoHeroes(), { type: 'HAIR_STYLE_CHANGED', id: 'p2', hairStyle: 'flame', hairLength: 'long' }).state;
+    const loaded = parseSaveFile(serializeSaveFile(buildSaveFile(changed)));
+    expect(loaded?.players[1]?.appearance).toEqual({ ...TEST_APPEARANCE, hairStyle: 'flame', hairLength: 'long' });
+  });
+
+  it('refuses an imported Save File with an unknown Hair Style, like other bad import data', () => {
+    const doc = JSON.parse(serializeSaveFile(buildSaveFile(twoHeroes())));
+    doc.players[0].appearance.hairStyle = 'mohawk';
+    expect(parseSaveFile(JSON.stringify(doc))).toBeNull();
   });
 });

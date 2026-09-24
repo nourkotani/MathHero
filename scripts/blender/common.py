@@ -685,6 +685,28 @@ def three_rotation(x, y, z):
     return (rx @ ry @ rz).to_quaternion()
 
 
+def three_world_rotation(x, y, z):
+    """A three.js Euler (order XYZ, in three's Y-up world) as a Blender
+    world-space rotation matrix, for placing a mesh: three's X, Y, Z are
+    Blender's X, Z, -Y."""
+    rx = Matrix.Rotation(x, 4, "X")
+    ry = Matrix.Rotation(y, 4, "Z")
+    rz = Matrix.Rotation(-z, 4, "Y")
+    return rx @ ry @ rz
+
+
+def hair_cone(name, head_pivot, x, y, z, tilt_x, tilt_z, radius=0.14, height=0.55, segments=6):
+    """A hair spike like three's ConeGeometry (centered, tip up), turned by
+    three's Euler (tilt_x, 0, tilt_z), at (x, y, z) from the head pivot."""
+    bm = bmesh.new()
+    bmesh.ops.create_cone(bm, cap_ends=True, segments=segments, radius1=radius, radius2=0.0, depth=height)
+    obj = _from_bmesh(name, bm, smooth=False)
+    px, py, pz = head_pivot
+    place = Matrix.Translation(Vector(three_point(px + x, py + y, pz + z))) @ three_world_rotation(tilt_x, 0.0, tilt_z)
+    obj.data.transform(place)
+    return obj
+
+
 def three_point(x, y, z):
     """A point in three.js hero space (Y up, facing +Z) in Blender space."""
     return (x, -z, y)
