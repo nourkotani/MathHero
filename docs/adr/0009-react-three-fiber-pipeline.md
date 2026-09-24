@@ -23,7 +23,14 @@ The family wants the standard web pipeline for anime fighters: Blender makes the
 
 ## Consequences
 
-- React adds about 45 KB to `MathHero.html`. The family waived the size limit (ADR 0007).
+- The pipeline doubles `MathHero.html`, measured on 2026-09-24. The family waived the size limit (ADR 0007), but boot time grows with the file.
+
+  | Build | Size | Gzip |
+  |---|---|---|
+  | `main` before this ADR | 5.45 MB | 3.05 MB |
+  | With R3F, drei, and Rapier | 10.17 MB | 4.74 MB |
+
+  Rapier's WASM, inlined as base64, is about 2.05 MB of the growth. React, R3F, drei, and three-stdlib make up most of the rest.
 - Two UI frameworks share one page. React renders only the 3D scene; Preact renders only the DOM overlay.
 - Mixamo requires an Adobe account, and VRoid Studio is a desktop app. A person downloads or exports these files; the agent then commits them and bakes them.
 - A sourced character must keep the Hair Styles and the tint regions of ADR 0008, or a new ADR must replace ADR 0008.
