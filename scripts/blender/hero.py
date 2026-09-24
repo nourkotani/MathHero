@@ -384,7 +384,7 @@ ATTACK_STRIKE = 0.55
 # hero stands 4.8 m from the Training Dummy (renderer/constants.ts), and a
 # fist or boot must enter the Dummy's hurtbox (src/scene/TrainingDummy.tsx)
 # for the strike to land on contact (ADR 0009).
-DASH = (3.5, 3.75, 4.2, 3.95)
+DASH = (3.5, 3.75, 4.0, 3.95)
 
 
 def attack_pose(kind):
@@ -430,7 +430,11 @@ def attack_pose(kind):
             p.set("armR", 0.8 * s, 0, -0.5)
         elif kind == 2:  # spin strike: wind opposite, whirl through with arms wide
             p.loc[2] = -w * 0.3 + s * DASH[2]
-            p.root_rot[1] = -w * 0.6 + (0.0 if t < 0.3 else (t - 0.3) / 0.7) * 2 * math.pi
+            # One full turn, eased so that at the strike's peak (t = 0.65) the
+            # hero has turned three quarters: an outflung fist then points at
+            # the Dummy (a backfist), not sideways past its hurtbox.
+            u = 0.0 if t < 0.3 else (t - 0.3) / 0.7
+            p.root_rot[1] = -w * 0.6 + (u + 0.25 * math.sin(math.pi * u)) * 2 * math.pi
             p.set("torso", y=-w * 0.5)
             p.set("armL", -0.2, 0, 0.3 + 1.1 * s)
             p.set("armR", -0.2, 0, -0.3 - 1.1 * s)

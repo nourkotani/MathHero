@@ -249,6 +249,9 @@ export function createReactions(opts: {
             // pose matches the blast leaving the hero's hands; it also
             // drops a queued Charge.
             hero.play('Blast');
+            // The hero threw a beam, not a punch: the strike it replaced
+            // never lands, and the blast's own hit launches the Dummy.
+            if (pendingStrike) pendingStrike.landed = true;
             fx.fireBlast(true);
             juice.punchCamera();
             juice.speedLines();
