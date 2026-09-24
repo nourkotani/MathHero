@@ -24,5 +24,7 @@ The family considered four options: family-only builds, Meshy's paid API, CMU mo
 - The bake stays reproducible without the model; making a source again needs the model, the prompt, and the seed from the manifest.
 - Anyone who gets the game from the family outside the Territory would receive HY-Motion output. The family shares the game only inside the Territory.
 - A region block by IP address is a reasonable effort, not a guarantee (VPNs pass it).
+- Cost: a domain, about $10 a year. Private repos are free, and the move off GitHub Pages means GitHub Pro is not needed. Cloudflare's free plan can block by country: a WAF custom rule on `ip.src.country`, or a Worker that reads `request.cf.country`. The shortcut field `ip.src.is_in_european_union` needs the Business plan, so the rule lists the 27 EU country codes, `GB`, and `KR` (checked 2026-09-24).
+- The installed home-screen copies on the family's iPhones and iPad come from `nourkotani.github.io`. After the move, each device installs the game again from the new domain.
 - Steps that only the family can do: buy the domain, create the Cloudflare account and an API token. Then the agent moves the host, makes the repo private, and stops GitHub Pages, in that order.
 - Other clips can follow the same path. A selection loop (many seeds, measured scores, a contact sheet) picks the candidates.

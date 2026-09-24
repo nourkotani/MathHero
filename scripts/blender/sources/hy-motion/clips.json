@@ -6,7 +6,8 @@
       "used_by": "hero.py: the Stagger clip (a wrong answer)",
       "prompts": [
         "A cartoon fighter gets bumped, stumbles two steps backward with arms windmilling for balance, then regains a fighting stance.",
-        "A person loses balance, wobbles backward with arms flailing, then steadies into a ready stance."
+        "A cartoon fighter is pushed on the chest, leans far back with both arms windmilling for balance, hops back one step, then stands up straight in a fighting stance.",
+        "A fighter is knocked off balance backward, arms circling wildly, stays upright, then settles back into a guard."
       ],
       "frames": 45,
       "samples": 4,
@@ -17,16 +18,23 @@
       ],
       "length": 1,
       "score": {
+        "lean_back": {
+          "target": 0.6,
+          "weight": 3
+        },
+        "lean_fwd": -3,
         "profile": -3,
-        "hunch": -2,
+        "back": {
+          "target": 0.3,
+          "weight": 1
+        },
         "drift": -0.5,
-        "back": 1,
         "motion": 0.2
       },
       "chosen": {
         "file": "stagger.npz",
-        "candidate": "p0s0",
-        "by": "npm run motion (score -1.734), 2026-09-24"
+        "candidate": "p2s2",
+        "by": "npm run motion (score -3.540), 2026-09-24"
       }
     }
   }
