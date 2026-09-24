@@ -4,7 +4,7 @@ import { factKey } from './facts';
 import { cosmeticUnlockedAt, formUnlockedAt, levelForXp } from './level';
 import { recordAttempt } from './mastery';
 import type { FactStats } from './mastery';
-import { HAIR_PRESETS, MAX_NAME_LENGTH, OUTFIT_PRESETS, validColors } from './players';
+import { DEFAULT_COLORS, MAX_NAME_LENGTH, validColors } from './players';
 import { seedPrng } from './prng';
 import { buildSaveFile, parseSaveFile, serializeSaveFile } from './savefile';
 import { pointsForCorrect } from './scoring';
@@ -165,16 +165,11 @@ export function update(state: GameState, event: GameEvent): UpdateResult {
 
     case 'HERO_CREATION_OPENED': {
       if (state.phase !== 'title') return noop(state);
-      const defaultColors = {
-        hair: HAIR_PRESETS[0]?.id ?? '',
-        outfitPrimary: OUTFIT_PRESETS[0]?.id ?? '',
-        outfitSecondary: OUTFIT_PRESETS[1]?.id ?? '',
-      };
       return {
         state: {
           ...state,
           phase: 'hero-creation',
-          draft: { colors: defaultColors, appearance: DEFAULT_APPEARANCE },
+          draft: { colors: DEFAULT_COLORS, appearance: DEFAULT_APPEARANCE },
         },
         effects: [],
       };

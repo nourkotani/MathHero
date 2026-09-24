@@ -34,6 +34,13 @@ export interface PlayerColors {
   outfitSecondary: string;
 }
 
+/** The colors a new hero starts with, and the hero on the Title screen wears. */
+export const DEFAULT_COLORS: PlayerColors = {
+  hair: HAIR_PRESETS[0]?.id ?? '',
+  outfitPrimary: OUTFIT_PRESETS[0]?.id ?? '',
+  outfitSecondary: OUTFIT_PRESETS[1]?.id ?? '',
+};
+
 import type { HeroAppearance } from './appearance';
 import type { Difficulty } from './difficulty';
 import type { FactStats } from './mastery';

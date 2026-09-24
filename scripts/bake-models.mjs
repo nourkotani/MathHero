@@ -11,6 +11,8 @@
 //    src/renderer/models/<name>.glb, which the build inlines.
 //
 // Nobody edits a .glb or a .blend by hand: change the script and re-bake.
+// After a re-bake of the hero, run `npm run gen:hero`: the React component
+// src/scene/models/HeroModel.tsx is made from hero.glb (ADR 0009).
 
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync } from 'node:fs';

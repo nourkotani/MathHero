@@ -1,14 +1,15 @@
 /** @jsxImportSource react */
 /*
-Made by gltfjsx from the baked model (ADR 0009), then edited:
-  npx gltfjsx src/renderer/models/hero.glb --types --shadows --keepnames
-Edits: the inlined model import (no network), meshopt without Draco (no
-web worker), the hero's tint materials (renderer/hero.ts) and the ink of
-materials.ts in place of Blender's, one `visible` per part from the
-director's parts, bloom on the painted hair, no frustum culling (the
-attack clips carry the root 4 m), and the group ref from the parent (it
-drives useAnimations). After a re-bake that changes the node tree, run
-gltfjsx again and redo these edits.
+Baked output: made by scripts/gltfjsx-hero.mjs (npm run gen:hero) from
+src/renderer/models/hero.glb, which gltfjsx turns into a component. Do not
+edit this file by hand (ADR 0007, ADR 0009); change the script and run it
+again after every re-bake of the hero.
+The script's edits: the inlined model import (no network), meshopt
+without Draco (no web worker), the hero's tint materials (renderer/hero.ts)
+and the ink of materials.ts in place of Blender's, one `visible` per part
+from the director's parts, bloom on the painted hair, no frustum culling
+(the attack clips carry the root 4 m), and the group ref from the parent
+(it drives useAnimations).
 */
 
 import { useGLTF } from '@react-three/drei';
@@ -70,8 +71,8 @@ type GLTFResult = GLTF & {
     PaintedOutfit: THREE.MeshStandardMaterial;
     PaintedSkin: THREE.MeshStandardMaterial;
     PaintedTrim: THREE.MeshStandardMaterial;
-    Ink: THREE.MeshStandardMaterial;
     PaintedHair: THREE.MeshStandardMaterial;
+    Ink: THREE.MeshStandardMaterial;
   };
 };
 

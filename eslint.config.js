@@ -2,7 +2,10 @@ import js from '@eslint/js';
 import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
-  { ignores: ['dist/', 'build/', 'node_modules/', 'test-results/', 'playwright-report/'] },
+  {
+    // .playwright-mcp/ holds the browser MCP's scratch output, never source.
+    ignores: ['dist/', 'build/', 'node_modules/', 'test-results/', 'playwright-report/', '.playwright-mcp/'],
+  },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {

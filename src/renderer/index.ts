@@ -6,6 +6,7 @@
 import * as THREE from 'three';
 import {
   DEFAULT_APPEARANCE,
+  DEFAULT_COLORS,
   formForLevel,
   glowIntensityForLevel,
   HAIR_PRESETS,
@@ -203,11 +204,11 @@ export function createRenderer({ gl: renderer, scene, camera, dummy }: RenderTar
 
   function applyLook(state: GameState) {
     // During hero creation the draft is previewed live on the 3D character.
+    // With no Player chosen yet (the Title screen), a new hero's look stands in.
     const player = state.players.find((p) => p.id === state.activePlayerId);
     const draft = state.phase === 'hero-creation' ? state.draft : null;
-    const colors = draft?.colors ?? player?.colors;
-    const appearance = draft?.appearance ?? player?.appearance;
-    if (!colors || !appearance) return;
+    const colors = draft?.colors ?? player?.colors ?? DEFAULT_COLORS;
+    const appearance = draft?.appearance ?? player?.appearance ?? DEFAULT_APPEARANCE;
     const level = draft ? 0 : levelForXp(player?.xp ?? 0);
 
     // The Form a hero has earned — never during hero creation, where the

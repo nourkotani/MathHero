@@ -8,6 +8,7 @@
     "dev": "vite",
     "bake:textures": "node scripts/bake-textures.mjs",
     "bake:models": "node scripts/bake-models.mjs",
+    "gen:hero": "node scripts/gltfjsx-hero.mjs",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tests",
     "lint": "eslint .",
     "test:core": "vitest run",
