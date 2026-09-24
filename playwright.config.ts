@@ -48,7 +48,11 @@ export default defineConfig({
   // already-resolved button blew the budget. Never paper over this with
   // retries — a retried test reports as "flaky", not "failed", and this
   // gate is the only thing standing between a bug and the family.
-  timeout: 90_000,
+  // Raised to 120s on 2026-09-24: with the Blender hero, Dummy, and arena
+  // (skinned, inlined glTF), heavy tests take ~19s alone but ~1.4m with
+  // both workers busy, and two deploy gates failed on 90s timeouts in
+  // different tests each time (page.goto included) — load, not a bug.
+  timeout: 120_000,
   projects: [
     {
       name: 'chromium',
