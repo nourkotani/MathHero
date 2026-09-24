@@ -1,4 +1,21 @@
 import { defineConfig } from '@playwright/test';
+import type { Project } from '@playwright/test';
+
+/** A touch-screen device at one viewport, running the layout suites. */
+function touchProject(name: string, width: number, height: number): Project {
+  return {
+    name,
+    testMatch: /(layout|screens)\.spec\.ts/,
+    use: {
+      browserName: 'chromium',
+      viewport: { width, height },
+      deviceScaleFactor: 1,
+      isMobile: true,
+      hasTouch: true,
+      launchOptions: { args: ['--enable-unsafe-swiftshader'] },
+    },
+  };
+}
 
 // Flow tests run against the built dist/MathHero.html over file:// — the same
 // way the family actually launches the game (ADR 0001). Run `npm run build` first;
@@ -27,21 +44,11 @@ export default defineConfig({
         launchOptions: { args: ['--enable-unsafe-swiftshader'] },
       },
     },
-    {
-      // iPhone 17 Pro held in portrait (402×874 CSS px), by touch. Only the
-      // layout suite runs here: the full suite on a second project would
-      // double the ~12-minute gate. Layout is in CSS px, so DPR 1 keeps
-      // software WebGL fast without changing what the child sees.
-      name: 'iphone-17-pro',
-      testMatch: /layout\.spec\.ts/,
-      use: {
-        browserName: 'chromium',
-        viewport: { width: 402, height: 874 },
-        deviceScaleFactor: 1,
-        isMobile: true,
-        hasTouch: true,
-        launchOptions: { args: ['--enable-unsafe-swiftshader'] },
-      },
-    },
+    // Touch devices, by touch: only the layout suites run here. The full
+    // suite on each would multiply the ~14-minute gate. Layout is in CSS
+    // px, so DPR 1 keeps software WebGL fast without changing the layout.
+    touchProject('iphone-17-pro', 402, 874), // iPhone 17 Pro, portrait
+    touchProject('ipad-portrait', 820, 1180),
+    touchProject('ipad-landscape', 1180, 820),
   ],
 });

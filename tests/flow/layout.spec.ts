@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import type { Locator, Page } from '@playwright/test';
-import { advanceClock, createHero, openGame, readCorrectAnswer } from './helpers';
+import { advanceClock, createHero, openGame, readCorrectAnswer, startRound } from './helpers';
 
 // Runs on the desktop project and on the iPhone 17 Pro project; every
 // expectation comes from the viewport's shape, as the Layout rule does.
@@ -30,13 +30,7 @@ async function tapAnswer(page: Page, answer: number): Promise<void> {
 async function openRound(page: Page, seed: number): Promise<void> {
   await openGame(page, `?testClock=1&seed=${seed}`);
   await createHero(page);
-  // GO! through the test hook: the Pre-round screen does not fit a phone
-  // yet (ticket #47). The Round itself is what this suite checks.
-  await page.evaluate(() =>
-    (
-      window as unknown as { __mathhero: { dispatch(e: { type: string }): void } }
-    ).__mathhero.dispatch({ type: 'ROUND_STARTED' }),
-  );
+  await startRound(page);
   await expect(page.getByTestId('question')).toBeVisible();
 }
 
