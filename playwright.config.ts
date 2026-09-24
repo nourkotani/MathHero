@@ -1,6 +1,21 @@
 import { defineConfig } from '@playwright/test';
 import type { Project } from '@playwright/test';
 
+/** A WebKit touch device at one viewport, running only the smoke set. */
+function webkitSmoke(name: string, width: number, height: number): Project {
+  return {
+    name,
+    testMatch: /smoke\.spec\.ts/,
+    use: {
+      browserName: 'webkit',
+      viewport: { width, height },
+      deviceScaleFactor: 1,
+      isMobile: true,
+      hasTouch: true,
+    },
+  };
+}
+
 /** A touch-screen device at one viewport, running the layout suites. */
 function touchProject(name: string, width: number, height: number): Project {
   return {
@@ -50,5 +65,9 @@ export default defineConfig({
     touchProject('iphone-17-pro', 402, 874), // iPhone 17 Pro, portrait
     touchProject('ipad-portrait', 820, 1180),
     touchProject('ipad-landscape', 1180, 820),
+    // iOS runs only WebKit (ADR 0006): a smoke Round at the phone and iPad
+    // viewports. WebKit needs no SwiftShader flag.
+    webkitSmoke('webkit-iphone-17-pro', 402, 874),
+    webkitSmoke('webkit-ipad-landscape', 1180, 820),
   ],
 });

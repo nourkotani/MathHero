@@ -73,14 +73,34 @@ function patchFor(effect: GameEffect): Tone[] | undefined {
 export function createAudio(): Audio {
   let ctx: AudioContext | null = null;
 
-  // Browsers keep audio suspended until a user gesture; the first tap or
-  // keypress on the Title screen unlocks it. Handled entirely in here.
+  // Older iOS Safari names it webkitAudioContext. A browser with no WebAudio
+  // at all plays silently: sound must never break the game.
+  const AudioCtor =
+    window.AudioContext ??
+    (window as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+
+  // Browsers keep audio suspended until a user gesture. On touch, WebKit
+  // counts only the end of a tap (pointerup/touchend) as one, so every
+  // gesture tries again until the context runs, then the listeners go.
+  const gestures = ['pointerdown', 'pointerup', 'touchend', 'keydown'] as const;
   const unlock = () => {
-    ctx ??= new AudioContext();
-    if (ctx.state === 'suspended') void ctx.resume();
+    if (!AudioCtor) return;
+    ctx ??= new AudioCtor();
+    if (ctx.state === 'running') {
+      for (const type of gestures) window.removeEventListener(type, unlock);
+    } else {
+      // Not a gesture that counts yet: resume rejects, and the next try waits.
+      void ctx
+        .resume()
+        .then(() => {
+          if (ctx?.state === 'running') {
+            for (const type of gestures) window.removeEventListener(type, unlock);
+          }
+        })
+        .catch(() => undefined);
+    }
   };
-  window.addEventListener('pointerdown', unlock, { once: true });
-  window.addEventListener('keydown', unlock, { once: true });
+  for (const type of gestures) window.addEventListener(type, unlock);
 
   function play(tones: Tone[]) {
     if (!ctx || ctx.state !== 'running') return;

@@ -20,6 +20,12 @@ Vocabulary comes from [`CONTEXT.md`](../CONTEXT.md) — use its terms verbatim. 
 
 There is no CI: `npm run check` (typecheck → lint → core tests → build → flow tests against the build) is the gate, and it must pass locally before every commit.
 
+| Gate fact | Value |
+|---|---|
+| Duration (2026-09-23) | About 21 minutes, most of it the flow suite on software WebGL |
+| Flow projects | Desktop Chromium (every spec); Chromium touch at iPhone 17 Pro portrait, iPad portrait, and iPad landscape (layout and screen specs); WebKit at iPhone 17 Pro portrait and iPad landscape (smoke spec) |
+| One-time setup | `npx playwright install chromium webkit` |
+
 ## Unidirectional event flow
 
 ```
