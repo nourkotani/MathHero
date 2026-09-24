@@ -20,7 +20,8 @@ import type { GLTF } from 'three-stdlib';
 import { bakedInkSurface, painterlySurface } from '../../renderer/materials';
 import dummyModelUrl from '../../renderer/models/training-dummy.glb';
 
-export type DummyClip = 'HitBack' | 'HitSpin' | 'HitTwist' | 'Idle' | 'Launch' | 'Recover' | 'Taunt';
+export type DummyClip =
+  'HitBack' | 'HitSpin' | 'HitTwist' | 'Idle' | 'Launch' | 'Recover' | 'Taunt';
 
 type GLTFResult = GLTF & {
   nodes: {

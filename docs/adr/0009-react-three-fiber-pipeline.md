@@ -27,3 +27,5 @@ The family wants the standard web pipeline for anime fighters: Blender makes the
 - Two UI frameworks share one page. React renders only the 3D scene; Preact renders only the DOM overlay.
 - Mixamo requires an Adobe account, and VRoid Studio is a desktop app. A person downloads or exports these files; the agent then commits them and bakes them.
 - A sourced character must keep the Hair Styles and the tint regions of ADR 0008, or a new ADR must replace ADR 0008.
+- The hero model mounts once for the session (`src/scene/Hero.tsx`). A new appearance or Form changes the visible parts through the hero director (`renderer/heroDirector.ts`) and rebuilds only the light made in code: face, aura, motes, and cosmetics. drei's `useAnimations` keeps each action bound to the first root, so a remounted model would lose its clips.
+- Cosmetics attach at the bones' rest positions from the `PIVOTS` table in `hero.ts`, not at the current pose: the model can be in the middle of a clip at a rebuild.

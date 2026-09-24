@@ -335,8 +335,9 @@ export function createReactions(opts: {
         }
       }
 
-      // Every pose is an authored Blender clip (Idle between actions); the
-      // code clips below only time effects (impacts, the wince, the waves).
+      // Every pose is an authored Blender clip (Idle between actions), which
+      // src/scene/Hero.tsx plays; the code clips below only time effects
+      // (impacts, the wince, the waves). The rig keeps the Form's hair scale.
       hero.animate(dt);
 
       heroChannel.update(dt, elapsed);

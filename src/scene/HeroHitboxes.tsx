@@ -34,7 +34,11 @@ export function HeroHitboxes({ strikePoints }: { strikePoints: () => THREE.Vecto
           type="kinematicPosition"
           colliders={false}
         >
-          <BallCollider sensor args={[STRIKE_RADIUS]} activeCollisionTypes={ActiveCollisionTypes.ALL} />
+          <BallCollider
+            sensor
+            args={[STRIKE_RADIUS]}
+            activeCollisionTypes={ActiveCollisionTypes.ALL}
+          />
         </RigidBody>
       ))}
     </>

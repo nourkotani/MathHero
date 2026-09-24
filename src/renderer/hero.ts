@@ -1,9 +1,10 @@
 // The hero: an original, DBZ-inspired (never copied) anime-style fighter,
-// procedurally assembled from the chosen appearance, plus the streak-form
-// looks that transform it.
+// dressed from the chosen appearance, plus the streak-form looks that
+// transform it. The body and its clips are the Blender hero, mounted by the
+// React component src/scene/Hero.tsx (ADR 0009); this module dresses it
+// with light — face, aura, motes, cosmetics — which stays in code (ADR 0007).
 
 import * as THREE from 'three';
-import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { COSMETIC_MILESTONES, FORMS, presetHex, SKIN_PRESETS } from '../core';
 import type { CosmeticSlot, Garment, HeroAppearance, StreakForm } from '../core';
 import {
@@ -14,12 +15,12 @@ import {
   markBloom,
   painterlySurface,
 } from './materials';
-import { loadModel } from './models';
-import heroModelUrl from './models/hero.glb';
 import { hairMeshFor } from './hairLook';
+import type { HeroDirector, HeroParts } from './heroDirector';
 import { STYLE } from './style';
 import type { Surface } from './materials';
 import { applyCelTreatment } from './cel';
+import { freeMesh } from './fx';
 import faceBoyUrl from './textures/face-boy.png';
 import faceGirlUrl from './textures/face-girl.png';
 import featherUrl from './textures/feather.png';
@@ -183,6 +184,16 @@ const PIVOTS: Record<keyof HeroJoints, [number, number, number, keyof HeroJoints
   kneeR: [0, -0.44, 0, 'legR'],
 };
 
+/** A joint's rest position in hero space: the pivots summed up its chain. */
+function restPosition(joint: keyof HeroJoints): THREE.Vector3 {
+  const at = new THREE.Vector3();
+  for (let j: keyof HeroJoints | null = joint; j !== null; j = PIVOTS[j][3]) {
+    const [x, y, z] = PIVOTS[j];
+    at.add(new THREE.Vector3(x, y, z));
+  }
+  return at;
+}
+
 /** Placeholder pivots, used only until the Blender hero decodes. */
 function heroJoints(root: THREE.Object3D): HeroJoints {
   const joints = {} as HeroJoints;
@@ -204,15 +215,6 @@ const GARMENT_MESHES: Record<Garment, string> = {
   armor: 'GarmentArmor',
 };
 
-/** Which named model part (body or garment) a mesh belongs to. */
-function meshOwner(mesh: THREE.Object3D): string | null {
-  for (let node: THREE.Object3D | null = mesh; node; node = node.parent) {
-    // A mesh with several materials loads as parts named Name, Name_1…
-    if (/^(Body|Garment|Hair_)/.test(node.name)) return node.name.replace(/_\d+$/, '');
-  }
-  return null;
-}
-
 /** Cosmetic slots worn on a bone: crowns and halos on the head, wings and
  *  trails on the back. Rings, wisps, and Legend circle the whole hero. */
 const SLOT_BONE: Partial<Record<CosmeticSlot, keyof HeroJoints>> = {
@@ -222,25 +224,46 @@ const SLOT_BONE: Partial<Record<CosmeticSlot, keyof HeroJoints>> = {
   trail: 'torso',
 };
 
-let heroTemplate: { scene: THREE.Object3D; clips: THREE.AnimationClip[] } | null = null;
+/**
+ * The hero's tint materials, one per painted region of hero.glb. They live
+ * for the whole session: the React model wears them, and the look code
+ * (applyLook, applyFormToRig, the reactions) recolors them.
+ */
+export interface HeroMaterials {
+  /** PaintedOutfit */
+  body: Surface;
+  /** PaintedTrim */
+  trim: Surface;
+  /** PaintedSkin */
+  skin: Surface;
+  /** PaintedHair */
+  hair: Surface;
+}
 
-/** Decode the Blender hero once; onReady fires when heroes can wear it. */
-export function loadHeroModel(onReady: () => void): void {
-  loadModel(heroModelUrl, (scene, clips) => {
-    heroTemplate = { scene, clips };
-    onReady();
-  });
+export function createHeroMaterials(): HeroMaterials {
+  return {
+    body: painterlySurface(null),
+    trim: painterlySurface(null),
+    skin: painterlySurface(null),
+    hair: painterlySurface(null),
+  };
+}
+
+/** The Blender parts this appearance and Form show. */
+export function heroParts(appearance: HeroAppearance, form: string | null): HeroParts {
+  return {
+    body: appearance.body === 'girl' ? 'BodyGirl' : 'BodyBoy',
+    garment: GARMENT_MESHES[appearance.garment],
+    hair: hairMeshFor(form, appearance.hairStyle, appearance.hairLength),
+  };
 }
 
 export interface HeroRig {
   group: THREE.Group;
   joints: HeroJoints;
-  /** Plays the authored clips; null until the Blender hero decodes. */
-  mixer: THREE.AnimationMixer | null;
-  /** Advance the clips, then keep the Form's hair scale: every clip keys
-   *  the hair bone at scale 1, so the scale is set again after the mixer. */
+  /** Keep the Form's hair scale: every clip keys the hair bone at scale 1,
+   *  and drei's mixer has already run this frame, so the scale is set again. */
   animate(dt: number): void;
-  idle: THREE.AnimationAction | null;
   /** The hair this hero wore before its current Form, and wears now: the
    *  Landmark scene shows the first, then swaps at the moment of ascension. */
   hairBefore: string;
@@ -269,6 +292,8 @@ export interface HeroRig {
   powerMotes: THREE.Group;
   moteMeshes: THREE.Sprite[];
   moteMaterial: THREE.SpriteMaterial;
+  /** Take this rig's light off the hero and free it (a rebuild follows). */
+  dispose(): void;
 }
 
 /** The effective look: what the hero IS, turned up by how hard they push. */
@@ -357,128 +382,70 @@ export function applyLevelToRig(rig: HeroRig, level: number): void {
   });
 }
 
+/** What a hero build dresses: the persistent parts it hangs its light on. */
+export interface HeroBuild {
+  appearance: HeroAppearance;
+  palette: FormPalette | null;
+  form: string | null;
+  /** The hero's root group; the React model is mounted inside it. */
+  group: THREE.Group;
+  /** The mounted Blender model, or null until it decodes (a moment at boot). */
+  model: THREE.Object3D | null;
+  materials: HeroMaterials;
+  director: HeroDirector;
+}
+
 /**
- * An original, DBZ-inspired (never copied) anime-style hero, assembled from
- * the chosen appearance: body style, hair style and length, garment, and
- * skin tone. The body is an articulated rig — shoulders, elbows, hips,
- * knees, torso, and head are pivot groups the animation loop poses.
+ * Dress an original, DBZ-inspired (never copied) anime-style hero from the
+ * chosen appearance: body style, hair style and length, garment, and skin
+ * tone. The Blender model (scripts/blender/hero.py, ADR 0007/0008) carries
+ * both bodies, the three garments and every hair on one rig whose bones sit
+ * on the joint pivots with identity rests; the director picks which parts
+ * show. This build adds the face, the aura, the motes and the cosmetics.
  *
  * Rig layout (group-local y, feet at 0): hips 0.88, torso pivot 1.0,
  * shoulders 1.7, head pivot 1.88, head center ~2.04.
  */
-export function buildHero(
-  appearance: HeroAppearance,
-  palette: FormPalette | null = null,
-  form: string | null = null,
-): HeroRig {
-  const group = new THREE.Group();
+export function buildHero({
+  appearance,
+  palette,
+  form,
+  group,
+  model,
+  materials,
+  director,
+}: HeroBuild): HeroRig {
   const girl = appearance.body === 'girl';
+  // Everything this build adds, so dispose() can take it off again: the
+  // model and its tint materials outlive every build.
+  const dressing: THREE.Object3D[] = [];
 
-  // The body is baked in Blender (scripts/blender/hero.py, ADR 0007/0008):
-  // both bodies and the three garments on one rig whose bones sit on the
-  // joint pivots with identity rests, so the poses below drive them as
-  // they drove the old code joints. Until the model decodes (a moment at
-  // boot) the joints are plain pivots and the body is simply not there;
-  // the renderer rebuilds the hero once it arrives.
-  const bodyMaterial = painterlySurface(null) as THREE.MeshToonMaterial;
-  const trimMaterial = painterlySurface(null) as THREE.MeshToonMaterial;
-  const skinMaterial = painterlySurface(null) as THREE.MeshToonMaterial;
-  skinMaterial.color.setHex(presetHex(SKIN_PRESETS, appearance.skinTone));
-  // The hair: one tint material, recolored by the chosen hair color and by
-  // every Form; the look table picks which Hair Style mesh shows.
-  const hairMaterial = painterlySurface(null) as THREE.MeshToonMaterial;
-  const hairMaterials: Surface[] = [hairMaterial];
-  const hairMesh = hairMeshFor(form, appearance.hairStyle, appearance.hairLength);
+  materials.skin.color.setHex(presetHex(SKIN_PRESETS, appearance.skinTone));
+  const parts = heroParts(appearance, form);
+  director.showParts(parts);
   const formIndex = FORMS.findIndex((f) => f.id === form);
   const formBefore = formIndex > 0 ? (FORMS[formIndex - 1]?.id ?? null) : null;
   const hairBefore = hairMeshFor(formBefore, appearance.hairStyle, appearance.hairLength);
-  // Every hair mesh by name, so the Landmark scene can swap them.
-  const hairParts = new Map<string, THREE.Mesh[]>();
-  const regionMaterials: Record<string, THREE.MeshToonMaterial> = {
-    PaintedHair: hairMaterial,
-    PaintedOutfit: bodyMaterial,
-    PaintedTrim: trimMaterial,
-    PaintedSkin: skinMaterial,
-  };
 
-  const joints = heroJoints(group);
-  let mixer: THREE.AnimationMixer | null = null;
-  let idle: THREE.AnimationAction | null = null;
-  const actions = new Map<string, THREE.AnimationAction>();
-  let hairBone: THREE.Object3D | null = null;
-  const hairScale = palette?.hairScale ?? 1;
-  let current: THREE.AnimationAction | null = null;
-  let next: string | null = null;
-  const blend = STYLE.heroBlend;
-  const fadeTo = (action: THREE.AnimationAction) => {
-    if (current && current !== action) current.fadeOut(blend);
-    action.reset().fadeIn(blend).play();
-    current = action;
-  };
-  if (heroTemplate) {
-    const body = girl ? 'BodyGirl' : 'BodyBoy';
-    const garment = GARMENT_MESHES[appearance.garment];
-    const model = cloneSkinned(heroTemplate.scene);
-    model.traverse((obj: THREE.Object3D) => {
-      if (!(obj instanceof THREE.Mesh)) return;
-      // The geometry belongs to the template, shared by every rebuild.
-      obj.userData.sharedGeometry = true;
-      const owner = meshOwner(obj);
-      obj.visible = owner === body || owner === garment || owner === hairMesh;
-      if (owner?.startsWith('Hair_')) {
-        const list = hairParts.get(owner) ?? [];
-        list.push(obj);
-        hairParts.set(owner, list);
-      }
-      // Glowing hair is a Power Streak reward: dark at rest (under the bloom
-      // pass's floor), radiant gold in surge and Super mode.
-      if (owner?.startsWith('Hair_') && !obj.userData.outlineHull) markBloom(obj);
-      if (obj.userData.outlineHull) return;
-      const region = (obj.material as THREE.Material).name;
-      const tinted = regionMaterials[region];
-      if (tinted) {
-        // One tint material per region per hero, wearing the baked light
-        // and shade of the template's painted atlas.
-        tinted.map = (obj.material as THREE.MeshToonMaterial).map;
-        tinted.needsUpdate = true;
-        obj.material = tinted;
-      }
-    });
-    group.add(model);
-    // The template's bones replace the placeholder pivots.
+  // The model's bones are the joints. Until it decodes, placeholder pivots
+  // at the same places hold the face and the cosmetics.
+  const placeholder = new THREE.Group();
+  const joints = heroJoints(placeholder);
+  if (model) {
     for (const name of Object.keys(joints) as Array<keyof HeroJoints>) {
       const bone = model.getObjectByName(name);
       if (bone) joints[name] = bone;
     }
-    // Hair grows and stiffens with the Form: the hair bone scales it from
-    // the head pivot, so a powered-up hero's hair visibly rises.
-    hairBone = model.getObjectByName('hair') ?? null;
-    mixer = new THREE.AnimationMixer(model);
-    for (const clip of heroTemplate.clips) {
-      const action = mixer.clipAction(clip);
-      if (clip.name !== 'Idle') {
-        action.setLoop(THREE.LoopOnce, 1);
-        action.clampWhenFinished = true;
-      }
-      actions.set(clip.name, action);
-    }
-    idle = actions.get('Idle') ?? null;
-    if (idle) {
-      idle.play();
-      current = idle;
-    }
-    // A one-shot clip hands on to the queued one, or back to Idle.
-    // Only the clip that is playing may hand on (a clip still fading out
-    // must not cut off its replacement).
-    mixer.addEventListener('finished', (event) => {
-      if (event.action !== current) return;
-      const then = (next !== null ? actions.get(next) : undefined) ?? idle;
-      next = null;
-      if (then) fadeTo(then);
-    });
+  } else {
+    group.add(placeholder);
+    dressing.push(placeholder);
   }
-  // The face and the hair stay in code for now, riding the head bone
-  // (the Hair Style ticket moves the hair into Blender).
+  // Hair grows and stiffens with the Form: the hair bone scales it from
+  // the head pivot, so a powered-up hero's hair visibly rises.
+  const hairBone = model?.getObjectByName('hair') ?? null;
+  const hairScale = palette?.hairScale ?? 1;
+
+  // The face rides the head bone.
   const headPivot = joints.head;
 
   // The painted anime face: a transparent decal on a sphere segment just
@@ -490,6 +457,7 @@ export function buildHero(
   face.position.y = 0.16;
   face.renderOrder = 1;
   headPivot.add(face);
+  dressing.push(face);
 
   // The irises ride their own sheet so a Form can change the hero's eyes
   // without rebaking a whole face per Form.
@@ -499,6 +467,7 @@ export function buildHero(
   irises.position.y = 0.16;
   irises.renderOrder = 2;
   headPivot.add(irises);
+  dressing.push(irises);
 
   // The catchlights sit on their own untinted sheet above the iris. On the
   // tinted sheet they took the Form's color, and an eye whose highlight
@@ -507,6 +476,7 @@ export function buildHero(
   sparks.position.y = 0.16;
   sparks.renderOrder = 3;
   headPivot.add(sparks);
+  dressing.push(sparks);
 
   // Front faces only: with two nested shells, double-sided rendering would
   // stack four color layers and wall the hero off inside the flame.
@@ -526,6 +496,7 @@ export function buildHero(
   aura.add(auraInner);
   aura.position.y = 0.02;
   group.add(aura);
+  dressing.push(aura);
 
   // The power-mote ring: small energy shards orbiting the fighter, revealed
   // one by one as Hero Levels climb. The frame loop spins the group.
@@ -546,6 +517,7 @@ export function buildHero(
     moteMeshes.push(mote);
   }
   group.add(powerMotes);
+  dressing.push(powerMotes);
 
   const cosmeticMotors: CosmeticMotor[] = [];
   const cosmetics = buildCosmetics(cosmeticMotors);
@@ -554,19 +526,24 @@ export function buildHero(
     // Cosmetic energy glows for real; children too (wisps, wings, halos).
     mesh.traverse(markBloom);
     group.add(mesh);
+    dressing.push(mesh);
   }
 
-  applyCelTreatment(group);
+  // Ink and shadows for the code-built pieces; the model has baked ink.
+  for (const piece of dressing) applyCelTreatment(piece);
 
   // Worn cosmetics ride their bone: the crown turns with the head, the
-  // wings lean with the torso. attach() keeps each piece where it was
-  // built (the rig is at rest here), so the tuned anchors still hold, and
-  // every motor re-reads its rest pose relative to the new parent.
-  group.updateMatrixWorld(true);
+  // wings lean with the torso. Each piece was built in hero space, and every
+  // bone rests on its pivot with an identity rotation, so moving a piece
+  // onto its bone only takes the bone's rest position off it. The model
+  // outlives every build and may be mid-clip, so the current pose must not
+  // count. Every motor then re-reads its rest pose relative to the new parent.
   for (const tier of COSMETIC_MILESTONES) {
     const bone = SLOT_BONE[tier.slot];
     const piece = cosmetics.get(tier.id);
-    if (bone && piece) joints[bone].attach(piece);
+    if (!bone || !piece) continue;
+    piece.position.sub(restPosition(bone));
+    joints[bone].add(piece);
   }
   for (const motor of cosmeticMotors) {
     motor.restY = motor.object.position.y;
@@ -578,32 +555,20 @@ export function buildHero(
   return {
     group,
     joints,
-    mixer,
-    idle,
     hairBefore,
-    hairNow: hairMesh,
-    animate(dt) {
-      mixer?.update(dt);
+    hairNow: parts.hair,
+    animate() {
       hairBone?.scale.setScalar(hairScale);
     },
     play(name, queued = false) {
-      const action = actions.get(name);
-      if (!action) return;
-      if (queued && current && current !== idle && current.isRunning()) {
-        next = name;
-        return;
-      }
-      next = null;
-      fadeTo(action);
+      director.play(name, queued);
     },
     showHair(name) {
-      for (const [owner, meshes] of hairParts) {
-        for (const mesh of meshes) mesh.visible = owner === name;
-      }
+      director.showHair(name);
     },
-    hairMaterials,
-    bodyMaterial,
-    trimMaterial,
+    hairMaterials: [materials.hair],
+    bodyMaterial: materials.body,
+    trimMaterial: materials.trim,
     aura,
     auraOuter,
     auraInner,
@@ -614,6 +579,14 @@ export function buildHero(
     powerMotes,
     moteMeshes,
     moteMaterial,
+    dispose() {
+      for (const piece of dressing) {
+        piece.removeFromParent();
+        piece.traverse((obj) => {
+          if (obj instanceof THREE.Mesh) freeMesh(obj);
+        });
+      }
+    },
   };
 }
 

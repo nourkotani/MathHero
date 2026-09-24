@@ -20,9 +20,11 @@ import { createCameraRig } from './cameraRig';
 import type { Focus } from './framing';
 import { CAMERA_FAR, DUMMY_X, HERO_X } from './constants';
 import type { Dummy } from './dummy';
-import { createFx, freeMesh } from './fx';
-import { applyLevelToRig, buildHero, FORM_PALETTES, loadHeroModel } from './hero';
-import type { FormPalette, HeroRig } from './hero';
+import { createFx } from './fx';
+import { applyLevelToRig, buildHero, createHeroMaterials, FORM_PALETTES, heroParts } from './hero';
+import type { FormPalette, HeroMaterials, HeroRig } from './hero';
+import { createHeroDirector } from './heroDirector';
+import type { HeroDirector } from './heroDirector';
 import { createPipeline } from './pipeline';
 import { initialImpactGate, tryImpactFrame } from './impactFrame';
 import { initialTierState, nextTier } from './qualityTier';
@@ -39,6 +41,22 @@ export interface Renderer {
   strikeContact(): void;
   /** The render time scale: below 1 while a hitstop freezes the frame. */
   timeScale(): number;
+  /** What the React hero (src/scene/Hero.tsx) mounts and follows. */
+  hero: HeroMount;
+}
+
+/**
+ * The hero's seam between React and the renderer (ADR 0009). React mounts
+ * the Blender model inside the group and plays the director's clips; the
+ * renderer poses the group, recolors the materials, and dresses the model
+ * with light (face, aura, motes, cosmetics) once its bones exist.
+ */
+export interface HeroMount {
+  group: THREE.Group;
+  director: HeroDirector;
+  materials: HeroMaterials;
+  /** The model mounted (its bones exist) or unmounted (null). */
+  modelReady(model: THREE.Object3D | null): void;
 }
 
 /** Each strike point: a bone, and the offset from it to the fist or boot
@@ -114,35 +132,41 @@ export function createRenderer({ gl: renderer, scene, camera, dummy }: RenderTar
     if (result.fire) pipeline.flashImpactFrame();
   }
 
-  let hero = buildHero(DEFAULT_APPEARANCE, null);
+  // The hero lives for the whole session: one group, one director, one set
+  // of tint materials, and (once it decodes) one Blender model mounted by
+  // React. A new appearance or Form only swaps the parts and the dressing.
+  const heroGroup = new THREE.Group();
+  heroGroup.position.set(HERO_X, 0.3, 0);
+  heroGroup.rotation.y = Math.PI / 2;
+  const heroMaterials = createHeroMaterials();
+  const heroDirector = createHeroDirector(heroParts(DEFAULT_APPEARANCE, null));
+  let heroModel: THREE.Object3D | null = null;
+  let build: { appearance: HeroAppearance; palette: FormPalette | null; form: string | null } = {
+    appearance: DEFAULT_APPEARANCE,
+    palette: null,
+    form: null,
+  };
+  const dressHero = () =>
+    buildHero({ ...build, group: heroGroup, model: heroModel, materials: heroMaterials, director: heroDirector });
+  let hero = dressHero();
   // The build key covers the Form too: hair length, hair scale, eye color
   // and aura shape are all baked in at construction.
   let appearanceKey = JSON.stringify([DEFAULT_APPEARANCE, null]);
-  placeHero();
-  scene.add(hero.group);
 
-  function placeHero() {
-    hero.group.position.set(HERO_X, 0.3, 0);
-    hero.group.rotation.y = Math.PI / 2;
+  /** Dress the hero again when the appearance, the Form, or the model changes. */
+  function rebuildHero() {
+    hero.dispose();
+    hero = dressHero();
   }
 
-  /** Swap the character model when the appearance or the Form changes. */
-  function rebuildHero(appearance: HeroAppearance, palette: FormPalette | null, form: string | null) {
-    scene.remove(hero.group);
-    hero.group.traverse((obj) => {
-      if (obj instanceof THREE.Mesh) freeMesh(obj);
-    });
-    hero = buildHero(appearance, palette, form);
-    placeHero();
-    scene.add(hero.group);
-  }
-
-  // The Blender hero decodes a moment after boot: wear it at once.
+  // The Blender hero decodes a moment after boot: dress it at once.
   let lastState: GameState | null = null;
-  loadHeroModel(() => {
-    appearanceKey = '';
+  function heroModelReady(model: THREE.Object3D | null) {
+    heroModel = model;
+    rebuildHero();
     if (lastState) applyLook(lastState);
-  });
+    reactions.refreshForm();
+  }
 
   const fx = createFx(scene, (big) => {
     if (big) {
@@ -194,7 +218,8 @@ export function createRenderer({ gl: renderer, scene, camera, dummy }: RenderTar
     const key = JSON.stringify([appearance, form?.id ?? null]);
     if (key !== appearanceKey) {
       appearanceKey = key;
-      rebuildHero(appearance, palette, form?.id ?? null);
+      build = { appearance, palette, form: form?.id ?? null };
+      rebuildHero();
     }
     reactions.setPlayerLook(
       presetHex(HAIR_PRESETS, colors.hair),
@@ -228,6 +253,12 @@ export function createRenderer({ gl: renderer, scene, camera, dummy }: RenderTar
   const strikePointCache: THREE.Vector3[] = [];
 
   return {
+    hero: {
+      group: heroGroup,
+      director: heroDirector,
+      materials: heroMaterials,
+      modelReady: heroModelReady,
+    },
     onStoreUpdate(state, effects) {
       lastState = state;
       applyLook(state);
