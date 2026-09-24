@@ -5,12 +5,16 @@
 
 import type { HairLength, HairStyle } from '../core';
 
-/** Forms whose hair grows long whatever length was chosen. Until the
- *  ascended manes arrive (ticket #52), this is Wild Mane's whole look. */
-const LONG_FORMS: ReadonlySet<string> = new Set(['wild-mane']);
+/** From Wild Mane on, every Hair Style ascends into its Form's shared mane:
+ *  past level 50 the hero has outgrown their old look (CONTEXT.md, Form). */
+const MANES: Readonly<Record<string, string>> = {
+  'wild-mane': 'Hair_mane_wild',
+  'crimson-sage': 'Hair_mane_crimson',
+  'rose-dawn': 'Hair_mane_rose',
+  legend: 'Hair_mane_legend',
+};
 
 /** The mesh name in hero.glb for this Form (null: none yet) and style. */
 export function hairMeshFor(form: string | null, style: HairStyle, length: HairLength): string {
-  const shown = form !== null && LONG_FORMS.has(form) ? 'long' : length;
-  return `Hair_${style}_${shown}`;
+  return (form !== null ? MANES[form] : undefined) ?? `Hair_${style}_${length}`;
 }

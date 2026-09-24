@@ -4,7 +4,7 @@
 
 import * as THREE from 'three';
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
-import { COSMETIC_MILESTONES, presetHex, SKIN_PRESETS } from '../core';
+import { COSMETIC_MILESTONES, FORMS, presetHex, SKIN_PRESETS } from '../core';
 import type { CosmeticSlot, Garment, HeroAppearance, StreakForm } from '../core';
 import {
   cosmeticPanel,
@@ -238,6 +238,11 @@ export interface HeroRig {
   /** Plays the authored Idle clip; null until the Blender hero decodes. */
   mixer: THREE.AnimationMixer | null;
   idle: THREE.AnimationAction | null;
+  /** The hair this hero wore before its current Form, and wears now: the
+   *  Landmark scene shows the first, then swaps at the moment of ascension. */
+  hairBefore: string;
+  hairNow: string;
+  showHair(name: string): void;
   hairMaterials: Surface[];
   bodyMaterial: Surface;
   trimMaterial: Surface;
@@ -376,6 +381,11 @@ export function buildHero(
   const hairMaterial = painterlySurface(null) as THREE.MeshToonMaterial;
   const hairMaterials: Surface[] = [hairMaterial];
   const hairMesh = hairMeshFor(form, appearance.hairStyle, appearance.hairLength);
+  const formIndex = FORMS.findIndex((f) => f.id === form);
+  const formBefore = formIndex > 0 ? (FORMS[formIndex - 1]?.id ?? null) : null;
+  const hairBefore = hairMeshFor(formBefore, appearance.hairStyle, appearance.hairLength);
+  // Every hair mesh by name, so the Landmark scene can swap them.
+  const hairParts = new Map<string, THREE.Mesh[]>();
   const regionMaterials: Record<string, THREE.MeshToonMaterial> = {
     PaintedHair: hairMaterial,
     PaintedOutfit: bodyMaterial,
@@ -396,9 +406,14 @@ export function buildHero(
       obj.userData.sharedGeometry = true;
       const owner = meshOwner(obj);
       obj.visible = owner === body || owner === garment || owner === hairMesh;
+      if (owner?.startsWith('Hair_')) {
+        const list = hairParts.get(owner) ?? [];
+        list.push(obj);
+        hairParts.set(owner, list);
+      }
       // Glowing hair is a Power Streak reward: dark at rest (under the bloom
       // pass's floor), radiant gold in surge and Super mode.
-      if (owner === hairMesh && !obj.userData.outlineHull) markBloom(obj);
+      if (owner?.startsWith('Hair_') && !obj.userData.outlineHull) markBloom(obj);
       if (obj.userData.outlineHull) return;
       const region = (obj.material as THREE.Material).name;
       const tinted = regionMaterials[region];
@@ -526,6 +541,13 @@ export function buildHero(
     joints,
     mixer,
     idle,
+    hairBefore,
+    hairNow: hairMesh,
+    showHair(name) {
+      for (const [owner, meshes] of hairParts) {
+        for (const mesh of meshes) mesh.visible = owner === name;
+      }
+    },
     hairMaterials,
     bodyMaterial,
     trimMaterial,

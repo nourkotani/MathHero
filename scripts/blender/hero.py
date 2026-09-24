@@ -273,23 +273,26 @@ def build_mane(mane, part):
         for i in range(7):
             a = (i - 3) / 3
             spike(a * 0.22, 0.7 - abs(a) * 0.08, 0.02, 0.1, -a * 0.6, 0.15, 0.7)
+        # Hanging spikes: centered low, so the wide end sits at the back of
+        # the head and the cone hangs down (a cone centered at head height
+        # stuck half its length up above the crown).
         for i in range(5):
             a = (i - 2) / 2
-            spike(a * 0.26, 0.28, -0.3, 2.4 + abs(a) * 0.15, -a * 0.35, 0.16, 1.15)
+            spike(a * 0.26, -0.18, -0.4, 2.55 + abs(a) * 0.1, -a * 0.35, 0.16, 1.15)
         for side in (-1, 1):
             spike(side * 0.34, 0.36, -0.02, 0.2, -side * 1.2, 0.13, 0.7)
-            spike(side * 0.3, 0.05, -0.22, 2.6, -side * 0.5, 0.13, 0.9)
+            spike(side * 0.3, -0.25, -0.3, 2.7, -side * 0.4, 0.13, 0.9)
     elif mane == "crimson":
         # Sleek blades swept straight back, and one long tail to the waist.
         cap(1.02, 0.62, 0.33)
         for i in range(5):
             a = (i - 2) / 2
             spike(a * 0.2, 0.5, -0.1, -2.0, -a * 0.25, 0.1, 0.7)
-        spike(0, 0.3, -0.36, 2.95, 0, 0.13, 1.5)
+        spike(0, -0.4, -0.4, 2.95, 0, 0.13, 1.5)
         for side in (-1, 1):
             spike(side * 0.31, 0.3, 0.08, -0.15, -side * 1.3, 0.07, 0.45)
     elif mane == "rose":
-        # Soft petal layers: round, flattened clusters opening like a bloom.
+        # A soft curly bloom: round puffs in two rings around the head.
         cap(1.08, 0.7, 0.32)
         for ring, (height, reach, count) in enumerate(((0.45, 0.3, 8), (0.22, 0.36, 10))):
             for i in range(count):
@@ -298,7 +301,7 @@ def build_mane(mane, part):
                 if z > 0.18:
                     continue  # the face stays clear
                 px, py, pz = pivot
-                petal = c.sphere("Petal", 0.16, P(px + x, py + height, pz + z), scale=(0.8, 1.2, 0.45), segments=16, rings=10)
+                petal = c.sphere("Petal", 0.15, P(px + x, py + height, pz + z), segments=16, rings=10)
                 part(petal, "hair", "hair")
     else:  # legend
         # A tall crown of upright flame spikes, and long spikes behind.
@@ -307,7 +310,7 @@ def build_mane(mane, part):
             spike(a * 0.26, 0.8 - abs(a) * 0.2, -0.02, -0.05, -a * 0.35, 0.13, 0.95 - abs(a) * 0.3)
         for i in range(3):
             a = i - 1
-            spike(a * 0.2, 0.3, -0.34, 2.55, -a * 0.2, 0.16, 1.3)
+            spike(a * 0.2, -0.28, -0.4, 2.7, -a * 0.2, 0.16, 1.3)
         for side in (-1, 1):
             spike(side * 0.33, 0.42, 0.02, 0.05, -side * 1.0, 0.1, 0.55)
 

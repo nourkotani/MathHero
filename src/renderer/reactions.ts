@@ -210,8 +210,14 @@ export function createReactions(opts: {
   function landmarkClip(): Clip {
     const waves = [0.15, 0.5, 0.8];
     let nextWave = 0;
+    // The old hair shows while the power gathers; the new Form's hair
+    // (a shared mane from Wild Mane on) takes over as the hero erupts.
+    let ascended = false;
+    getHero().showHair(getHero().hairBefore);
     return {
       duration: 2.0,
+      // However the scene ends, the hero leaves it wearing the new hair.
+      onDone: () => getHero().showHair(getHero().hairNow),
       apply(t, elapsed) {
         const hero = getHero();
         const j = hero.joints;
@@ -233,6 +239,10 @@ export function createReactions(opts: {
           j.armL.rotation.set(-0.2, 0, 0.75);
           j.armR.rotation.set(-0.2, 0, -0.75);
           return;
+        }
+        if (!ascended) {
+          ascended = true;
+          hero.showHair(hero.hairNow);
         }
         // Eruption: rise past standing, arch back, arms thrown wide to the
         // sky, easing home over the tail of the clip.
