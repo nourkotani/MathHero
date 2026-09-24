@@ -157,7 +157,10 @@ test('localStorage works under file:// (persistence harness smoke check)', async
 test('the game makes no network requests', async ({ page }) => {
   const remote: string[] = [];
   page.on('request', (request) => {
-    if (!request.url().startsWith('file://')) remote.push(request.url());
+    // blob: is in-memory: the baked model's texture, decoded from the file's
+    // own inlined bytes (ADR 0007). It never leaves the page.
+    const url = request.url();
+    if (!url.startsWith('file://') && !url.startsWith('blob:')) remote.push(url);
   });
   await openGame(page);
   await createHero(page);
@@ -176,10 +179,26 @@ test('the built file is truly single: nothing is requested beyond the document',
   const extra: string[] = [];
   page.on('request', (request) => {
     const url = request.url();
-    if (!url.startsWith('data:') && !/MathHero\.html/.test(url)) extra.push(url);
+    const inMemory = url.startsWith('data:') || url.startsWith('blob:');
+    if (!inMemory && !/MathHero\.html/.test(url)) extra.push(url);
   });
   await openGame(page);
   await createHero(page);
   await startRound(page);
   expect(extra).toEqual([]);
+});
+
+test('the baked Training Dummy loads from the single file', async ({ page }) => {
+  // The model is inlined meshopt glTF (ADR 0007), decoded on the main
+  // thread. A missing decoder, a worker, or a bad inline reports here.
+  const failures: string[] = [];
+  page.on('console', (message) => {
+    if (message.type() === 'error' && /baked model/.test(message.text())) failures.push(message.text());
+  });
+  page.on('pageerror', (error) => failures.push(error.message));
+  await openGame(page);
+  await createHero(page);
+  await startRound(page);
+  await page.waitForTimeout(3000);
+  expect(failures).toEqual([]);
 });

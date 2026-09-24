@@ -5,6 +5,23 @@ export const STYLE = {
   /** Toon shading bands, dark → lit. More entries = softer cel steps. */
   ramp: [0.28, 0.62, 1.0],
 
+  /** The painterly look of the Blender models (ADR 0007). The painted
+   * texture carries the color, the folds, and the edge light; the runtime
+   * adds soft light steps and a colored rim on the silhouette edge. */
+  painterly: {
+    /** Light steps, dark → lit. Linear-filtered, so the steps blend like
+     * soft paint instead of hard cel bands. */
+    ramp: [0.52, 0.66, 0.84, 0.97, 1.0],
+    /** The rim: the edge that turns away from the camera catches this
+     * light. from/to set where the rim starts and where it is full
+     * (1 - facing), so it is a crisp painted band, not a haze. */
+    rim: { color: 0x7fd4ff, strength: 0.75, from: 0.62, to: 0.82 },
+  },
+
+  /** How far the Training Dummy turns from the hero toward the camera
+   * (radians): a three-quarter view shows its face and chest target. */
+  dummyTurn: 0.6,
+
   /** Ink outlines on the characters (inverted hull). */
   outline: {
     color: 0x14101f,

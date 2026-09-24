@@ -768,12 +768,13 @@ function bakeFace(girl, part = 'face') {
   return encodePng(size, size, pixels, 4);
 }
 
-// -------------------------------------------------- cloth / hair / padding
+// ------------------------------------------------------------ cloth / hair
 
 /**
  * Multiply-maps for the toon materials: white where the player's chosen
- * color must stay full, gently darker where fabric weave, hair strands, or
- * worn padding shade it. They can only darken — that is the whole contract.
+ * color must stay full, gently darker where fabric weave or hair strands
+ * shade it. They can only darken — that is the whole contract. (The
+ * Training Dummy's padding is painted in Blender now, ADR 0007.)
  */
 function bakeCloth(size = 256) {
   const weave = makeNoise(1313, 32);
@@ -796,23 +797,6 @@ function bakeHairStrands(size = 256) {
     const s = fbm(strand, u * 64, v * 6, 3);
     let value = 1 - Math.max(0, 0.55 - Math.abs(s - 0.5)) * 0.28;
     value -= (fbm(strand, u * 10 + 30, v * 3, 2) - 0.5) * 0.08;
-    const c = 255 * Math.min(1, value);
-    return [c, c, c];
-  });
-  return encodePng(size, size, pixels);
-}
-
-function bakePadding(size = 256) {
-  const wear = makeNoise(1616, 16);
-  const pixels = paintWide(size, size, 3, (u, v) => {
-    let value = 1;
-    // Cross stitching in a wide diamond grid.
-    const gx = Math.abs(((u * 10) % 1) - 0.5);
-    const gy = Math.abs(((v * 10) % 1) - 0.5);
-    if (Math.min(gx, gy) < 0.045) value -= 0.1;
-    // Scuffs and worn patches from a thousand training blasts.
-    const scuff = fbm(wear, u * 16, v * 16, 3);
-    if (scuff < 0.42) value -= (0.42 - scuff) * 0.5;
     const c = 255 * Math.min(1, value);
     return [c, c, c];
   });
@@ -847,7 +831,6 @@ const bakes = [
   ['spark-girl.png', () => bakeFace(true, 'spark')],
   ['cloth.png', bakeCloth],
   ['hair-strands.png', bakeHairStrands],
-  ['padding.png', bakePadding],
 ];
 for (const [name, bake] of bakes) {
   const png = bake();

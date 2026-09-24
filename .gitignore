@@ -4,4 +4,10 @@ test-results/
 playwright-report/
 .playwright-mcp/
 
+# Blender output (ADR 0007): only the compressed .glb in src/ is committed.
+build/
+*.blend
+*.blend1
+
 bash.exe.stackdump
+__pycache__/

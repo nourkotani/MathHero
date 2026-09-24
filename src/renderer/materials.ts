@@ -51,6 +51,61 @@ export function characterSurface(color: number, mapUrl?: string): Surface {
   return material;
 }
 
+let softRamp: THREE.DataTexture | null = null;
+
+/** The rim values every painterly material shares: one tune, every model. */
+const rimUniforms = {
+  rimColor: { value: new THREE.Color(STYLE.painterly.rim.color) },
+  rimStrength: { value: STYLE.painterly.rim.strength },
+  rimFrom: { value: STYLE.painterly.rim.from },
+  rimTo: { value: STYLE.painterly.rim.to },
+};
+
+/**
+ * The shared look of every Blender-baked model (ADR 0007): the baked
+ * painted albedo, soft light steps that blend (the cel ramp, but linear-
+ * filtered), and a colored rim light on the silhouette edge.
+ */
+export function painterlySurface(map: THREE.Texture | null): Surface {
+  if (softRamp === null) {
+    softRamp = createToonRamp(STYLE.painterly.ramp);
+    // Linear filtering blends neighbouring steps: painted, not cut.
+    softRamp.minFilter = THREE.LinearFilter;
+    softRamp.magFilter = THREE.LinearFilter;
+  }
+  const material = new THREE.MeshToonMaterial({ color: 0xffffff, map, gradientMap: softRamp });
+  material.onBeforeCompile = (shader) => {
+    Object.assign(shader.uniforms, rimUniforms);
+    shader.fragmentShader = shader.fragmentShader
+      .replace(
+        'void main() {',
+        `uniform vec3 rimColor;
+uniform float rimStrength;
+uniform float rimFrom;
+uniform float rimTo;
+void main() {`,
+      )
+      .replace(
+        '#include <opaque_fragment>',
+        `float rimFacing = 1.0 - clamp(dot(normal, normalize(vViewPosition)), 0.0, 1.0);
+outgoingLight += rimColor * rimStrength * smoothstep(rimFrom, rimTo, rimFacing);
+#include <opaque_fragment>`,
+      );
+  };
+  material.customProgramCacheKey = () => 'painterly';
+  material.userData.role = 'painted';
+  return material;
+}
+
+/**
+ * The ink of a baked inverted hull: the Blender script already built the
+ * shell with flipped normals, so it draws front faces only (unlike the
+ * code-built hulls in cel.ts, which draw back faces of a scaled copy).
+ */
+export function bakedInkSurface(): THREE.MeshBasicMaterial {
+  return new THREE.MeshBasicMaterial({ color: STYLE.outline.color });
+}
+
 /**
  * The hero's painted anime face, worn as a transparent decal on a sphere
  * segment floating just off the skull. Deliberately NOT a character-role
