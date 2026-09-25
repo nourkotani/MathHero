@@ -27,7 +27,7 @@ A self-contained, offline 3D multiplication game (times tables 1–12) for two k
 
 ## Model and animation pipeline
 
-Blender is the bakery: every model and clip in the game is the output of a committed script. AI tools make the inputs. ADR 0007, 0009, 0010, 0011, and 0012 hold the decisions; this section is how to run it. ADR 0012 (the Tripo hero) is in progress: until it lands, the hero is the scripted `hero.py` body.
+Blender is the bakery: every model and clip in the game is the output of a committed script. AI tools make the inputs. ADR 0007, 0009, 0010, 0011, and 0012 hold the decisions; this section is how to run it. The hero's bodies come from Tripo (ADR 0012); `hero.py` fits them to the game.
 
 **Records**
 
@@ -37,7 +37,7 @@ Blender is the bakery: every model and clip in the game is the output of a commi
 | Tripo sources: every candidate at full detail, the rigged model, one file per clip | `scripts/blender/sources/tripo/<name>/**/*.glb` (git LFS) |
 | HY-Motion briefs, scores, and chosen candidates | `scripts/blender/sources/hy-motion/clips.json`, `*.npz` |
 | Bake scripts | `scripts/blender/` (`bake.py` lists the models; `common.py`, `regions.py`, `mocap.py`, `tripo_prepare.py`, `tripo_preview.py`, `motion_score.py`, `contact_sheet.py`) |
-| Baked output: committed, never LFS, never edited by hand | `src/renderer/models/*.glb`, `src/scene/models/*.tsx` |
+| Baked output: committed, never LFS, never edited by hand | `src/renderer/models/*.glb`, `src/renderer/models/hero-rig.json` (each body's joints and strike points), `src/scene/models/*.tsx` |
 
 **Commands**
 
@@ -68,6 +68,7 @@ Blender is the bakery: every model and clip in the game is the output of a commi
 - Send one preset per retarget task. A task with several presets bills each preset but returns only the last clip.
 - Put the Tripo sources in git LFS. Never put `src/renderer/models/` in LFS: the build would inline the pointer text, and the game would break with no error.
 - Never edit a `.blend`, a `.glb`, or a generated component by hand. Change the script and bake again.
+- Each hero body keeps its own Tripo rig and weights; never transfer weights between the bodies (ADR 0012). Garment and hair pieces are fitted per body and named `<part>-<body>`.
 - The clip owns its length; the code reads it (ADR 0012). Do not copy a clip's duration into a constant.
 - HY-Motion runs outside the repo on GPU 1 (memory note `hy-motion-local-setup`). It needs the target's `build/models/<target>.blend`: run `npm run bake:models hero` or `fighter` first. `mocap.py` retargets onto the scripted hero's joints, or onto a Tripo rig through a naming scheme (`mocap.TRIPO`). Its outputs are limited to the license Territory (ADR 0010).
 - Tests assert behavior only. Judge the look by eye on the sheet and in the game.

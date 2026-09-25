@@ -3,7 +3,7 @@
 One row per clip, seven frames across it, an orthographic side view. A
 view says what to show and where the camera stands:
 
-- HERO: the boy in the gi with short spiky hair, seen from his right as the
+- HERO: the boy with short spiky hair, seen from his right as the
   game's camera sees him, facing right toward the Rival (-Y in Blender), a
   frame wide enough for the dash. Flat colors per painted region.
 - FIGHTER: the Tripo fighter (fighter.py), facing right (+X), its own
@@ -31,7 +31,7 @@ REGION_COLORS = {
 # shown: the meshes to render (by name prefix); camera: location, rotation,
 # and orthographic width; color: Workbench's color source.
 HERO = {
-    "shown": ("BodyBoy", "GarmentGi", "Hair_spiky_short"),
+    "shown": ("BodyBoy", "Hair_spiky_short-BodyBoy"),
     "camera": ((-10.0, -1.3, 1.5), (1.5708, 0.0, -1.5708), 7.4),  # look along +X
     "color": "MATERIAL",
 }

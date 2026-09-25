@@ -33,6 +33,31 @@ function findBlender() {
   return existsSync(windows) ? windows : 'blender';
 }
 
+/**
+ * The hero's two rigs play the same clips (scripts/blender/hero.py): the
+ * bake keys each clip on both, the girl's copy named `<clip>-BodyGirl`.
+ * Here the girl's tracks join the boy's clip, so the game plays one clip
+ * per name and both rigs move.
+ */
+function mergeBodyClips(document) {
+  const animations = document.getRoot().listAnimations();
+  for (const extra of animations) {
+    const match = extra.getName().match(/^(.+)-Body\w+$/);
+    if (!match) continue;
+    const base = animations.find((a) => a.getName() === match[1]);
+    if (!base) throw new Error(`${extra.getName()} has no clip ${match[1]} to join`);
+    for (const channel of extra.listChannels()) {
+      extra.removeChannel(channel);
+      base.addChannel(channel);
+    }
+    for (const sampler of extra.listSamplers()) {
+      extra.removeSampler(sampler);
+      base.addSampler(sampler);
+    }
+    extra.dispose();
+  }
+}
+
 const only = process.argv.slice(2);
 mkdirSync(RAW_DIR, { recursive: true });
 mkdirSync(OUT_DIR, { recursive: true });
@@ -64,6 +89,7 @@ for (const file of readdirSync(RAW_DIR).filter((f) => f.endsWith('.raw.glb')).so
   const name = file.replace(/\.raw\.glb$/, '');
   if (only.length > 0 && !only.includes(name)) continue;
   const document = await io.read(join(RAW_DIR, file));
+  mergeBodyClips(document);
   // keepUniqueNames: the hero's tint regions (PaintedSkin, PaintedOutfit,
   // PaintedTrim) differ only by name, and the renderer tints them by name.
   await document.transform(

@@ -23,7 +23,7 @@ import { CAMERA_FAR, RIVAL_X, HERO_X } from './constants';
 import type { Rival } from './rival';
 import { createFx } from './fx';
 import { applyLevelToRig, buildHero, createHeroMaterials, FORM_PALETTES, heroParts } from './hero';
-import type { FormPalette, HeroMaterials, HeroRig } from './hero';
+import type { FormPalette, HeroMaterials } from './hero';
 import { createHeroDirector } from './heroDirector';
 import type { HeroDirector } from './heroDirector';
 import { createPipeline } from './pipeline';
@@ -59,15 +59,6 @@ export interface HeroMount {
   /** The model mounted (its bones exist) or unmounted (null). */
   modelReady(model: THREE.Object3D | null): void;
 }
-
-/** Each strike point: a bone, and the offset from it to the fist or boot
- *  centre in the bone's space (scripts/blender/hero.py). */
-const STRIKE_BONES: ReadonlyArray<[keyof HeroRig['joints'], [number, number, number]]> = [
-  ['elbowL', [0, -0.46, 0.02]],
-  ['elbowR', [0, -0.46, 0.02]],
-  ['kneeL', [0, -0.32, 0.07]],
-  ['kneeR', [0, -0.32, 0.07]],
-];
 
 /** The parts of the frame that the R3F root owns (src/scene/mount.tsx). */
 export interface RenderTarget {
@@ -276,9 +267,10 @@ export function createRenderer({ gl: renderer, scene, camera, rival }: RenderTar
       reactions.handleEffects(effects);
     },
     strikePoints() {
-      return STRIKE_BONES.map(([bone, offset], i) => {
+      // The shown body's fists and boots (hero-rig.json), on its bones.
+      return hero.strikes.map(({ joint, offset }, i) => {
         const point = (strikePointCache[i] ??= new THREE.Vector3());
-        return hero.joints[bone].localToWorld(point.set(...offset));
+        return hero.joints[joint].localToWorld(point.copy(offset));
       });
     },
     strikeContact() {

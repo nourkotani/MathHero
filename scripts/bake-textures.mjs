@@ -628,121 +628,6 @@ function bakeWisp(size = 128) {
   return encodePng(size, size, pixels, 4);
 }
 
-// ----------------------------------------------------------- face decals
-
-/**
- * The hero's painted anime face, split across three sheets so a Form can
- * recolor the eyes without the rest of the face following:
- *
- *   'face'  — brows, eye whites, lash arc, mouth. Never tinted.
- *   'iris'  — the iris and pupil, baked in greys for the Form to tint.
- *   'spark' — the catchlights, pure white and never tinted, drawn on top.
- *
- * That split matters: when the catchlight lived on the tinted sheet it
- * turned brown with the iris, and an eye with no spark in it reads dead.
- * Both eyes catch the light from the SAME side for the same reason —
- * mirrored highlights imply two light sources and look wrong.
- *
- * RGBA throughout: transparent everywhere except the features, so every
- * skin tone shows through unchanged.
- */
-function bakeFace(girl, part = 'face') {
-  const size = 256;
-  // Soft-edged coverage of an ellipse, 1 inside, feathering at the rim.
-  const ellipse = (u, v, cx, cy, rx, ry, soft = 0.16) => {
-    const d = Math.hypot((u - cx) / rx, (v - cy) / ry);
-    return Math.max(0, Math.min(1, (1.08 - d) / soft));
-  };
-  // Soft capsule between two points (brows, lash arc, mouth).
-  const stroke = (u, v, x0, y0, x1, y1, w) => {
-    const dx = x1 - x0;
-    const dy = y1 - y0;
-    const len2 = dx * dx + dy * dy;
-    const t = Math.max(0, Math.min(1, ((u - x0) * dx + (v - y0) * dy) / len2));
-    const dist = Math.hypot(u - (x0 + dx * t), v - (y0 + dy * t));
-    return Math.max(0, Math.min(1, (w - dist) / (w * 0.45)));
-  };
-
-  const eyeRx = girl ? 0.098 : 0.084;
-  const eyeRy = girl ? 0.13 : 0.112;
-  const eyeCy = 0.46;
-  // The iris sits centred, a touch low — never pushed to one side, which
-  // is what made the two eyes look like they pointed different ways.
-  const irisCy = eyeCy + 0.012;
-  const irisRx = eyeRx * 0.66;
-  const irisRy = eyeRy * 0.74;
-
-  const pixels = paintWide(size, size, 4, (u, v) => {
-    let r = 0;
-    let g = 0;
-    let b = 0;
-    let a = 0;
-    const put = (cov, cr, cg, cb) => {
-      if (cov <= 0) return;
-      const o = Math.min(1, cov);
-      r = r * (1 - o) + cr * o;
-      g = g * (1 - o) + cg * o;
-      b = b * (1 - o) + cb * o;
-      a = Math.max(a, o);
-    };
-
-    for (const side of [-1, 1]) {
-      const cx = 0.5 + side * 0.175;
-      const sclera = ellipse(u, v, cx, eyeCy, eyeRx, eyeRy);
-
-      if (part === 'iris') {
-        // Greys for the Form to tint: brighter low, darker up under the
-        // lash, the way a lit iris actually falls.
-        const iris = Math.min(sclera, ellipse(u, v, cx, irisCy, irisRx, irisRy, 0.1));
-        const lowLift = 0.72 + Math.max(0, (v - irisCy) / irisRy) * 0.28;
-        put(iris, 255 * lowLift, 255 * lowLift, 255 * lowLift);
-        // A clean dark pupil, centred in the iris — dark whatever the tint.
-        put(Math.min(iris, ellipse(u, v, cx, irisCy, irisRx * 0.46, irisRy * 0.46, 0.12)) * 0.82, 26, 20, 18);
-        continue;
-      }
-
-      if (part === 'spark') {
-        // One bright catchlight up and to the left on BOTH eyes, plus a
-        // small echo opposite it. Pure white, never tinted.
-        put(ellipse(u, v, cx - 0.03, eyeCy - 0.045, 0.03, 0.036, 0.5), 255, 255, 255);
-        put(ellipse(u, v, cx + 0.026, eyeCy + 0.05, 0.015, 0.017, 0.6) * 0.75, 255, 255, 255);
-        continue;
-      }
-
-      // Friendly brows: a gentle arc, lifted at the outer end.
-      put(stroke(u, v, cx - side * 0.08, 0.3, cx + side * 0.072, 0.272, 0.016), 44, 32, 28);
-      // The eye white.
-      put(sclera, 246, 242, 233);
-      // A soft lash arc riding the top rim — an arc, not a filled hood.
-      const lash =
-        stroke(u, v, cx - eyeRx * 0.96, eyeCy - eyeRy * 0.52, cx, eyeCy - eyeRy * 0.98, 0.016) +
-        stroke(u, v, cx, eyeCy - eyeRy * 0.98, cx + eyeRx * 0.96, eyeCy - eyeRy * 0.52, 0.016);
-      put(Math.min(1, lash) * Math.min(1, sclera * 3), 38, 28, 26);
-      if (girl) {
-        // The lash flick at the outer corner.
-        put(
-          stroke(
-            u, v,
-            cx + side * eyeRx * 0.92, eyeCy - eyeRy * 0.62,
-            cx + side * (eyeRx * 0.92 + 0.032), eyeCy - eyeRy * 0.95,
-            0.013,
-          ),
-          38, 28, 26,
-        );
-      }
-    }
-
-    if (part === 'face') {
-      // A small friendly mouth with a gentle upward curve.
-      put(stroke(u, v, 0.458, 0.742, 0.5, 0.756, 0.0105), 108, 62, 54);
-      put(stroke(u, v, 0.5, 0.756, 0.542, 0.742, 0.0105), 108, 62, 54);
-    }
-
-    return [r, g, b, 255 * a];
-  });
-  return encodePng(size, size, pixels, 4);
-}
-
 // ------------------------------------------------------------- site icons
 
 /**
@@ -826,12 +711,6 @@ const bakes = [
   ['halo-ring.png', bakeHaloRing],
   ['streak.png', bakeStreak],
   ['wisp.png', bakeWisp],
-  ['face-boy.png', () => bakeFace(false)],
-  ['face-girl.png', () => bakeFace(true)],
-  ['iris-boy.png', () => bakeFace(false, 'iris')],
-  ['iris-girl.png', () => bakeFace(true, 'iris')],
-  ['spark-boy.png', () => bakeFace(false, 'spark')],
-  ['spark-girl.png', () => bakeFace(true, 'spark')],
 ];
 for (const [name, bake] of bakes) {
   const png = bake();

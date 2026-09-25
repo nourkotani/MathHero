@@ -49,18 +49,13 @@ SHEET_ROWS = 4
 TARGETS = {
     "hero": {
         "forward": (0.0, -1.0, 0.0),
-        "pelvis": "root",
+        "pelvis": "Hip",
         "chest": "torso",
         "head": "head",
-        # As src/renderer/index.ts places them.
-        "strike": {
-            "elbowL": (0.0, -0.46, 0.02),
-            "elbowR": (0.0, -0.46, 0.02),
-            "kneeL": (0.0, -0.32, 0.07),
-            "kneeR": (0.0, -0.32, 0.07),
-        },
-        "scheme": None,
-        "stance": lambda rig: hero.stance(),
+        # As the bake writes them for src/renderer (hero-rig.json).
+        "strike": hero.strike_offsets,
+        "scheme": hero.SCHEME,
+        "stance": hero.stance,
         "sheet": contact_sheet.HERO,
     },
     "fighter": {
@@ -148,7 +143,10 @@ def main():
     argv = sys.argv[sys.argv.index("--") + 1 :]
     target, clip, out_dir, specs = TARGETS[argv[0]], argv[1], argv[2], argv[3:]
     brief = mocap.hy_clips()[clip]
-    rig = next(o for o in bpy.context.scene.objects if o.type == "ARMATURE")
+    # The hero's model holds two rigs (hero.py); the boy's is the root one.
+    rig = next(o for o in bpy.context.scene.objects if o.type == "ARMATURE" and o.parent is None)
+    if callable(target["strike"]):
+        target["strike"] = target["strike"](rig)
     stance = target["stance"](rig)
     results = []
     for spec in specs:

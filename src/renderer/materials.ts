@@ -111,18 +111,15 @@ export function bakedInkSurface(): THREE.MeshBasicMaterial {
 }
 
 /**
- * The hero's painted anime face, worn as a transparent decal on a sphere
- * segment floating just off the skull. Deliberately NOT a character-role
- * surface: it must never grow an ink hull or cast a shadow, and depth
- * writes stay off so it cannot z-fight the skull beneath it.
+ * A face layer of the hero (ADR 0012): the painted features (eyes, brows,
+ * lashes) on a thin layer just off the skin, opaque only where a feature
+ * is, so the tinted skin shows around them. The baked model gives it its
+ * map (src/scene/Hero.tsx). Deliberately NOT a character-role surface: it
+ * must never grow an ink hull or cast a shadow, and depth writes stay off
+ * so it cannot z-fight the skin beneath it.
  */
-export function faceDecal(url: string): THREE.MeshBasicMaterial {
-  return new THREE.MeshBasicMaterial({
-    map: paintedMap(url),
-    transparent: true,
-    depthWrite: false,
-    side: THREE.DoubleSide,
-  });
+export function faceLayer(): THREE.MeshBasicMaterial {
+  return new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false });
 }
 
 const paintedMaps = new Map<string, THREE.Texture>();

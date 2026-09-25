@@ -5,11 +5,11 @@ src/renderer/models/hero.glb, which gltfjsx turns into a component. Do not
 edit this file by hand (ADR 0007, ADR 0009); change the script and run it
 again after every re-bake of the hero.
 The script's edits: the inlined model import (no network), meshopt
-without Draco (no web worker), the hero's tint materials (renderer/hero.ts)
-and the ink of materials.ts in place of Blender's, one `visible` per part
-from the director's parts, bloom on the painted hair, no frustum culling
-(the attack clips carry the root 4 m), and the group ref from the parent
-(it drives useAnimations).
+without Draco (no web worker), the hero's tint materials and face layers
+(renderer/hero.ts) and the ink of materials.ts in place of Blender's, one
+`visible` per part from the director's parts, bloom on the painted hair,
+no frustum culling (the attack clips carry the root 4 m), and the group
+ref from the parent (it drives useAnimations).
 */
 
 import { useGLTF } from '@react-three/drei';
@@ -26,52 +26,76 @@ import heroModelUrl from '../../renderer/models/hero.glb';
 
 type GLTFResult = GLTF & {
   nodes: {
-    BodyBoy_1: THREE.SkinnedMesh;
-    BodyBoy_2: THREE.SkinnedMesh;
-    BodyBoy_3: THREE.SkinnedMesh;
-    BodyBoy_4: THREE.SkinnedMesh;
     BodyGirl_1: THREE.SkinnedMesh;
     BodyGirl_2: THREE.SkinnedMesh;
     BodyGirl_3: THREE.SkinnedMesh;
     BodyGirl_4: THREE.SkinnedMesh;
-    GarmentArmor_1: THREE.SkinnedMesh;
-    GarmentArmor_2: THREE.SkinnedMesh;
-    GarmentCape_1: THREE.SkinnedMesh;
-    GarmentCape_2: THREE.SkinnedMesh;
-    GarmentGi_1: THREE.SkinnedMesh;
-    GarmentGi_2: THREE.SkinnedMesh;
-    GarmentGi_3: THREE.SkinnedMesh;
-    Hair_buzz_long_1: THREE.SkinnedMesh;
-    Hair_buzz_long_2: THREE.SkinnedMesh;
-    Hair_buzz_short_1: THREE.SkinnedMesh;
-    Hair_buzz_short_2: THREE.SkinnedMesh;
-    Hair_flame_long_1: THREE.SkinnedMesh;
-    Hair_flame_long_2: THREE.SkinnedMesh;
-    Hair_flame_short_1: THREE.SkinnedMesh;
-    Hair_flame_short_2: THREE.SkinnedMesh;
-    Hair_mane_crimson_1: THREE.SkinnedMesh;
-    Hair_mane_crimson_2: THREE.SkinnedMesh;
-    Hair_mane_legend_1: THREE.SkinnedMesh;
-    Hair_mane_legend_2: THREE.SkinnedMesh;
-    Hair_mane_rose_1: THREE.SkinnedMesh;
-    Hair_mane_rose_2: THREE.SkinnedMesh;
-    Hair_mane_wild_1: THREE.SkinnedMesh;
-    Hair_mane_wild_2: THREE.SkinnedMesh;
-    Hair_ponytail_long_1: THREE.SkinnedMesh;
-    Hair_ponytail_long_2: THREE.SkinnedMesh;
-    Hair_ponytail_short_1: THREE.SkinnedMesh;
-    Hair_ponytail_short_2: THREE.SkinnedMesh;
-    Hair_spiky_long_1: THREE.SkinnedMesh;
-    Hair_spiky_long_2: THREE.SkinnedMesh;
-    Hair_spiky_short_1: THREE.SkinnedMesh;
-    Hair_spiky_short_2: THREE.SkinnedMesh;
+    BodyGirl_5: THREE.SkinnedMesh;
+    BodyGirl_6: THREE.SkinnedMesh;
+    ['Hair_buzz_long-BodyGirl_1']: THREE.SkinnedMesh;
+    ['Hair_buzz_long-BodyGirl_2']: THREE.SkinnedMesh;
+    ['Hair_buzz_short-BodyGirl_1']: THREE.SkinnedMesh;
+    ['Hair_buzz_short-BodyGirl_2']: THREE.SkinnedMesh;
+    ['Hair_flame_long-BodyGirl_1']: THREE.SkinnedMesh;
+    ['Hair_flame_long-BodyGirl_2']: THREE.SkinnedMesh;
+    ['Hair_flame_short-BodyGirl_1']: THREE.SkinnedMesh;
+    ['Hair_flame_short-BodyGirl_2']: THREE.SkinnedMesh;
+    ['Hair_mane_crimson-BodyGirl_1']: THREE.SkinnedMesh;
+    ['Hair_mane_crimson-BodyGirl_2']: THREE.SkinnedMesh;
+    ['Hair_mane_legend-BodyGirl_1']: THREE.SkinnedMesh;
+    ['Hair_mane_legend-BodyGirl_2']: THREE.SkinnedMesh;
+    ['Hair_mane_rose-BodyGirl_1']: THREE.SkinnedMesh;
+    ['Hair_mane_rose-BodyGirl_2']: THREE.SkinnedMesh;
+    ['Hair_mane_wild-BodyGirl_1']: THREE.SkinnedMesh;
+    ['Hair_mane_wild-BodyGirl_2']: THREE.SkinnedMesh;
+    ['Hair_ponytail_long-BodyGirl_1']: THREE.SkinnedMesh;
+    ['Hair_ponytail_long-BodyGirl_2']: THREE.SkinnedMesh;
+    ['Hair_ponytail_short-BodyGirl_1']: THREE.SkinnedMesh;
+    ['Hair_ponytail_short-BodyGirl_2']: THREE.SkinnedMesh;
+    ['Hair_spiky_long-BodyGirl_1']: THREE.SkinnedMesh;
+    ['Hair_spiky_long-BodyGirl_2']: THREE.SkinnedMesh;
+    ['Hair_spiky_short-BodyGirl_1']: THREE.SkinnedMesh;
+    ['Hair_spiky_short-BodyGirl_2']: THREE.SkinnedMesh;
+    BodyBoy_1: THREE.SkinnedMesh;
+    BodyBoy_2: THREE.SkinnedMesh;
+    BodyBoy_3: THREE.SkinnedMesh;
+    BodyBoy_4: THREE.SkinnedMesh;
+    BodyBoy_5: THREE.SkinnedMesh;
+    BodyBoy_6: THREE.SkinnedMesh;
+    ['Hair_buzz_long-BodyBoy_1']: THREE.SkinnedMesh;
+    ['Hair_buzz_long-BodyBoy_2']: THREE.SkinnedMesh;
+    ['Hair_buzz_short-BodyBoy_1']: THREE.SkinnedMesh;
+    ['Hair_buzz_short-BodyBoy_2']: THREE.SkinnedMesh;
+    ['Hair_flame_long-BodyBoy_1']: THREE.SkinnedMesh;
+    ['Hair_flame_long-BodyBoy_2']: THREE.SkinnedMesh;
+    ['Hair_flame_short-BodyBoy_1']: THREE.SkinnedMesh;
+    ['Hair_flame_short-BodyBoy_2']: THREE.SkinnedMesh;
+    ['Hair_mane_crimson-BodyBoy_1']: THREE.SkinnedMesh;
+    ['Hair_mane_crimson-BodyBoy_2']: THREE.SkinnedMesh;
+    ['Hair_mane_legend-BodyBoy_1']: THREE.SkinnedMesh;
+    ['Hair_mane_legend-BodyBoy_2']: THREE.SkinnedMesh;
+    ['Hair_mane_rose-BodyBoy_1']: THREE.SkinnedMesh;
+    ['Hair_mane_rose-BodyBoy_2']: THREE.SkinnedMesh;
+    ['Hair_mane_wild-BodyBoy_1']: THREE.SkinnedMesh;
+    ['Hair_mane_wild-BodyBoy_2']: THREE.SkinnedMesh;
+    ['Hair_ponytail_long-BodyBoy_1']: THREE.SkinnedMesh;
+    ['Hair_ponytail_long-BodyBoy_2']: THREE.SkinnedMesh;
+    ['Hair_ponytail_short-BodyBoy_1']: THREE.SkinnedMesh;
+    ['Hair_ponytail_short-BodyBoy_2']: THREE.SkinnedMesh;
+    ['Hair_spiky_long-BodyBoy_1']: THREE.SkinnedMesh;
+    ['Hair_spiky_long-BodyBoy_2']: THREE.SkinnedMesh;
+    ['Hair_spiky_short-BodyBoy_1']: THREE.SkinnedMesh;
+    ['Hair_spiky_short-BodyBoy_2']: THREE.SkinnedMesh;
     root: THREE.Bone;
+    girl_root: THREE.Bone;
   };
   materials: {
     PaintedOutfit: THREE.MeshStandardMaterial;
     PaintedSkin: THREE.MeshStandardMaterial;
     PaintedTrim: THREE.MeshStandardMaterial;
     PaintedHair: THREE.MeshStandardMaterial;
+    Face: THREE.MeshStandardMaterial;
+    Iris: THREE.MeshStandardMaterial;
     Ink: THREE.MeshStandardMaterial;
   };
 };
@@ -102,19 +126,311 @@ export function HeroModel({
   const clone = useMemo(() => SkeletonUtils.clone(scene), [scene]);
   const { nodes } = useGraph(clone) as unknown as GLTFResult;
   const ink = useMemo(() => bakedInkSurface(), []);
-  const show = (part: string) =>
-    part === parts.body || part === parts.garment || part === parts.hair;
+  // A piece fitted to one body (`<part>-<body>`) shows with that body.
+  const show = (part: string, of?: string) =>
+    (of === undefined || of === parts.body) &&
+    (part === parts.body || part === parts.garment || part === parts.hair);
   return (
     <group ref={groupRef} dispose={null}>
       <group name="Scene">
         <group name="HeroRig">
           <primitive object={nodes.root} />
+          <group name="GirlRig">
+            <primitive object={nodes.girl_root} />
+            <group name="BodyGirl" visible={show('BodyGirl')}>
+              <skinnedMesh
+                name="BodyGirl_1"
+                geometry={nodes.BodyGirl_1.geometry}
+                skeleton={nodes.BodyGirl_1.skeleton}
+                material={materials.skin}
+                castShadow
+                frustumCulled={false}
+              />
+              <skinnedMesh
+                name="BodyGirl_2"
+                geometry={nodes.BodyGirl_2.geometry}
+                skeleton={nodes.BodyGirl_2.skeleton}
+                material={materials.body}
+                castShadow
+                frustumCulled={false}
+              />
+              <skinnedMesh
+                name="BodyGirl_3"
+                geometry={nodes.BodyGirl_3.geometry}
+                skeleton={nodes.BodyGirl_3.skeleton}
+                material={materials.trim}
+                castShadow
+                frustumCulled={false}
+              />
+              <skinnedMesh
+                name="BodyGirl_4"
+                geometry={nodes.BodyGirl_4.geometry}
+                skeleton={nodes.BodyGirl_4.skeleton}
+                material={ink}
+                userData={INK}
+                frustumCulled={false}
+              />
+              <skinnedMesh
+                name="BodyGirl_5"
+                geometry={nodes.BodyGirl_5.geometry}
+                skeleton={nodes.BodyGirl_5.skeleton}
+                material={materials.face}
+                renderOrder={1}
+                frustumCulled={false}
+              />
+              <skinnedMesh
+                name="BodyGirl_6"
+                geometry={nodes.BodyGirl_6.geometry}
+                skeleton={nodes.BodyGirl_6.skeleton}
+                material={materials.iris}
+                renderOrder={2}
+                frustumCulled={false}
+              />
+            </group>
+            <group name="Hair_buzz_long-BodyGirl" visible={show('Hair_buzz_long', 'BodyGirl')}>
+              <skinnedMesh
+                name="Hair_buzz_long-BodyGirl_1"
+                geometry={nodes['Hair_buzz_long-BodyGirl_1'].geometry}
+                skeleton={nodes['Hair_buzz_long-BodyGirl_1'].skeleton}
+                material={materials.hair}
+                castShadow
+                layers={BLOOM}
+                frustumCulled={false}
+              />
+              <skinnedMesh
+                name="Hair_buzz_long-BodyGirl_2"
+                geometry={nodes['Hair_buzz_long-BodyGirl_2'].geometry}
+                skeleton={nodes['Hair_buzz_long-BodyGirl_2'].skeleton}
+                material={ink}
+                userData={INK}
+                frustumCulled={false}
+              />
+            </group>
+            <group name="Hair_buzz_short-BodyGirl" visible={show('Hair_buzz_short', 'BodyGirl')}>
+              <skinnedMesh
+                name="Hair_buzz_short-BodyGirl_1"
+                geometry={nodes['Hair_buzz_short-BodyGirl_1'].geometry}
+                skeleton={nodes['Hair_buzz_short-BodyGirl_1'].skeleton}
+                material={materials.hair}
+                castShadow
+                layers={BLOOM}
+                frustumCulled={false}
+              />
+              <skinnedMesh
+                name="Hair_buzz_short-BodyGirl_2"
+                geometry={nodes['Hair_buzz_short-BodyGirl_2'].geometry}
+                skeleton={nodes['Hair_buzz_short-BodyGirl_2'].skeleton}
+                material={ink}
+                userData={INK}
+                frustumCulled={false}
+              />
+            </group>
+            <group name="Hair_flame_long-BodyGirl" visible={show('Hair_flame_long', 'BodyGirl')}>
+              <skinnedMesh
+                name="Hair_flame_long-BodyGirl_1"
+                geometry={nodes['Hair_flame_long-BodyGirl_1'].geometry}
+                skeleton={nodes['Hair_flame_long-BodyGirl_1'].skeleton}
+                material={materials.hair}
+                castShadow
+                layers={BLOOM}
+                frustumCulled={false}
+              />
+              <skinnedMesh
+                name="Hair_flame_long-BodyGirl_2"
+                geometry={nodes['Hair_flame_long-BodyGirl_2'].geometry}
+                skeleton={nodes['Hair_flame_long-BodyGirl_2'].skeleton}
+                material={ink}
+                userData={INK}
+                frustumCulled={false}
+              />
+            </group>
+            <group name="Hair_flame_short-BodyGirl" visible={show('Hair_flame_short', 'BodyGirl')}>
+              <skinnedMesh
+                name="Hair_flame_short-BodyGirl_1"
+                geometry={nodes['Hair_flame_short-BodyGirl_1'].geometry}
+                skeleton={nodes['Hair_flame_short-BodyGirl_1'].skeleton}
+                material={materials.hair}
+                castShadow
+                layers={BLOOM}
+                frustumCulled={false}
+              />
+              <skinnedMesh
+                name="Hair_flame_short-BodyGirl_2"
+                geometry={nodes['Hair_flame_short-BodyGirl_2'].geometry}
+                skeleton={nodes['Hair_flame_short-BodyGirl_2'].skeleton}
+                material={ink}
+                userData={INK}
+                frustumCulled={false}
+              />
+            </group>
+            <group
+              name="Hair_mane_crimson-BodyGirl"
+              visible={show('Hair_mane_crimson', 'BodyGirl')}
+            >
+              <skinnedMesh
+                name="Hair_mane_crimson-BodyGirl_1"
+                geometry={nodes['Hair_mane_crimson-BodyGirl_1'].geometry}
+                skeleton={nodes['Hair_mane_crimson-BodyGirl_1'].skeleton}
+                material={materials.hair}
+                castShadow
+                layers={BLOOM}
+                frustumCulled={false}
+              />
+              <skinnedMesh
+                name="Hair_mane_crimson-BodyGirl_2"
+                geometry={nodes['Hair_mane_crimson-BodyGirl_2'].geometry}
+                skeleton={nodes['Hair_mane_crimson-BodyGirl_2'].skeleton}
+                material={ink}
+                userData={INK}
+                frustumCulled={false}
+              />
+            </group>
+            <group name="Hair_mane_legend-BodyGirl" visible={show('Hair_mane_legend', 'BodyGirl')}>
+              <skinnedMesh
+                name="Hair_mane_legend-BodyGirl_1"
+                geometry={nodes['Hair_mane_legend-BodyGirl_1'].geometry}
+                skeleton={nodes['Hair_mane_legend-BodyGirl_1'].skeleton}
+                material={materials.hair}
+                castShadow
+                layers={BLOOM}
+                frustumCulled={false}
+              />
+              <skinnedMesh
+                name="Hair_mane_legend-BodyGirl_2"
+                geometry={nodes['Hair_mane_legend-BodyGirl_2'].geometry}
+                skeleton={nodes['Hair_mane_legend-BodyGirl_2'].skeleton}
+                material={ink}
+                userData={INK}
+                frustumCulled={false}
+              />
+            </group>
+            <group name="Hair_mane_rose-BodyGirl" visible={show('Hair_mane_rose', 'BodyGirl')}>
+              <skinnedMesh
+                name="Hair_mane_rose-BodyGirl_1"
+                geometry={nodes['Hair_mane_rose-BodyGirl_1'].geometry}
+                skeleton={nodes['Hair_mane_rose-BodyGirl_1'].skeleton}
+                material={materials.hair}
+                castShadow
+                layers={BLOOM}
+                frustumCulled={false}
+              />
+              <skinnedMesh
+                name="Hair_mane_rose-BodyGirl_2"
+                geometry={nodes['Hair_mane_rose-BodyGirl_2'].geometry}
+                skeleton={nodes['Hair_mane_rose-BodyGirl_2'].skeleton}
+                material={ink}
+                userData={INK}
+                frustumCulled={false}
+              />
+            </group>
+            <group name="Hair_mane_wild-BodyGirl" visible={show('Hair_mane_wild', 'BodyGirl')}>
+              <skinnedMesh
+                name="Hair_mane_wild-BodyGirl_1"
+                geometry={nodes['Hair_mane_wild-BodyGirl_1'].geometry}
+                skeleton={nodes['Hair_mane_wild-BodyGirl_1'].skeleton}
+                material={materials.hair}
+                castShadow
+                layers={BLOOM}
+                frustumCulled={false}
+              />
+              <skinnedMesh
+                name="Hair_mane_wild-BodyGirl_2"
+                geometry={nodes['Hair_mane_wild-BodyGirl_2'].geometry}
+                skeleton={nodes['Hair_mane_wild-BodyGirl_2'].skeleton}
+                material={ink}
+                userData={INK}
+                frustumCulled={false}
+              />
+            </group>
+            <group
+              name="Hair_ponytail_long-BodyGirl"
+              visible={show('Hair_ponytail_long', 'BodyGirl')}
+            >
+              <skinnedMesh
+                name="Hair_ponytail_long-BodyGirl_1"
+                geometry={nodes['Hair_ponytail_long-BodyGirl_1'].geometry}
+                skeleton={nodes['Hair_ponytail_long-BodyGirl_1'].skeleton}
+                material={materials.hair}
+                castShadow
+                layers={BLOOM}
+                frustumCulled={false}
+              />
+              <skinnedMesh
+                name="Hair_ponytail_long-BodyGirl_2"
+                geometry={nodes['Hair_ponytail_long-BodyGirl_2'].geometry}
+                skeleton={nodes['Hair_ponytail_long-BodyGirl_2'].skeleton}
+                material={ink}
+                userData={INK}
+                frustumCulled={false}
+              />
+            </group>
+            <group
+              name="Hair_ponytail_short-BodyGirl"
+              visible={show('Hair_ponytail_short', 'BodyGirl')}
+            >
+              <skinnedMesh
+                name="Hair_ponytail_short-BodyGirl_1"
+                geometry={nodes['Hair_ponytail_short-BodyGirl_1'].geometry}
+                skeleton={nodes['Hair_ponytail_short-BodyGirl_1'].skeleton}
+                material={materials.hair}
+                castShadow
+                layers={BLOOM}
+                frustumCulled={false}
+              />
+              <skinnedMesh
+                name="Hair_ponytail_short-BodyGirl_2"
+                geometry={nodes['Hair_ponytail_short-BodyGirl_2'].geometry}
+                skeleton={nodes['Hair_ponytail_short-BodyGirl_2'].skeleton}
+                material={ink}
+                userData={INK}
+                frustumCulled={false}
+              />
+            </group>
+            <group name="Hair_spiky_long-BodyGirl" visible={show('Hair_spiky_long', 'BodyGirl')}>
+              <skinnedMesh
+                name="Hair_spiky_long-BodyGirl_1"
+                geometry={nodes['Hair_spiky_long-BodyGirl_1'].geometry}
+                skeleton={nodes['Hair_spiky_long-BodyGirl_1'].skeleton}
+                material={materials.hair}
+                castShadow
+                layers={BLOOM}
+                frustumCulled={false}
+              />
+              <skinnedMesh
+                name="Hair_spiky_long-BodyGirl_2"
+                geometry={nodes['Hair_spiky_long-BodyGirl_2'].geometry}
+                skeleton={nodes['Hair_spiky_long-BodyGirl_2'].skeleton}
+                material={ink}
+                userData={INK}
+                frustumCulled={false}
+              />
+            </group>
+            <group name="Hair_spiky_short-BodyGirl" visible={show('Hair_spiky_short', 'BodyGirl')}>
+              <skinnedMesh
+                name="Hair_spiky_short-BodyGirl_1"
+                geometry={nodes['Hair_spiky_short-BodyGirl_1'].geometry}
+                skeleton={nodes['Hair_spiky_short-BodyGirl_1'].skeleton}
+                material={materials.hair}
+                castShadow
+                layers={BLOOM}
+                frustumCulled={false}
+              />
+              <skinnedMesh
+                name="Hair_spiky_short-BodyGirl_2"
+                geometry={nodes['Hair_spiky_short-BodyGirl_2'].geometry}
+                skeleton={nodes['Hair_spiky_short-BodyGirl_2'].skeleton}
+                material={ink}
+                userData={INK}
+                frustumCulled={false}
+              />
+            </group>
+          </group>
           <group name="BodyBoy" visible={show('BodyBoy')}>
             <skinnedMesh
               name="BodyBoy_1"
               geometry={nodes.BodyBoy_1.geometry}
               skeleton={nodes.BodyBoy_1.skeleton}
-              material={materials.body}
+              material={materials.skin}
               castShadow
               frustumCulled={false}
             />
@@ -122,7 +438,7 @@ export function HeroModel({
               name="BodyBoy_2"
               geometry={nodes.BodyBoy_2.geometry}
               skeleton={nodes.BodyBoy_2.skeleton}
-              material={materials.skin}
+              material={materials.body}
               castShadow
               frustumCulled={false}
             />
@@ -142,326 +458,249 @@ export function HeroModel({
               userData={INK}
               frustumCulled={false}
             />
-          </group>
-          <group name="BodyGirl" visible={show('BodyGirl')}>
             <skinnedMesh
-              name="BodyGirl_1"
-              geometry={nodes.BodyGirl_1.geometry}
-              skeleton={nodes.BodyGirl_1.skeleton}
-              material={materials.body}
-              castShadow
+              name="BodyBoy_5"
+              geometry={nodes.BodyBoy_5.geometry}
+              skeleton={nodes.BodyBoy_5.skeleton}
+              material={materials.face}
+              renderOrder={1}
               frustumCulled={false}
             />
             <skinnedMesh
-              name="BodyGirl_2"
-              geometry={nodes.BodyGirl_2.geometry}
-              skeleton={nodes.BodyGirl_2.skeleton}
-              material={materials.skin}
-              castShadow
-              frustumCulled={false}
-            />
-            <skinnedMesh
-              name="BodyGirl_3"
-              geometry={nodes.BodyGirl_3.geometry}
-              skeleton={nodes.BodyGirl_3.skeleton}
-              material={materials.trim}
-              castShadow
-              frustumCulled={false}
-            />
-            <skinnedMesh
-              name="BodyGirl_4"
-              geometry={nodes.BodyGirl_4.geometry}
-              skeleton={nodes.BodyGirl_4.skeleton}
-              material={ink}
-              userData={INK}
+              name="BodyBoy_6"
+              geometry={nodes.BodyBoy_6.geometry}
+              skeleton={nodes.BodyBoy_6.skeleton}
+              material={materials.iris}
+              renderOrder={2}
               frustumCulled={false}
             />
           </group>
-          <group name="GarmentArmor" visible={show('GarmentArmor')}>
+          <group name="Hair_buzz_long-BodyBoy" visible={show('Hair_buzz_long', 'BodyBoy')}>
             <skinnedMesh
-              name="GarmentArmor_1"
-              geometry={nodes.GarmentArmor_1.geometry}
-              skeleton={nodes.GarmentArmor_1.skeleton}
-              material={materials.trim}
-              castShadow
-              frustumCulled={false}
-            />
-            <skinnedMesh
-              name="GarmentArmor_2"
-              geometry={nodes.GarmentArmor_2.geometry}
-              skeleton={nodes.GarmentArmor_2.skeleton}
-              material={ink}
-              userData={INK}
-              frustumCulled={false}
-            />
-          </group>
-          <group name="GarmentCape" visible={show('GarmentCape')}>
-            <skinnedMesh
-              name="GarmentCape_1"
-              geometry={nodes.GarmentCape_1.geometry}
-              skeleton={nodes.GarmentCape_1.skeleton}
-              material={materials.trim}
-              castShadow
-              frustumCulled={false}
-            />
-            <skinnedMesh
-              name="GarmentCape_2"
-              geometry={nodes.GarmentCape_2.geometry}
-              skeleton={nodes.GarmentCape_2.skeleton}
-              material={ink}
-              userData={INK}
-              frustumCulled={false}
-            />
-          </group>
-          <group name="GarmentGi" visible={show('GarmentGi')}>
-            <skinnedMesh
-              name="GarmentGi_1"
-              geometry={nodes.GarmentGi_1.geometry}
-              skeleton={nodes.GarmentGi_1.skeleton}
-              material={materials.body}
-              castShadow
-              frustumCulled={false}
-            />
-            <skinnedMesh
-              name="GarmentGi_2"
-              geometry={nodes.GarmentGi_2.geometry}
-              skeleton={nodes.GarmentGi_2.skeleton}
-              material={materials.trim}
-              castShadow
-              frustumCulled={false}
-            />
-            <skinnedMesh
-              name="GarmentGi_3"
-              geometry={nodes.GarmentGi_3.geometry}
-              skeleton={nodes.GarmentGi_3.skeleton}
-              material={ink}
-              userData={INK}
-              frustumCulled={false}
-            />
-          </group>
-          <group name="Hair_buzz_long" visible={show('Hair_buzz_long')}>
-            <skinnedMesh
-              name="Hair_buzz_long_1"
-              geometry={nodes.Hair_buzz_long_1.geometry}
-              skeleton={nodes.Hair_buzz_long_1.skeleton}
+              name="Hair_buzz_long-BodyBoy_1"
+              geometry={nodes['Hair_buzz_long-BodyBoy_1'].geometry}
+              skeleton={nodes['Hair_buzz_long-BodyBoy_1'].skeleton}
               material={materials.hair}
               castShadow
               layers={BLOOM}
               frustumCulled={false}
             />
             <skinnedMesh
-              name="Hair_buzz_long_2"
-              geometry={nodes.Hair_buzz_long_2.geometry}
-              skeleton={nodes.Hair_buzz_long_2.skeleton}
+              name="Hair_buzz_long-BodyBoy_2"
+              geometry={nodes['Hair_buzz_long-BodyBoy_2'].geometry}
+              skeleton={nodes['Hair_buzz_long-BodyBoy_2'].skeleton}
               material={ink}
               userData={INK}
               frustumCulled={false}
             />
           </group>
-          <group name="Hair_buzz_short" visible={show('Hair_buzz_short')}>
+          <group name="Hair_buzz_short-BodyBoy" visible={show('Hair_buzz_short', 'BodyBoy')}>
             <skinnedMesh
-              name="Hair_buzz_short_1"
-              geometry={nodes.Hair_buzz_short_1.geometry}
-              skeleton={nodes.Hair_buzz_short_1.skeleton}
+              name="Hair_buzz_short-BodyBoy_1"
+              geometry={nodes['Hair_buzz_short-BodyBoy_1'].geometry}
+              skeleton={nodes['Hair_buzz_short-BodyBoy_1'].skeleton}
               material={materials.hair}
               castShadow
               layers={BLOOM}
               frustumCulled={false}
             />
             <skinnedMesh
-              name="Hair_buzz_short_2"
-              geometry={nodes.Hair_buzz_short_2.geometry}
-              skeleton={nodes.Hair_buzz_short_2.skeleton}
+              name="Hair_buzz_short-BodyBoy_2"
+              geometry={nodes['Hair_buzz_short-BodyBoy_2'].geometry}
+              skeleton={nodes['Hair_buzz_short-BodyBoy_2'].skeleton}
               material={ink}
               userData={INK}
               frustumCulled={false}
             />
           </group>
-          <group name="Hair_flame_long" visible={show('Hair_flame_long')}>
+          <group name="Hair_flame_long-BodyBoy" visible={show('Hair_flame_long', 'BodyBoy')}>
             <skinnedMesh
-              name="Hair_flame_long_1"
-              geometry={nodes.Hair_flame_long_1.geometry}
-              skeleton={nodes.Hair_flame_long_1.skeleton}
+              name="Hair_flame_long-BodyBoy_1"
+              geometry={nodes['Hair_flame_long-BodyBoy_1'].geometry}
+              skeleton={nodes['Hair_flame_long-BodyBoy_1'].skeleton}
               material={materials.hair}
               castShadow
               layers={BLOOM}
               frustumCulled={false}
             />
             <skinnedMesh
-              name="Hair_flame_long_2"
-              geometry={nodes.Hair_flame_long_2.geometry}
-              skeleton={nodes.Hair_flame_long_2.skeleton}
+              name="Hair_flame_long-BodyBoy_2"
+              geometry={nodes['Hair_flame_long-BodyBoy_2'].geometry}
+              skeleton={nodes['Hair_flame_long-BodyBoy_2'].skeleton}
               material={ink}
               userData={INK}
               frustumCulled={false}
             />
           </group>
-          <group name="Hair_flame_short" visible={show('Hair_flame_short')}>
+          <group name="Hair_flame_short-BodyBoy" visible={show('Hair_flame_short', 'BodyBoy')}>
             <skinnedMesh
-              name="Hair_flame_short_1"
-              geometry={nodes.Hair_flame_short_1.geometry}
-              skeleton={nodes.Hair_flame_short_1.skeleton}
+              name="Hair_flame_short-BodyBoy_1"
+              geometry={nodes['Hair_flame_short-BodyBoy_1'].geometry}
+              skeleton={nodes['Hair_flame_short-BodyBoy_1'].skeleton}
               material={materials.hair}
               castShadow
               layers={BLOOM}
               frustumCulled={false}
             />
             <skinnedMesh
-              name="Hair_flame_short_2"
-              geometry={nodes.Hair_flame_short_2.geometry}
-              skeleton={nodes.Hair_flame_short_2.skeleton}
+              name="Hair_flame_short-BodyBoy_2"
+              geometry={nodes['Hair_flame_short-BodyBoy_2'].geometry}
+              skeleton={nodes['Hair_flame_short-BodyBoy_2'].skeleton}
               material={ink}
               userData={INK}
               frustumCulled={false}
             />
           </group>
-          <group name="Hair_mane_crimson" visible={show('Hair_mane_crimson')}>
+          <group name="Hair_mane_crimson-BodyBoy" visible={show('Hair_mane_crimson', 'BodyBoy')}>
             <skinnedMesh
-              name="Hair_mane_crimson_1"
-              geometry={nodes.Hair_mane_crimson_1.geometry}
-              skeleton={nodes.Hair_mane_crimson_1.skeleton}
+              name="Hair_mane_crimson-BodyBoy_1"
+              geometry={nodes['Hair_mane_crimson-BodyBoy_1'].geometry}
+              skeleton={nodes['Hair_mane_crimson-BodyBoy_1'].skeleton}
               material={materials.hair}
               castShadow
               layers={BLOOM}
               frustumCulled={false}
             />
             <skinnedMesh
-              name="Hair_mane_crimson_2"
-              geometry={nodes.Hair_mane_crimson_2.geometry}
-              skeleton={nodes.Hair_mane_crimson_2.skeleton}
+              name="Hair_mane_crimson-BodyBoy_2"
+              geometry={nodes['Hair_mane_crimson-BodyBoy_2'].geometry}
+              skeleton={nodes['Hair_mane_crimson-BodyBoy_2'].skeleton}
               material={ink}
               userData={INK}
               frustumCulled={false}
             />
           </group>
-          <group name="Hair_mane_legend" visible={show('Hair_mane_legend')}>
+          <group name="Hair_mane_legend-BodyBoy" visible={show('Hair_mane_legend', 'BodyBoy')}>
             <skinnedMesh
-              name="Hair_mane_legend_1"
-              geometry={nodes.Hair_mane_legend_1.geometry}
-              skeleton={nodes.Hair_mane_legend_1.skeleton}
+              name="Hair_mane_legend-BodyBoy_1"
+              geometry={nodes['Hair_mane_legend-BodyBoy_1'].geometry}
+              skeleton={nodes['Hair_mane_legend-BodyBoy_1'].skeleton}
               material={materials.hair}
               castShadow
               layers={BLOOM}
               frustumCulled={false}
             />
             <skinnedMesh
-              name="Hair_mane_legend_2"
-              geometry={nodes.Hair_mane_legend_2.geometry}
-              skeleton={nodes.Hair_mane_legend_2.skeleton}
+              name="Hair_mane_legend-BodyBoy_2"
+              geometry={nodes['Hair_mane_legend-BodyBoy_2'].geometry}
+              skeleton={nodes['Hair_mane_legend-BodyBoy_2'].skeleton}
               material={ink}
               userData={INK}
               frustumCulled={false}
             />
           </group>
-          <group name="Hair_mane_rose" visible={show('Hair_mane_rose')}>
+          <group name="Hair_mane_rose-BodyBoy" visible={show('Hair_mane_rose', 'BodyBoy')}>
             <skinnedMesh
-              name="Hair_mane_rose_1"
-              geometry={nodes.Hair_mane_rose_1.geometry}
-              skeleton={nodes.Hair_mane_rose_1.skeleton}
+              name="Hair_mane_rose-BodyBoy_1"
+              geometry={nodes['Hair_mane_rose-BodyBoy_1'].geometry}
+              skeleton={nodes['Hair_mane_rose-BodyBoy_1'].skeleton}
               material={materials.hair}
               castShadow
               layers={BLOOM}
               frustumCulled={false}
             />
             <skinnedMesh
-              name="Hair_mane_rose_2"
-              geometry={nodes.Hair_mane_rose_2.geometry}
-              skeleton={nodes.Hair_mane_rose_2.skeleton}
+              name="Hair_mane_rose-BodyBoy_2"
+              geometry={nodes['Hair_mane_rose-BodyBoy_2'].geometry}
+              skeleton={nodes['Hair_mane_rose-BodyBoy_2'].skeleton}
               material={ink}
               userData={INK}
               frustumCulled={false}
             />
           </group>
-          <group name="Hair_mane_wild" visible={show('Hair_mane_wild')}>
+          <group name="Hair_mane_wild-BodyBoy" visible={show('Hair_mane_wild', 'BodyBoy')}>
             <skinnedMesh
-              name="Hair_mane_wild_1"
-              geometry={nodes.Hair_mane_wild_1.geometry}
-              skeleton={nodes.Hair_mane_wild_1.skeleton}
+              name="Hair_mane_wild-BodyBoy_1"
+              geometry={nodes['Hair_mane_wild-BodyBoy_1'].geometry}
+              skeleton={nodes['Hair_mane_wild-BodyBoy_1'].skeleton}
               material={materials.hair}
               castShadow
               layers={BLOOM}
               frustumCulled={false}
             />
             <skinnedMesh
-              name="Hair_mane_wild_2"
-              geometry={nodes.Hair_mane_wild_2.geometry}
-              skeleton={nodes.Hair_mane_wild_2.skeleton}
+              name="Hair_mane_wild-BodyBoy_2"
+              geometry={nodes['Hair_mane_wild-BodyBoy_2'].geometry}
+              skeleton={nodes['Hair_mane_wild-BodyBoy_2'].skeleton}
               material={ink}
               userData={INK}
               frustumCulled={false}
             />
           </group>
-          <group name="Hair_ponytail_long" visible={show('Hair_ponytail_long')}>
+          <group name="Hair_ponytail_long-BodyBoy" visible={show('Hair_ponytail_long', 'BodyBoy')}>
             <skinnedMesh
-              name="Hair_ponytail_long_1"
-              geometry={nodes.Hair_ponytail_long_1.geometry}
-              skeleton={nodes.Hair_ponytail_long_1.skeleton}
+              name="Hair_ponytail_long-BodyBoy_1"
+              geometry={nodes['Hair_ponytail_long-BodyBoy_1'].geometry}
+              skeleton={nodes['Hair_ponytail_long-BodyBoy_1'].skeleton}
               material={materials.hair}
               castShadow
               layers={BLOOM}
               frustumCulled={false}
             />
             <skinnedMesh
-              name="Hair_ponytail_long_2"
-              geometry={nodes.Hair_ponytail_long_2.geometry}
-              skeleton={nodes.Hair_ponytail_long_2.skeleton}
+              name="Hair_ponytail_long-BodyBoy_2"
+              geometry={nodes['Hair_ponytail_long-BodyBoy_2'].geometry}
+              skeleton={nodes['Hair_ponytail_long-BodyBoy_2'].skeleton}
               material={ink}
               userData={INK}
               frustumCulled={false}
             />
           </group>
-          <group name="Hair_ponytail_short" visible={show('Hair_ponytail_short')}>
+          <group
+            name="Hair_ponytail_short-BodyBoy"
+            visible={show('Hair_ponytail_short', 'BodyBoy')}
+          >
             <skinnedMesh
-              name="Hair_ponytail_short_1"
-              geometry={nodes.Hair_ponytail_short_1.geometry}
-              skeleton={nodes.Hair_ponytail_short_1.skeleton}
+              name="Hair_ponytail_short-BodyBoy_1"
+              geometry={nodes['Hair_ponytail_short-BodyBoy_1'].geometry}
+              skeleton={nodes['Hair_ponytail_short-BodyBoy_1'].skeleton}
               material={materials.hair}
               castShadow
               layers={BLOOM}
               frustumCulled={false}
             />
             <skinnedMesh
-              name="Hair_ponytail_short_2"
-              geometry={nodes.Hair_ponytail_short_2.geometry}
-              skeleton={nodes.Hair_ponytail_short_2.skeleton}
+              name="Hair_ponytail_short-BodyBoy_2"
+              geometry={nodes['Hair_ponytail_short-BodyBoy_2'].geometry}
+              skeleton={nodes['Hair_ponytail_short-BodyBoy_2'].skeleton}
               material={ink}
               userData={INK}
               frustumCulled={false}
             />
           </group>
-          <group name="Hair_spiky_long" visible={show('Hair_spiky_long')}>
+          <group name="Hair_spiky_long-BodyBoy" visible={show('Hair_spiky_long', 'BodyBoy')}>
             <skinnedMesh
-              name="Hair_spiky_long_1"
-              geometry={nodes.Hair_spiky_long_1.geometry}
-              skeleton={nodes.Hair_spiky_long_1.skeleton}
+              name="Hair_spiky_long-BodyBoy_1"
+              geometry={nodes['Hair_spiky_long-BodyBoy_1'].geometry}
+              skeleton={nodes['Hair_spiky_long-BodyBoy_1'].skeleton}
               material={materials.hair}
               castShadow
               layers={BLOOM}
               frustumCulled={false}
             />
             <skinnedMesh
-              name="Hair_spiky_long_2"
-              geometry={nodes.Hair_spiky_long_2.geometry}
-              skeleton={nodes.Hair_spiky_long_2.skeleton}
+              name="Hair_spiky_long-BodyBoy_2"
+              geometry={nodes['Hair_spiky_long-BodyBoy_2'].geometry}
+              skeleton={nodes['Hair_spiky_long-BodyBoy_2'].skeleton}
               material={ink}
               userData={INK}
               frustumCulled={false}
             />
           </group>
-          <group name="Hair_spiky_short" visible={show('Hair_spiky_short')}>
+          <group name="Hair_spiky_short-BodyBoy" visible={show('Hair_spiky_short', 'BodyBoy')}>
             <skinnedMesh
-              name="Hair_spiky_short_1"
-              geometry={nodes.Hair_spiky_short_1.geometry}
-              skeleton={nodes.Hair_spiky_short_1.skeleton}
+              name="Hair_spiky_short-BodyBoy_1"
+              geometry={nodes['Hair_spiky_short-BodyBoy_1'].geometry}
+              skeleton={nodes['Hair_spiky_short-BodyBoy_1'].skeleton}
               material={materials.hair}
               castShadow
               layers={BLOOM}
               frustumCulled={false}
             />
             <skinnedMesh
-              name="Hair_spiky_short_2"
-              geometry={nodes.Hair_spiky_short_2.geometry}
-              skeleton={nodes.Hair_spiky_short_2.skeleton}
+              name="Hair_spiky_short-BodyBoy_2"
+              geometry={nodes['Hair_spiky_short-BodyBoy_2'].geometry}
+              skeleton={nodes['Hair_spiky_short-BodyBoy_2'].skeleton}
               material={ink}
               userData={INK}
               frustumCulled={false}

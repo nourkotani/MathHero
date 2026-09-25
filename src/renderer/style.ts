@@ -178,11 +178,11 @@ export const STYLE = {
   juice: {
     /** A strike. The Attack clip owns its length (ADR 0012); these are
      *  fractions. anticipation: the share of the clip before the strike
-     *  phase (hero.py: ATTACK_ANTICIPATION of ATTACK_ANTICIPATION +
-     *  ATTACK_STRIKE). contactFrom: the strike phase where a fist or boot
-     *  on the Rival's hurtbox lands the hit; landBy: the latest it lands
-     *  without contact (the strike peaks at 0.65 in hero.py). */
-    attack: { anticipation: 0.12 / 0.67, contactFrom: 0.3, landBy: 0.75 },
+     *  phase (hero.py ATTACK_ANTICIPATION). contactFrom: the strike phase
+     *  where a fist or boot on the Rival's hurtbox lands the hit (hero.py
+     *  CONTACT_FROM: the dash starts there); landBy: the latest it lands
+     *  without contact (the dash peaks at 0.65 of the strike phase). */
+    attack: { anticipation: 0.18, contactFrom: 0.3, landBy: 0.75 },
     /** Render freeze on high-streak hits: duration and how frozen it is. */
     hitstop: { duration: 0.07, timeScale: 0.02 },
     /** Camera punch-in on Super-mode blasts. */

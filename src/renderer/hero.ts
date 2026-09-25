@@ -10,7 +10,7 @@ import type { CosmeticSlot, Garment, HeroAppearance, StreakForm } from '../core'
 import {
   cosmeticPanel,
   cosmeticSprite,
-  faceDecal,
+  faceLayer,
   glowSurface,
   markBloom,
   painterlySurface,
@@ -21,13 +21,8 @@ import { STYLE } from './style';
 import type { Surface } from './materials';
 import { applyCelTreatment } from './cel';
 import { freeMesh } from './fx';
-import faceBoyUrl from './textures/face-boy.png';
-import faceGirlUrl from './textures/face-girl.png';
+import heroRig from './models/hero-rig.json';
 import featherUrl from './textures/feather.png';
-import irisBoyUrl from './textures/iris-boy.png';
-import irisGirlUrl from './textures/iris-girl.png';
-import sparkBoyUrl from './textures/spark-boy.png';
-import sparkGirlUrl from './textures/spark-girl.png';
 import haloRingUrl from './textures/halo-ring.png';
 import streakUrl from './textures/streak.png';
 import wispUrl from './textures/wisp.png';
@@ -153,7 +148,6 @@ export const FORM_LOOKS: Record<
   super: { hair: 0xffd700, auraColor: 0xffb300, auraOpacity: 0.4, emissive: 0.6, bodyEmissive: 0xffb300, hitColor: 0xffb300, sparkColor: 0xffb300, arcRate: 5, hitstop: true },
 };
 
-/** Joint pivots the frame loop poses every frame. Limb meshes hang inside. */
 /** The joints the poses drive: the Blender rig's bones, or placeholder
  *  pivots at the same places until the model decodes. */
 export interface HeroJoints {
@@ -169,43 +163,109 @@ export interface HeroJoints {
   kneeR: THREE.Object3D;
 }
 
-/** Where each joint pivots, relative to its parent joint (the hero root
- *  for torso and legs) — the same pivots as the rig's bones. */
-const PIVOTS: Record<keyof HeroJoints, [number, number, number, keyof HeroJoints | null]> = {
-  torso: [0, 1.0, 0, null],
-  head: [0, 0.88, 0, 'torso'],
-  armL: [-0.52, 0.7, 0, 'torso'],
-  elbowL: [0, -0.36, 0, 'armL'],
-  armR: [0.52, 0.7, 0, 'torso'],
-  elbowR: [0, -0.36, 0, 'armR'],
-  legL: [-0.2, 0.88, 0, null],
-  kneeL: [0, -0.44, 0, 'legL'],
-  legR: [0.2, 0.88, 0, null],
-  kneeR: [0, -0.44, 0, 'legR'],
-};
+const JOINT_NAMES: ReadonlyArray<keyof HeroJoints> = [
+  'torso', 'head', 'armL', 'armR', 'elbowL', 'elbowR', 'legL', 'legR', 'kneeL', 'kneeR',
+];
 
-/** A joint's rest position in hero space: the pivots summed up its chain. */
-function restPosition(joint: keyof HeroJoints): THREE.Vector3 {
-  const at = new THREE.Vector3();
-  for (let j: keyof HeroJoints | null = joint; j !== null; j = PIVOTS[j][3]) {
-    const [x, y, z] = PIVOTS[j];
-    at.add(new THREE.Vector3(x, y, z));
-  }
-  return at;
+function isJoint(name: string): name is keyof HeroJoints {
+  return (JOINT_NAMES as ReadonlyArray<string>).includes(name);
 }
 
-/** Placeholder pivots, used only until the Blender hero decodes. */
-function heroJoints(root: THREE.Object3D): HeroJoints {
+/**
+ * The rigs at rest (hero-rig.json, baked output of scripts/blender/
+ * hero.py, ADR 0012). Each body keeps its own Tripo rig in the model,
+ * its bone names under the body's prefix; one clip moves both. Per body:
+ * each joint's rest position and rotation in hero space, its nearest
+ * named parent, and where the fists and boots sit in their joint's
+ * frame. A Tripo bone rests turned along its limb, so a piece hung on a
+ * joint must take the rest rotation off, not only the position: see
+ * mountOn.
+ */
+interface JointRest {
+  parent: string | null;
+  position: number[];
+  quaternion: number[];
+}
+interface BodyRig {
+  prefix: string;
+  joints: Record<string, JointRest>;
+  strikes: Array<{ joint: string; offset: number[] }>;
+}
+const RIG: { bodies: Record<string, BodyRig> } = heroRig;
+
+/** The rig of a body part (BodyBoy, BodyGirl). */
+function bodyRig(body: string): BodyRig {
+  const rig = RIG.bodies[body];
+  if (!rig) throw new Error(`hero-rig.json has no body ${body}`);
+  return rig;
+}
+
+/** A joint's rest transform in hero space. */
+function jointRest(rig: BodyRig, joint: string): THREE.Matrix4 {
+  const rest = rig.joints[joint];
+  if (!rest) throw new Error(`hero-rig.json has no joint ${joint}`);
+  return new THREE.Matrix4().compose(
+    new THREE.Vector3().fromArray(rest.position),
+    new THREE.Quaternion().fromArray(rest.quaternion),
+    new THREE.Vector3(1, 1, 1),
+  );
+}
+
+/** A strike point: a joint, and the offset from it to the fist or boot
+ *  centre in the joint's space. */
+export interface StrikePoint {
+  joint: keyof HeroJoints;
+  offset: THREE.Vector3;
+}
+
+/** The strike points of a body, in the order the hitboxes expect. */
+function strikePoints(rig: BodyRig): StrikePoint[] {
+  return rig.strikes.map(({ joint, offset }) => {
+    if (!isJoint(joint)) throw new Error(`hero-rig.json strikes an unknown joint ${joint}`);
+    return { joint, offset: new THREE.Vector3().fromArray(offset) };
+  });
+}
+
+/** Placeholder pivots at the rig's rest, used only until the Blender hero
+ *  decodes: every joint of the rig, so the chain composes as the bones do. */
+function heroJoints(root: THREE.Object3D, rig: BodyRig): HeroJoints {
+  const made = new Map<string, THREE.Object3D>();
   const joints = {} as HeroJoints;
-  for (const [name, [x, y, z, parent]] of Object.entries(PIVOTS) as Array<
-    [keyof HeroJoints, [number, number, number, keyof HeroJoints | null]]
-  >) {
+  for (const [name, rest] of Object.entries(rig.joints)) {
     const pivot = new THREE.Group();
-    pivot.position.set(x, y, z);
-    (parent ? joints[parent] : root).add(pivot);
-    joints[name] = pivot;
+    const parent = rest.parent === null ? null : made.get(rest.parent);
+    const local = jointRest(rig, name);
+    if (parent && rest.parent !== null) local.premultiply(jointRest(rig, rest.parent).invert());
+    local.decompose(pivot.position, pivot.quaternion, pivot.scale);
+    (parent ?? root).add(pivot);
+    made.set(name, pivot);
+    if (isJoint(name)) joints[name] = pivot;
+  }
+  for (const name of JOINT_NAMES) {
+    if (!joints[name]) throw new Error(`hero-rig.json has no joint ${name}`);
   }
   return joints;
+}
+
+/**
+ * Hang a piece built in hero space on a joint, at the joint's rest: a
+ * mount group carries the inverse of the rest transform, so the piece
+ * keeps its own position and rotation (its motors animate those) and
+ * turns with the bone from its rest, not from the bone's turned frame.
+ * The model may be mid-clip when a build happens, so the current pose
+ * must not count: the rest comes from the baked rig, never the scene.
+ */
+function mountOn(
+  rig: BodyRig,
+  joint: THREE.Object3D,
+  name: keyof HeroJoints,
+  piece: THREE.Object3D,
+): THREE.Group {
+  const mount = new THREE.Group();
+  jointRest(rig, name).invert().decompose(mount.position, mount.quaternion, mount.scale);
+  mount.add(piece);
+  joint.add(mount);
+  return mount;
 }
 
 /** The garment mesh in the hero model for each garment choice. */
@@ -225,9 +285,10 @@ const SLOT_BONE: Partial<Record<CosmeticSlot, keyof HeroJoints>> = {
 };
 
 /**
- * The hero's tint materials, one per painted region of hero.glb. They live
- * for the whole session: the React model wears them, and the look code
- * (applyLook, applyFormToRig, the reactions) recolors them.
+ * The hero's tint materials, one per painted region of hero.glb, and its
+ * face layers (ADR 0012). They live for the whole session: the React
+ * model wears them, and the look code (applyLook, applyFormToRig, the
+ * reactions) recolors them.
  */
 export interface HeroMaterials {
   /** PaintedOutfit */
@@ -238,6 +299,11 @@ export interface HeroMaterials {
   skin: Surface;
   /** PaintedHair */
   hair: Surface;
+  /** Face: the painted features, never tinted. */
+  face: THREE.MeshBasicMaterial;
+  /** Iris: the painted iris, worn in the Form's eye color once a Form is
+   *  earned; hidden before, when the painted eyes show as they are. */
+  iris: THREE.MeshBasicMaterial;
 }
 
 export function createHeroMaterials(): HeroMaterials {
@@ -246,6 +312,8 @@ export function createHeroMaterials(): HeroMaterials {
     trim: painterlySurface(null),
     skin: painterlySurface(null),
     hair: painterlySurface(null),
+    face: faceLayer(),
+    iris: faceLayer(),
   };
 }
 
@@ -260,7 +328,10 @@ export function heroParts(appearance: HeroAppearance, form: string | null): Hero
 
 export interface HeroRig {
   group: THREE.Group;
+  /** The shown body's joints: its own bones once the model decodes. */
   joints: HeroJoints;
+  /** The shown body's fists and boots, on its joints. */
+  strikes: StrikePoint[];
   /** Keep the Form's hair scale: every clip keys the hair bone at scale 1,
    *  and drei's mixer has already run this frame, so the scale is set again. */
   animate(dt: number): void;
@@ -400,13 +471,13 @@ export interface HeroBuild {
 /**
  * Dress an original, DBZ-inspired (never copied) anime-style hero from the
  * chosen appearance: body style, hair style and length, garment, and skin
- * tone. The Blender model (scripts/blender/hero.py, ADR 0007/0008) carries
- * both bodies, the three garments and every hair on one rig whose bones sit
- * on the joint pivots with identity rests; the director picks which parts
- * show. This build adds the face, the aura, the motes and the cosmetics.
+ * tone. The Blender model (scripts/blender/hero.py, ADR 0012) carries both
+ * Tripo bodies with their painted faces and every hair on one rig; the
+ * director picks which parts show. This build adds the aura, the motes
+ * and the cosmetics, and gives the iris the Form's eye color.
  *
- * Rig layout (group-local y, feet at 0): hips 0.88, torso pivot 1.0,
- * shoulders 1.7, head pivot 1.88, head center ~2.04.
+ * Rig layout (group-local y, feet at 0; hero-rig.json): hips 1.34, torso
+ * pivot 1.48, shoulders 2.03, head pivot 2.14, skull top 2.6.
  */
 export function buildHero({
   appearance,
@@ -417,25 +488,29 @@ export function buildHero({
   materials,
   director,
 }: HeroBuild): HeroRig {
-  const girl = appearance.body === 'girl';
   // Everything this build adds, so dispose() can take it off again: the
   // model and its tint materials outlive every build.
   const dressing: THREE.Object3D[] = [];
 
   materials.skin.color.setHex(presetHex(SKIN_PRESETS, appearance.skinTone));
+  // The irises ride their own layer so a Form can change the hero's eyes;
+  // before any Form, the painted eyes show as Tripo drew them.
+  materials.iris.color.setHex(palette?.eye ?? BASE_EYE);
+  materials.iris.visible = palette !== null;
   const parts = heroParts(appearance, form);
   director.showParts(parts);
   const formIndex = FORMS.findIndex((f) => f.id === form);
   const formBefore = formIndex > 0 ? (FORMS[formIndex - 1]?.id ?? null) : null;
   const hairBefore = hairMeshFor(formBefore, appearance.hairStyle, appearance.hairLength);
 
-  // The model's bones are the joints. Until it decodes, placeholder pivots
-  // at the same places hold the face and the cosmetics.
+  // The shown body's bones are the joints. Until the model decodes,
+  // placeholder pivots at the same places hold the cosmetics.
+  const rig = bodyRig(parts.body);
   const placeholder = new THREE.Group();
-  const joints = heroJoints(placeholder);
+  const joints = heroJoints(placeholder, rig);
   if (model) {
     for (const name of Object.keys(joints) as Array<keyof HeroJoints>) {
-      const bone = model.getObjectByName(name);
+      const bone = model.getObjectByName(rig.prefix + name);
       if (bone) joints[name] = bone;
     }
   } else {
@@ -444,41 +519,8 @@ export function buildHero({
   }
   // Hair grows and stiffens with the Form: the hair bone scales it from
   // the head pivot, so a powered-up hero's hair visibly rises.
-  const hairBone = model?.getObjectByName('hair') ?? null;
+  const hairBone = model?.getObjectByName(`${rig.prefix}hair`) ?? null;
   const hairScale = palette?.hairScale ?? 1;
-
-  // The face rides the head bone.
-  const headPivot = joints.head;
-
-  // The painted anime face: a transparent decal on a sphere segment just
-  // off the skull, so every skin tone shows through around the features.
-  // The girl's variant carries the larger eyes and the lash flicks.
-  const faceShape = () =>
-    new THREE.SphereGeometry(0.35, 24, 16, Math.PI / 2 - 0.95, 1.9, 0.85, 1.45);
-  const face = new THREE.Mesh(faceShape(), faceDecal(girl ? faceGirlUrl : faceBoyUrl));
-  face.position.y = 0.16;
-  face.renderOrder = 1;
-  headPivot.add(face);
-  dressing.push(face);
-
-  // The irises ride their own sheet so a Form can change the hero's eyes
-  // without rebaking a whole face per Form.
-  const irisMaterial = faceDecal(girl ? irisGirlUrl : irisBoyUrl);
-  irisMaterial.color.setHex(palette?.eye ?? BASE_EYE);
-  const irises = new THREE.Mesh(faceShape(), irisMaterial);
-  irises.position.y = 0.16;
-  irises.renderOrder = 2;
-  headPivot.add(irises);
-  dressing.push(irises);
-
-  // The catchlights sit on their own untinted sheet above the iris. On the
-  // tinted sheet they took the Form's color, and an eye whose highlight
-  // matches its iris has no spark in it at all — which reads as a stare.
-  const sparks = new THREE.Mesh(faceShape(), faceDecal(girl ? sparkGirlUrl : sparkBoyUrl));
-  sparks.position.y = 0.16;
-  sparks.renderOrder = 3;
-  headPivot.add(sparks);
-  dressing.push(sparks);
 
   // Front faces only: with two nested shells, double-sided rendering would
   // stack four color layers and wall the hero off inside the flame.
@@ -535,17 +577,14 @@ export function buildHero({
   for (const piece of dressing) applyCelTreatment(piece);
 
   // Worn cosmetics ride their bone: the crown turns with the head, the
-  // wings lean with the torso. Each piece was built in hero space, and every
-  // bone rests on its pivot with an identity rotation, so moving a piece
-  // onto its bone only takes the bone's rest position off it. The model
-  // outlives every build and may be mid-clip, so the current pose must not
-  // count. Every motor then re-reads its rest pose relative to the new parent.
+  // wings lean with the torso. Each piece was built in hero space and
+  // hangs on a mount that takes the bone's rest off it (mountOn); the
+  // mounts go with the dressing, after the pieces they carry.
   for (const tier of COSMETIC_MILESTONES) {
     const bone = SLOT_BONE[tier.slot];
     const piece = cosmetics.get(tier.id);
     if (!bone || !piece) continue;
-    piece.position.sub(restPosition(bone));
-    joints[bone].add(piece);
+    dressing.push(mountOn(rig, joints[bone], bone, piece));
   }
   for (const motor of cosmeticMotors) {
     motor.restY = motor.object.position.y;
@@ -557,6 +596,7 @@ export function buildHero({
   return {
     group,
     joints,
+    strikes: strikePoints(rig),
     hairBefore,
     hairNow: parts.hair,
     animate() {

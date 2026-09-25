@@ -32,7 +32,8 @@ DARK = 0.12
 SMOOTHING_PASSES = 2
 
 
-def _base_color_image(mesh):
+def base_color_image(mesh):
+    """The image a Tripo material puts on the base color."""
     for mat in mesh.data.materials:
         if mat is None or not mat.use_nodes:
             continue
@@ -121,7 +122,7 @@ def _smooth(mesh, labels):
 
 def classify(mesh):
     """The region index (SKIN, OUTFIT, TRIM) of every face of a triangle mesh."""
-    return _smooth(mesh, _raw_labels(mesh, _base_color_image(mesh)))
+    return _smooth(mesh, _raw_labels(mesh, base_color_image(mesh)))
 
 
 def histogram(labels):
@@ -156,13 +157,18 @@ def _texel_labels(rgb):
     return labels
 
 
-def normalize(image):
+def normalize(image, fill=None):
     """Make the texture gray: keep its light and shade, drop its color.
 
     Each region's mean linear brightness becomes its PAINT value; the
     runtime tint then gives the color. The image stays sRGB-encoded (an
     8-bit texture from Tripo); dark texels keep the Outfit scale. Returns
     the region means before the change, for the log.
+
+    fill: an (height, width) weight in 0..1 of texels to paint over with
+    the skin's mean brightness before the change: the painted face of a
+    body, which the face layer shows instead (ADR 0012), so no dark ghost
+    of an eye shows through the tinted skin.
     """
     width, height = image.size
     px = np.empty(width * height * 4, dtype=np.float32)
@@ -170,6 +176,11 @@ def normalize(image):
     px = px.reshape(height, width, 4)
     labels = _texel_labels(px[:, :, :3])
     luma = _to_linear(px[:, :, :3]) @ LUMA
+    if fill is not None:
+        skin = labels == SKIN
+        mean = float(luma[skin].mean()) if skin.any() else PAINT[SKIN]
+        luma = luma * (1.0 - fill) + mean * fill
+        labels = np.where(fill > 0.5, SKIN, labels).astype(np.int8)
     gray = np.empty_like(luma)
     means = {}
     for region, value in PAINT.items():

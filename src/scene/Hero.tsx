@@ -21,17 +21,20 @@ export function Hero({ mount, timeScale }: { mount: HeroMount; timeScale: () => 
   const [cue, setCue] = useState(director.cue());
   const [parts, setParts] = useState(director.parts());
 
-  // The model exists: it wears the baked atlas under each tint, the
-  // director learns its clips, and the renderer dresses its bones.
+  // The model exists: it wears the baked atlas under each tint and the
+  // baked face on its face layers, the director learns its clips, and
+  // the renderer dresses its bones.
   useLayoutEffect(() => {
-    const atlas: Array<[THREE.Material, THREE.MeshStandardMaterial]> = [
-      [materials.body, baked.PaintedOutfit],
-      [materials.trim, baked.PaintedTrim],
-      [materials.skin, baked.PaintedSkin],
-      [materials.hair, baked.PaintedHair],
+    const atlas: Array<[THREE.Material & { map: THREE.Texture | null }, THREE.MeshStandardMaterial]> = [
+      [materials.body as THREE.MeshToonMaterial, baked.PaintedOutfit],
+      [materials.trim as THREE.MeshToonMaterial, baked.PaintedTrim],
+      [materials.skin as THREE.MeshToonMaterial, baked.PaintedSkin],
+      [materials.hair as THREE.MeshToonMaterial, baked.PaintedHair],
+      [materials.face, baked.Face],
+      [materials.iris, baked.Iris],
     ];
     for (const [tint, painted] of atlas) {
-      (tint as THREE.MeshToonMaterial).map = painted.map;
+      tint.map = painted.map;
       tint.needsUpdate = true;
     }
     director.ready(clips.map((clip) => ({ name: clip.name, duration: clip.duration })));

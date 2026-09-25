@@ -537,16 +537,6 @@ def bake_painted(obj, size=1024, regions=None):
 
     bpy.ops.object.bake(type="EMIT", margin=8, use_clear=True)
 
-    def wearing(name):
-        painted = bpy.data.materials.new(name)
-        painted.use_nodes = True
-        bsdf = painted.node_tree.nodes["Principled BSDF"]
-        tex = painted.node_tree.nodes.new("ShaderNodeTexImage")
-        tex.image = image
-        painted.node_tree.links.new(tex.outputs["Color"], bsdf.inputs["Base Color"])
-        bsdf.inputs["Roughness"].default_value = 1.0
-        return painted
-
     regions = regions or {}
     old = list(obj.data.materials)
     targets = [PAINTED] + sorted(set(regions.values()))
@@ -557,12 +547,28 @@ def bake_painted(obj, size=1024, regions=None):
     new_index = [old_to_new[poly.material_index] for poly in obj.data.polygons]
     obj.data.materials.clear()
     for name in targets:
-        obj.data.materials.append(wearing(name if name == PAINTED else PAINTED + name))
+        obj.data.materials.append(painted_material(name if name == PAINTED else PAINTED + name, image))
     for poly, index in zip(obj.data.polygons, new_index):
         poly.material_index = index
     for mat in old:
         bpy.data.materials.remove(mat)
     return image
+
+
+def painted_material(name, image, alpha=False):
+    """The material the runtime reads: the image as the base color, and,
+    for a decal layer, the image's alpha as the material's alpha."""
+    painted = bpy.data.materials.new(name)
+    painted.use_nodes = True
+    bsdf = painted.node_tree.nodes["Principled BSDF"]
+    tex = painted.node_tree.nodes.new("ShaderNodeTexImage")
+    tex.image = image
+    painted.node_tree.links.new(tex.outputs["Color"], bsdf.inputs["Base Color"])
+    if alpha:
+        painted.node_tree.links.new(tex.outputs["Alpha"], bsdf.inputs["Alpha"])
+        painted.surface_render_method = "BLENDED"
+    bsdf.inputs["Roughness"].default_value = 1.0
+    return painted
 
 
 def ink_material():
@@ -726,6 +732,93 @@ def hair_cone(name, head_pivot, x, y, z, tilt_x, tilt_z, radius=0.14, height=0.5
 def three_point(x, y, z):
     """A point in three.js hero space (Y up, facing +Z) in Blender space."""
     return (x, -z, y)
+
+
+# ---------------------------------------------------------------- sourced models
+#
+# Helpers for a model that Tripo made and rigged (ADR 0011, ADR 0012):
+# the import, its size, an ink hull that keeps the vertex weights, and the
+# sampling of its clips into poses that the bake can window and blend.
+
+
+def import_glb(path):
+    """Import a glTF file; return the objects it added to the scene."""
+    before = set(bpy.context.scene.objects)
+    bpy.ops.import_scene.gltf(filepath=path)
+    return set(bpy.context.scene.objects) - before
+
+
+def mesh_height(meshes):
+    zs = [(m.matrix_world @ v.co).z for m in meshes for v in m.data.vertices]
+    return max(zs) - min(zs)
+
+
+def ink_hull_skinned(mesh, rig, width):
+    """The inverted hull, applied with the operator so vertex weights stay.
+
+    add_ink_hull rebuilds the mesh, which drops the vertex groups; the
+    scripted models get their hull before they are rigged, a Tripo model
+    after. The ink material must be the last slot: the hull's faces take
+    the slot after each face's own.
+    """
+    for mod in [m for m in mesh.modifiers if m.type == "ARMATURE"]:
+        mesh.modifiers.remove(mod)
+    mesh.data.materials.append(ink_material())
+    bpy.context.view_layer.objects.active = mesh
+    hull = mesh.modifiers.new("Ink", "SOLIDIFY")
+    hull.thickness = width
+    hull.offset = 1.0
+    hull.use_flip_normals = True
+    hull.use_rim = False
+    hull.use_even_offset = False
+    hull.material_offset = len(mesh.data.materials) - 1
+    bpy.ops.object.modifier_apply(modifier=hull.name)
+    skin = mesh.modifiers.new("Armature", "ARMATURE")
+    skin.object = rig
+
+
+def play_action(rig, action):
+    """Make action the one the rig plays (Blender 5 actions have slots)."""
+    rig.animation_data.action = action
+    if action.slots:
+        rig.animation_data.action_slot = action.slots[0]
+
+
+def sample_poses(rig, action, first, count):
+    """The pose of every bone at count frames from the source frame first:
+    [{bone: (location, quaternion, scale, pose matrix)}] as the action
+    plays them."""
+    scene = bpy.context.scene
+    play_action(rig, action)
+    frames = []
+    for i in range(count):
+        f = first + i
+        scene.frame_set(int(f), subframe=f - int(f))
+        pose = {}
+        for pb in rig.pose.bones:
+            pose[pb.name] = (pb.location.copy(), pb.rotation_quaternion.copy(), pb.scale.copy(), pb.matrix.copy())
+        frames.append(pose)
+    rig.animation_data.action = None
+    return frames
+
+
+def blend_poses(pose, target, weight):
+    """Between two sampled poses: the rotation slerped, the rest lerped."""
+    out = {}
+    for bone, (loc, quat, scale, matrix) in pose.items():
+        t_loc, t_quat, t_scale, _ = target[bone]
+        if quat.dot(t_quat) < 0:
+            t_quat = -t_quat
+        out[bone] = (loc.lerp(t_loc, weight), quat.slerp(t_quat, weight), scale.lerp(t_scale, weight), matrix)
+    return out
+
+
+def action_fcurves(action):
+    """Every F-curve of a Blender 5 action (layers, strips, channel bags)."""
+    for layer in action.layers:
+        for strip in layer.strips:
+            for bag in strip.channelbags:
+                yield from bag.fcurves
 
 
 # ---------------------------------------------------------------- export

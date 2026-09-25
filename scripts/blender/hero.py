@@ -1,194 +1,668 @@
-"""The hero (ADR 0007, ADR 0008): two bodies (girl and boy) and three
-garments on one shared rig, with heroic-teen arcade proportions — a big
-head, big fists, and big boots.
+"""The hero (ADR 0012): the Tripo bodies, fitted to the game.
 
-Authored in three.js hero space (Y up, facing +Z), through
-common.three_point, so every number here matches the renderer's joints.
-The rig's bones stand upright, so after the Y-up export they have identity
-rests in three.js hero axes and sit on the old joint pivots: the renderer's
-poses drive them exactly as they drove the code-built joints.
+The sources are in sources/tripo/hero-boy/ and hero-girl/, made by
+`npm run tripo` (models.json is the record): Idle.glb carries each body
+(the chosen candidate decimated to 30k faces, rigged by Tripo with its
+native biped skeleton) and the preset idle; the boy's other files carry
+one preset clip each on the same skeleton, no geometry. The girl's
+texture has no face; her retexture (candidates/p1s1-texture.glb, the same
+UV layout) has one.
 
-The painted bake holds light and shade only for the tint regions: Skin,
-Outfit, and Trim are painted near white, and the renderer tints each with
-the Player's chosen color. The face decals and the hair stay in code for
-now, on the head bone (ticket #50 replaces the hair).
+This script makes the game's version, and nothing is edited by hand:
 
-Export: "HeroRig" with the skinned meshes BodyGirl, BodyBoy, GarmentGi,
-GarmentCape, and GarmentArmor; the renderer shows one body and one garment.
+- each body keeps its own Tripo armature and weights, in three.js hero
+  space (Y up, facing +Z, the feet at 0, FIGHTER_HEIGHT tall). A transfer
+  of the boy's weights onto the girl tears her slim limbs (tried on
+  2026-09-25), and her own weights on his bones open seams where the
+  joints differ, so the two rigs stay. The girl's bones carry the prefix
+  GIRL; her armature is a child of the boy's, so one model holds both.
+  Every clip exists on both rigs, and the bake (scripts/bake-models.mjs)
+  merges each clip's girl tracks into the boy's clip: the runtime plays
+  one clip, and both rigs move; the shown body's rig is the one seen;
+- the joints the renderer uses, renamed by side (the character's left is
+  the hero's +X, so L_Upperarm is armR), and a `hair` bone under each
+  head;
+- the tint regions Skin, Outfit, and Trim, sorted by hue from each body's
+  texture (regions.py) and made gray, in one atlas for both bodies, so
+  the runtime tints them as it tinted the scripted hero;
+- a face layer per body: the head's front faces, a little off the skin,
+  wearing the painted face with only its features opaque, and an iris
+  layer above it that the Form recolors;
+- the preset clips, each a window of its source, blended from and to the
+  stance (the preset idle's first frame), the strike dash added to the
+  root so the fists and boots reach the Rival (PRESETS table);
+- the HY-Motion clips (ADR 0010) through mocap's scheme for each rig;
+- the scripted Hair Styles and manes, fitted rigidly to each body's hair
+  bone until the Tripo hair pieces land (ticket D);
+- a baked ink hull, as on the scripted models;
+- each body's joints at rest and its strike offsets, written to
+  src/renderer/models/hero-rig.json for the renderer.
+
+Part names (the director shows one body, one garment, one hair): a body
+is BodyBoy or BodyGirl; a piece fitted to a body is `<part>-<body>`, for
+example Hair_spiky_short-BodyGirl. There is no garment piece yet: every
+garment choice shows the body's own suit (ticket D adds the pieces under
+the same naming).
 """
 
+import json
 import math
+import os
+
+import bmesh
+import bpy
+import numpy as np
+from mathutils import Matrix, Vector
 
 import common as c
 import mocap
+import regions
 
-P = c.three_point
+HERE = os.path.dirname(os.path.abspath(__file__))
+SOURCES = os.path.join(HERE, "sources", "tripo")
+RIG_JSON = os.path.normpath(os.path.join(HERE, "..", "..", "src", "renderer", "models", "hero-rig.json"))
 
-# Near-white paint: the bake keeps only light and shade; the runtime tints.
-SKIN = (0.86, 0.86, 0.86)
-OUTFIT = (0.82, 0.82, 0.82)
-TRIM = (0.86, 0.86, 0.86)
+FIGHTER_HEIGHT = 2.6  # game units: src/renderer/constants.ts FIGHTER_HEIGHT
+INK_WIDTH = 0.012
+# Textures: each body gets BODY_TEXTURE px of a 2 x 1 atlas; each face
+# FACE_TEXTURE px of another; the hair pieces bake into their own.
+BODY_TEXTURE = 1024
+FACE_TEXTURE = 512
+HAIR_TEXTURE = 1024
+# How far off the skin the face layers float (inside the ink hull).
+FACE_LIFT = 0.008
+IRIS_LIFT = 0.011
+
+# The bodies: the part name, and the prefix on that rig's bone names. The
+# boy's rig is the bare one: the motion tools (motion_score.py) and the
+# contact sheet read it by the plain joint names.
+BODIES = {"BodyBoy": "", "BodyGirl": "girl_"}
+GIRL = BODIES["BodyGirl"]
+
+# Near-white paint for the hair: the bake keeps only light and shade.
 HAIR = (0.84, 0.84, 0.84)
-
 # Hair Styles (ADR 0008): the four styles, each short or long.
 HAIR_STYLES = ("spiky", "flame", "ponytail", "buzz")
 HAIR_LENGTHS = ("short", "long")
 # The shared manes (spec #45): from Wild Mane on, every Hair Style ascends
 # into its Form's mane.
 MANES = ("wild", "crimson", "rose", "legend")
+# The scripted skull the hair was drawn on: its diameter, and how far its
+# centre sat above the hair pivot (hero.py before ADR 0012).
+SCRIPTED_SKULL = 0.68
+SCRIPTED_SKULL_LIFT = 0.16
 
-INK_WIDTH = 0.012
+# Hero space in Blender: the hero faces three's +Z, which is Blender -Y.
+FORWARD = Vector((0.0, -1.0, 0.0))
+UP = Vector((0.0, 0.0, 1.0))
+# Blender axes to three.js axes: (x, y, z) -> (x, z, -y).
+TO_THREE = Matrix(((1.0, 0.0, 0.0), (0.0, 0.0, 1.0), (0.0, -1.0, 0.0)))
 
-# Mesh density: chunky shapes with an ink outline read well at low counts,
-# and the hero is skinned every frame (software WebGL in the check gate
-# timed out at the old 32×16 spheres).
-SPHERE = {"segments": 20, "rings": 12}
-CAPSULE = 16
-CYLINDER = 20
+# Tripo's bones that the renderer drives by name, renamed by side: the hero
+# faces +Z, so the character's left (+X) is the hero's "R" side.
+JOINTS = {
+    "Root": "root",
+    "Spine01": "torso",
+    "Head": "head",
+    "L_Upperarm": "armR",
+    "L_Forearm": "elbowR",
+    "L_Thigh": "legR",
+    "L_Calf": "kneeR",
+    "R_Upperarm": "armL",
+    "R_Forearm": "elbowL",
+    "R_Thigh": "legL",
+    "R_Calf": "kneeL",
+}
+# The strike points, in the order src/renderer/index.ts reads them: the
+# joint that carries each, and the bone whose middle is the fist or boot.
+STRIKES = (("elbowL", "R_Hand"), ("elbowR", "L_Hand"), ("kneeL", "R_Foot"), ("kneeR", "L_Foot"))
 
-# Joint pivots, in three.js hero space (the old code joints).
-SHOULDER_X = 0.52
-HIP_X = 0.2
-PIVOTS = {
-    "root": (0.0, 0.0, 0.0, None),
-    "torso": (0.0, 1.0, 0.0, "root"),
-    "head": (0.0, 1.88, 0.0, "torso"),
-    # The hair rides its own bone at the head pivot, so a Form can scale the
-    # hair up without scaling the skull.
-    "hair": (0.0, 1.88, 0.0, "head"),
-    "armL": (-SHOULDER_X, 1.7, 0.0, "torso"),
-    "elbowL": (-SHOULDER_X, 1.34, 0.0, "armL"),
-    "armR": (SHOULDER_X, 1.7, 0.0, "torso"),
-    "elbowR": (SHOULDER_X, 1.34, 0.0, "armR"),
-    "legL": (-HIP_X, 0.88, 0.0, "root"),
-    "kneeL": (-HIP_X, 0.44, 0.0, "legL"),
-    "legR": (HIP_X, 0.88, 0.0, "root"),
-    "kneeR": (HIP_X, 0.44, 0.0, "legR"),
+HY_CLIPS = ("Idle", "Stagger", "Transform", "Charge", "Victory")
+
+# A strike clip: the share of it before the strike phase, and the share of
+# the strike phase from which a fist or boot on the Rival's hurtbox lands
+# the hit. src/renderer/style.ts (STYLE.juice.attack) reads the same
+# fractions to open the contact window.
+ATTACK_ANTICIPATION = 0.18
+CONTACT_FROM = 0.3
+DASH_FROM = ATTACK_ANTICIPATION + (1.0 - ATTACK_ANTICIPATION) * CONTACT_FROM
+# The spin strike turns a full circle from here to the dash's peak.
+SPIN_FROM = 0.15
+
+# The preset clips the game plays, in seconds of the source (models.json
+# "animations" names the preset). blend: the shares of the clip that blend
+# in from and out to the stance. The strikes add to the root: dash, how
+# far forward it travels at the strike's peak (the hero stands 4.8 m from
+# the Rival; a fist or boot must enter its hurtbox, src/scene/Rival.tsx,
+# for the strike to land on contact); lift, the jump; spin, a full turn;
+# face, the root turns against the hips' heading, so the body keeps
+# facing the Rival whatever the source does; aim, degrees the root turns
+# at the dash's peak, so a strike that goes to the side of the body goes
+# at the Rival. front_kick_01 is a side kick at hip height with the body
+# turned 160 degrees and a sidestep: faced, aimed 90 degrees, and pinned,
+# it lands as a turning side kick. The hips' sideways travel comes off the
+# root in every clip, so the hero stays in the side plane.
+PRESETS = {
+    "Attack0": {"window": (0.17, 1.0), "blend": (0.12, 0.3), "dash": 3.0},
+    "Attack1": {"window": (0.2, 1.1), "blend": (0.12, 0.3), "dash": 2.8, "lift": 0.3, "face": True, "aim": 90.0},
+    "Attack2": {"window": (1.83, 2.4), "blend": (0.15, 0.3), "dash": 3.5, "spin": True},
+    "Attack3": {"window": (0.29, 0.92), "blend": (0.12, 0.3), "dash": 3.3, "lift": 0.4},
+    "Blast": {"window": (2.3, 3.1), "blend": (0.1, 0.2)},
 }
 
 
-def build():
-    m = {
-        "skin": c.paint_material("Skin", SKIN, grain=0.05, edge=0.12, crevice=0.35, top=0.12, stroke_scale=4.0),
-        "outfit": c.paint_material("Outfit", OUTFIT, grain=0.14, edge=0.15, crevice=0.5, top=0.16, stroke_scale=7.0),
-        "trim": c.paint_material("Trim", TRIM, grain=0.1, edge=0.2, crevice=0.45, top=0.16),
-        "hair": c.paint_material("Hair", HAIR, grain=0.2, edge=0.35, crevice=0.4, top=0.3, stroke_scale=14.0),
+def piece_name(part, body):
+    """The name of a piece fitted to one body: Hair_spiky_short-BodyGirl."""
+    return f"{part}-{body}"
+
+
+def scheme(prefix=""):
+    """HY-Motion onto a hero rig (mocap.py): Tripo's scheme with the
+    renamed bones, facing hero forward."""
+    return {
+        "forward": tuple(FORWARD),
+        "up": tuple(UP),
+        "bones": {role: prefix + JOINTS.get(bone, bone) for role, bone in mocap.TRIPO["bones"].items()},
     }
-    parts = []
-    tag = {"part": None, "bone": None}
-
-    def part(obj, material, bone):
-        obj["bone"] = bone
-        obj["part"] = tag["part"]
-        parts.append(c.assign(obj, m[material]))
-        return obj
-
-    def at(x, y, z=0.0):
-        return P(x, y, z)
-
-    for girl in (True, False):
-        tag["part"] = "BodyGirl" if girl else "BodyBoy"
-        build_body(girl, part, at)
-    for garment in ("Gi", "Cape", "Armor"):
-        tag["part"] = f"Garment{garment}"
-        build_garment(garment, part, at)
-    for style in HAIR_STYLES:
-        for length in HAIR_LENGTHS:
-            tag["part"] = hair_name(style, length)
-            build_hair(style, length == "long", part)
-    for mane in MANES:
-        tag["part"] = mane_name(mane)
-        build_mane(mane, part)
-
-    hero = c.join("Hero", parts)
-    c.bake_painted(hero, size=2048, regions={"Skin": "Skin", "Outfit": "Outfit", "Trim": "Trim", "Hair": "Hair"})
-    c.add_ink_hull(hero, INK_WIDTH)
-
-    names = ["BodyGirl", "BodyBoy", "GarmentGi", "GarmentCape", "GarmentArmor"]
-    names += [hair_name(style, length) for style in HAIR_STYLES for length in HAIR_LENGTHS]
-    names += [mane_name(mane) for mane in MANES]
-    pieces = [c.split_group(hero, name, name, center=False) for name in names]
-    c.remove(hero)
-    for piece in pieces:
-        for name in names:
-            group = piece.vertex_groups.get(name)
-            if group is not None:
-                piece.vertex_groups.remove(group)
-
-    bones = []
-    for name, (x, y, z, parent) in PIVOTS.items():
-        head = P(x, y, z)
-        # Upright with zero roll: after the Y-up export every bone's axes are
-        # three.js hero axes and every rest is identity (see add_rig).
-        bones.append((name, head, (head[0], head[1], head[2] + 0.1), parent))
-    rig = c.add_rig(pieces, bones, name="HeroRig", rotation="QUATERNION")
-    add_clips(rig)
-    return rig
 
 
-def build_body(girl, part, at):
-    """One body: the same joints, a girl's or a boy's shape."""
-    # Pelvis and hips: the gi's trousers.
-    part(c.sphere("Pelvis", 0.3, at(0, 0.92), scale=(1.22 if girl else 1.08, 0.85 if girl else 0.8, 0.58), **SPHERE), "outfit", "root")
-    # The belt hugs the waist: an oval, flatter front to back.
-    belt = c.cylinder("Belt", 0.4 if girl else 0.43, 0.15, 0.88, segments=CYLINDER)
-    c.scale_about(belt, (1.0, 0.76, 1.0), at(0, 0.955))
-    part(belt, "trim", "root")
-    # The belt knot and its two tails, in front.
-    front = 0.27 if girl else 0.31
-    part(c.sphere("Knot", 0.085, at(0, 1.0, front), scale=(1.25, 0.72, 0.85), **SPHERE), "trim", "root")
-    for side in (-1, 1):
-        tail = c.rounded_box("Tail", (0.08, 0.03, 0.22), at(side * 0.075, 0.87, front - 0.02), 0.012, rotation=(0, -side * 0.18, 0))
-        part(tail, "trim", "root")
-
-    # Chest: a broad V for the boy, a narrower waist for the girl.
-    chest = c.capsule("Chest", 0.36, at(0, 1.2), at(0, 1.55), segments=20)
-    c.scale_about(chest, (0.88, 0.74, 1.0) if girl else (1.12, 0.82, 1.0), at(0, 1.37))
-    part(chest, "outfit", "torso")
-    if girl:
-        part(c.sphere("Contour", 0.24, at(0, 1.5, 0.15), scale=(1.15, 0.75, 0.7), **SPHERE), "outfit", "torso")
-    part(c.cylinder("Neck", 0.105, 0.2, 1.58, segments=CYLINDER), "skin", "torso")
-
-    # The head: the face decals and the hair ride this skull from code.
-    part(c.sphere("Skull", 0.34, at(0, 2.04), segments=28, rings=16), "skin", "head")
-    for side in (-1, 1):
-        part(c.sphere("Ear", 0.07, at(side * 0.33, 2.03, -0.02), scale=(0.55, 1.0, 0.8), **SPHERE), "skin", "head")
-
-    # Arms: shoulder, upper arm, forearm, wristband, and a big fist.
-    for side, arm, elbow in ((-1, "armL", "elbowL"), (1, "armR", "elbowR")):
-        x = side * SHOULDER_X
-        part(c.sphere("Shoulder", 0.16, at(x, 1.69), **SPHERE), "outfit", arm)
-        part(c.capsule("UpperArm", 0.13, at(x, 1.66), at(x, 1.4), segments=CAPSULE), "outfit", arm)
-        part(c.capsule("Forearm", 0.115, at(x, 1.33), at(x, 1.06), segments=CAPSULE), "skin", elbow)
-        part(c.cylinder("Wristband", 0.14, 0.13, 0.91, x=x, segments=CYLINDER), "trim", elbow)
-        part(c.sphere("Fist", 0.175, at(x, 0.88, 0.02), scale=(1.0, 1.1, 0.95), **SPHERE), "skin", elbow)
-        part(c.sphere("Thumb", 0.07, at(x - side * 0.1, 0.93, 0.1), scale=(0.9, 1.3, 1.0), **SPHERE), "skin", elbow)
-
-    # Legs: thigh, shin, and big boots.
-    for side, leg, knee in ((-1, "legL", "kneeL"), (1, "legR", "kneeR")):
-        x = side * HIP_X
-        part(c.capsule("Thigh", 0.17, at(x, 0.84), at(x, 0.5), segments=CAPSULE), "outfit", leg)
-        part(c.capsule("Shin", 0.145, at(x, 0.42), at(x, 0.2), segments=CAPSULE), "outfit", knee)
-        part(c.rounded_box("Boot", (0.34, 0.5, 0.26), at(x, 0.12, 0.07), 0.07), "trim", knee)
-        part(c.cylinder("BootCuff", 0.18, 0.1, 0.19, x=x, segments=CYLINDER), "trim", knee)
+SCHEME = scheme()
 
 
-def build_garment(garment, part, at):
-    if garment == "Gi":
-        # The crossed collar: two trim bands meeting in a V at the chest.
-        for side in (-1, 1):
-            lapel = c.rounded_box("Lapel", (0.27, 0.035, 0.06), at(side * 0.1, 1.56, 0.285), 0.012, rotation=(0, -side * 0.55, 0))
-            part(lapel, "trim", "torso")
-        part(c.rounded_box("Flap", (0.42, 0.05, 0.25), at(0, 0.83, 0.25), 0.02, rotation=(0.14, 0, 0)), "outfit", "root")
-    elif garment == "Cape":
-        part(c.rounded_box("Cape", (0.95, 0.05, 1.4), at(0, 1.05, -0.4), 0.02, rotation=(0.12, 0, 0)), "trim", "torso")
-        part(c.rounded_box("Clasp", (0.7, 0.08, 0.1), at(0, 1.72, -0.28), 0.03), "trim", "torso")
-    else:
-        plate = c.capsule("Plate", 0.44, at(0, 1.2), at(0, 1.55), segments=20)
-        c.scale_about(plate, (1.1, 0.9, 0.85), at(0, 1.38))
-        part(plate, "trim", "torso")
-        for side, arm in ((-1, "armL"), (1, "armR")):
-            part(c.sphere("Pauldron", 0.2, at(side * SHOULDER_X, 1.73), scale=(1.25, 1.1, 0.85), **SPHERE), "trim", arm)
+# ---------------------------------------------------------------- bodies
+
+
+def _import_body(brief):
+    """A body's rigged Idle.glb: its armature and its one mesh."""
+    base = next(info for info in brief["clips"].values() if info.get("geometry"))
+    added = c.import_glb(os.path.join(SOURCES, base["file"]))
+    rig = next(o for o in added if o.type == "ARMATURE")
+    mesh = next(o for o in added if o.type == "MESH" and o.parent == rig)
+    # The importer also adds an "Icosphere", its display shape for bones.
+    for obj in added - {rig, mesh}:
+        bpy.data.objects.remove(obj, do_unlink=True)
+    return rig, mesh
+
+
+def _hero_space(rig, mesh):
+    """The matrix that puts a body in hero space: turned to face -Y, scaled
+    to FIGHTER_HEIGHT, the hips over the origin and the feet on z = 0."""
+    turn = Matrix.Rotation(math.radians(-90.0), 4, "Z")
+    scale = FIGHTER_HEIGHT / c.mesh_height([mesh])
+    placed = Matrix.Scale(scale, 4) @ turn
+    hip = placed @ rig.data.bones["Hip"].head_local
+    floor = min((placed @ v.co).z for v in mesh.data.vertices)
+    return Matrix.Translation((-hip.x, -hip.y, -floor)) @ placed, scale
+
+
+def _transform(rig, mesh, matrix):
+    mesh.data.transform(matrix)
+    bpy.context.view_layer.objects.active = rig
+    bpy.ops.object.mode_set(mode="EDIT")
+    for bone in rig.data.edit_bones:
+        bone.transform(matrix, scale=True, roll=True)
+    bpy.ops.object.mode_set(mode="OBJECT")
+
+
+def _compare_rigs(rig, rig_girl):
+    """How far the girl's joints sit from the boy's, as a share of the
+    height, for the log: the two rigs differ, which is why each body keeps
+    its own (see the module docstring)."""
+    offsets = {
+        bone: (rig.data.bones[bone].head_local - rig_girl.data.bones[bone].head_local).length / FIGHTER_HEIGHT
+        for bone in JOINTS
+    }
+    worst = max(offsets, key=offsets.get)
+    print(f"RIGS: largest joint offset between the bodies {offsets[worst]:.3f} of the height at {worst}")
+
+
+def _rename_bones(rig, mesh, prefix):
+    """The renderer's joint names on the bones and the vertex groups, the
+    body's prefix on every bone, and the hair bone: upright at the head
+    pivot, so its rest is identity in three.js axes and the Form's hair
+    scale grows the hair from there."""
+    bpy.context.view_layer.objects.active = rig
+    bpy.ops.object.mode_set(mode="EDIT")
+    bones = rig.data.edit_bones
+    names = {bone.name: prefix + JOINTS.get(bone.name, bone.name) for bone in bones}
+    for bone in bones:
+        bone.name = names[bone.name]
+    head = bones[prefix + "head"]
+    hair = bones.new(prefix + "hair")
+    hair.head = head.head.copy()
+    hair.tail = head.head + Vector((0.0, 0.0, 0.1))
+    hair.roll = 0.0
+    hair.parent = head
+    bpy.ops.object.mode_set(mode="OBJECT")
+    for group in mesh.vertex_groups:
+        group.name = names.get(group.name, group.name)
+    for pose_bone in rig.pose.bones:
+        pose_bone.rotation_mode = "QUATERNION"
+
+
+# ---------------------------------------------------------------- clips
+
+
+def _load_clips(rig, brief, scale):
+    """Every preset clip as an action on the boy's armature, its location
+    channels in hero units, its bone paths renamed for the joints."""
+    rig.animation_data_create()
+    for track in list(rig.animation_data.nla_tracks):
+        rig.animation_data.nla_tracks.remove(track)
+    actions = {}
+    for clip, info in brief["clips"].items():
+        if info.get("geometry"):
+            action = rig.animation_data.action
+        else:
+            added = c.import_glb(os.path.join(SOURCES, info["file"]))
+            other = next(o for o in added if o.type == "ARMATURE")
+            action = other.animation_data.action
+            for obj in added:
+                bpy.data.objects.remove(obj, do_unlink=True)
+        action.name = f"Preset{clip}"
+        action.use_fake_user = True
+        for fcurve in c.action_fcurves(action):
+            for old, new in JOINTS.items():
+                fcurve.data_path = fcurve.data_path.replace(f'["{old}"]', f'["{new}"]')
+            if fcurve.data_path.endswith(".location"):
+                for point in fcurve.keyframe_points:
+                    point.co.y *= scale
+                    point.handle_left.y *= scale
+                    point.handle_right.y *= scale
+        actions[clip] = action
+    rig.animation_data.action = None
+    return actions
+
+
+def _prefixed_copy(action, prefix, suffix):
+    """The same clip for the other rig: its bone paths with that rig's
+    prefix. The location keys are offsets from each bone's own rest, so
+    they serve as they are."""
+    copy = action.copy()
+    copy.name = action.name + suffix
+    for fcurve in c.action_fcurves(copy):
+        fcurve.data_path = fcurve.data_path.replace('pose.bones["', f'pose.bones["{prefix}')
+    return copy
+
+
+def _stance(rig, idle):
+    """The pose every clip blends in from and out to: the preset idle's
+    first frame, sampled."""
+    return c.sample_poses(rig, idle, idle.frame_range[0], 1)[0]
+
+
+def _bump(u):
+    """The strike dash: 0 until the contact window opens, a sine to the
+    strike's peak, and back to 0 at the clip's end."""
+    if u <= DASH_FROM:
+        return 0.0
+    return math.sin(math.pi * (u - DASH_FROM) / (1.0 - DASH_FROM))
+
+
+def _spin(u):
+    """The spin strike's yaw: one full turn, eased, from SPIN_FROM to the
+    dash's peak, so the hero faces the Rival again as the fist lands."""
+    peak = DASH_FROM + (1.0 - DASH_FROM) / 2.0
+    return 2.0 * math.pi * mocap._smooth((u - SPIN_FROM) / (peak - SPIN_FROM))
+
+
+def _fit_clip(rig, action, name, spec, stance, prefix):
+    """The window of a preset that the game plays, blended to the stance,
+    with the strike's root motion added; the source action goes."""
+    root, hip = prefix + "root", prefix + "Hip"
+    start, end = spec["window"]
+    blend_in, blend_out = spec["blend"]
+    count = int(round((end - start) * c.FPS)) + 1
+    frames = c.sample_poses(rig, action, action.frame_range[0] + start * c.FPS, count)
+    rest = rig.data.bones[root].matrix_local.to_3x3()
+    rest_inv = rest.inverted()
+    hip_forward = rig.data.bones[hip].matrix_local.to_3x3().inverted() @ FORWARD
+    hip_home = stance[hip][3].to_translation()
+    keys = {bone: [] for bone in frames[0]}
+    for i, sampled in enumerate(frames):
+        u = i / (count - 1)
+        weight = min(mocap._ramp(u, blend_in), mocap._ramp(1.0 - u, blend_out))
+        pose = c.blend_poses(stance, sampled, weight)
+        loc, quat, scale, _ = pose[root]
+        bump = _bump(u)
+        turn = 0.0
+        if spec.get("face"):
+            # The hips' heading as sampled (the source turns the body) is
+            # taken off the root.
+            ahead = sampled[hip][3].to_3x3() @ hip_forward
+            turn -= math.atan2(ahead.x, -ahead.y) * weight
+        if spec.get("aim"):
+            turn += math.radians(spec["aim"]) * bump
+        if spec.get("spin"):
+            turn += _spin(u)
+        yaw = Matrix.Rotation(turn, 3, "Z")
+        # The root's travel: the dash and the lift, less the hips' sideways
+        # travel once turned (a sidestep in the source, or the turn's swing).
+        travel = FORWARD * spec.get("dash", 0.0) * bump + UP * spec.get("lift", 0.0) * bump
+        hip_here = yaw @ sampled[hip][3].to_translation()
+        travel.x -= (hip_here.x - hip_home.x) * weight
+        loc = loc + rest_inv @ travel
+        if turn:
+            quat = (rest_inv @ yaw @ rest).to_quaternion() @ quat
+        pose[root] = (loc, quat, scale, None)
+        for bone, (loc, quat, scale, _) in pose.items():
+            keys[bone].append((i, {"loc": tuple(loc), "quat": tuple(quat), "scale": tuple(scale)}))
+    bpy.data.actions.remove(action)
+    c.add_clip(rig, name, count - 1, keys)
+
+
+def stance(rig):
+    """The pose the HY-Motion clips blend in from and out to, as mocap
+    wants it: Idle's first frame, {bone: {"quat", "loc"}} in each bone's
+    own rest frame. On a baked hero.blend (motion_score.py) Idle is the
+    HY-Motion idle, which starts in this same stance."""
+    rig.animation_data_create()
+    idle = bpy.data.actions["Idle"]
+    first = c.sample_poses(rig, idle, idle.frame_range[0], 1)[0]
+    return {bone: {"quat": quat, "loc": loc} for bone, (loc, quat, _, _) in first.items()}
+
+
+def _clips(rigs, brief, scale):
+    """Idle and the reactions from HY-Motion, the strikes and the Blast
+    from the presets, on every rig, each on its own muted NLA track
+    (common.add_clip). The girl's clips carry her suffix; the bake merges
+    them into the boy's."""
+    boy = rigs["BodyBoy"]
+    presets = _load_clips(boy, brief, scale)
+    per_rig = {"BodyBoy": presets}
+    for body, prefix in BODIES.items():
+        if prefix:
+            per_rig[body] = {name: _prefixed_copy(action, prefix, "-" + body) for name, action in presets.items()}
+    for body, actions in per_rig.items():
+        rig, prefix = rigs[body], BODIES[body]
+        suffix = "" if not prefix else "-" + body
+        rest = _stance(rig, actions.pop("Idle"))
+        for name, spec in PRESETS.items():
+            _fit_clip(rig, actions.pop(name), name + suffix, spec, rest, prefix)
+        for action in actions.values():
+            bpy.data.actions.remove(action)
+        mocap_rest = {bone: {"quat": quat, "loc": loc} for bone, (loc, quat, _, _) in rest.items()}
+        for name in HY_CLIPS:
+            mocap.hy_clip(rig, name + suffix, name.lower(), mocap_rest, scheme(prefix))
+    for action in list(bpy.data.actions):
+        if action.name.startswith("Preset"):
+            bpy.data.actions.remove(action)
+
+
+# ---------------------------------------------------------------- regions and textures
+
+
+def _on_bone(mesh, name):
+    """Which vertices a bone carries most of."""
+    index = mesh.vertex_groups[name].index
+    on = np.zeros(len(mesh.data.vertices), dtype=bool)
+    for v in mesh.data.vertices:
+        on[v.index] = sum(g.weight for g in v.groups if g.group == index) > 0.5
+    return on
+
+
+def _head_polygons(mesh, labels, prefix):
+    """The head's front faces: the face layer. Every corner on the head
+    bone, the face turned forward, skin (not a collar), and not the crown."""
+    on_head = _on_bone(mesh, prefix + "head")
+    zs = [v.co.z for v in mesh.data.vertices if on_head[v.index]]
+    top, bottom = max(zs), min(zs)
+    crown = top - 0.15 * (top - bottom)
+    polys = []
+    for poly in mesh.data.polygons:
+        if labels[poly.index] != regions.SKIN or not all(on_head[i] for i in poly.vertices):
+            continue
+        if poly.normal.dot(FORWARD) < 0.15 or poly.center.z > crown:
+            continue
+        polys.append(poly.index)
+    return polys
+
+
+def _uv_raster(mesh, polys, size):
+    """Which texels of a size x size image the polygons' UVs cover."""
+    uv = mesh.data.uv_layers.active.data
+    inside = np.zeros((size, size), dtype=bool)
+    for index in polys:
+        poly = mesh.data.polygons[index]
+        pts = np.array([uv[li].uv[:] for li in poly.loop_indices]) % 1.0 * (size - 1)
+        x0, y0 = np.floor(pts.min(axis=0)).astype(int)
+        x1, y1 = np.ceil(pts.max(axis=0)).astype(int)
+        if x1 <= x0 or y1 <= y0:
+            continue
+        xs, ys = np.meshgrid(np.arange(x0, x1 + 1), np.arange(y0, y1 + 1))
+        (ax, ay), (bx, by), (cx, cy) = pts
+        det = (bx - ax) * (cy - ay) - (cx - ax) * (by - ay)
+        if abs(det) < 1e-9:
+            continue
+        w0 = ((bx - xs) * (cy - ys) - (cx - xs) * (by - ys)) / det
+        w1 = ((cx - xs) * (ay - ys) - (ax - xs) * (cy - ys)) / det
+        w2 = 1.0 - w0 - w1
+        hit = (w0 >= -0.002) & (w1 >= -0.002) & (w2 >= -0.002)
+        inside[ys[hit], xs[hit]] = True
+    return inside
+
+
+def _pixels(image):
+    width, height = image.size
+    px = np.empty(width * height * 4, dtype=np.float32)
+    image.pixels.foreach_get(px)
+    return px.reshape(height, width, 4)
+
+
+def _smoothstep(x):
+    x = np.clip(x, 0.0, 1.0)
+    return x * x * (3.0 - 2.0 * x)
+
+
+def _features(rgb, skin):
+    """How much each texel differs from the skin: 0 on skin, 1 on a
+    painted feature. Three kinds count: the white of an eye (no hue, and
+    bright), a dark brow, lash, or pupil (much darker than the skin), and
+    a colour of another hue than the skin (an iris, a lip). The skin's own
+    shading, darker or more saturated but of the same hue, does not."""
+    hue, sat, val = regions._hsv(rgb)
+    skin_hue, skin_sat, skin_val = (float(x) for x in regions._hsv(skin))
+    white = _smoothstep((0.2 - sat) / 0.1) * _smoothstep((val / max(skin_val, 1e-3) - 0.55) / 0.2)
+    dark = _smoothstep((0.4 - val / max(skin_val, 1e-3)) / 0.15)
+    away = np.abs((hue - skin_hue + 180.0) % 360.0 - 180.0)
+    other = _smoothstep((away - 22.0) / 15.0) * _smoothstep((sat - 0.2) / 0.15)
+    return np.maximum(np.maximum(white, dark), other).astype(np.float32)
+
+
+def _grow(mask, radius):
+    out = mask.copy()
+    for _ in range(radius):
+        grown = out.copy()
+        grown[1:] |= out[:-1]
+        grown[:-1] |= out[1:]
+        grown[:, 1:] |= out[:, :-1]
+        grown[:, :-1] |= out[:, 1:]
+        out = grown
+    return out
+
+
+def _shrink(mask, radius):
+    return ~_grow(~mask, radius)
+
+
+def _iris(rgb, alpha):
+    """The iris: the painted eye's coloured or dark middle, ringed by the
+    white of the eye. The whites are the bright, unsaturated features;
+    closing them fills the hole the iris leaves; the pupil stays dark."""
+    luma = rgb @ regions.LUMA
+    sat = 1.0 - rgb.min(axis=-1) / np.maximum(rgb.max(axis=-1), 1e-3)
+    white = (alpha > 0.5) & (luma > 0.55) & (sat < 0.25)
+    radius = max(2, rgb.shape[0] // 40)
+    eye = _shrink(_grow(white, radius), radius)
+    inside = eye & ~white & (alpha > 0.3)
+    keep = _smoothstep((luma - 0.08) / 0.2)
+    return np.where(inside, alpha * keep, 0.0).astype(np.float32)
+
+
+def _face_layer(body, polys, source, into, half):
+    """The face layer of a body: the head's front faces as their own
+    object, the painted face baked onto their own UVs. Returns the object
+    (its UVs in the given half of the face atlas) and the baked pixels."""
+    bm = bmesh.new()
+    bm.from_mesh(body.data)
+    bm.faces.ensure_lookup_table()
+    keep = set(polys)
+    bmesh.ops.delete(bm, geom=[f for f in bm.faces if f.index not in keep], context="FACES")
+    mesh = bpy.data.meshes.new("Face")
+    bm.to_mesh(mesh)
+    bm.free()
+    face = bpy.data.objects.new("Face", mesh)
+    bpy.context.scene.collection.objects.link(face)
+    for group in body.vertex_groups:
+        face.vertex_groups.new(name=group.name)
+    # Bake the source through the original UVs into the layer's own UVs.
+    bpy.ops.object.select_all(action="DESELECT")
+    face.select_set(True)
+    bpy.context.view_layer.objects.active = face
+    face.data.uv_layers.new(name="FaceUV")
+    face.data.uv_layers["FaceUV"].active = True
+    bpy.ops.object.mode_set(mode="EDIT")
+    bpy.ops.mesh.select_all(action="SELECT")
+    bpy.ops.uv.smart_project(angle_limit=math.radians(60), island_margin=0.02, rotate_method="AXIS_ALIGNED_Y")
+    bpy.ops.uv.pack_islands(margin=0.01, rotate=False)
+    bpy.ops.object.mode_set(mode="OBJECT")
+    face.data.uv_layers["FaceUV"].active_render = True
+    mat = bpy.data.materials.new("FaceBake")
+    mat.use_nodes = True
+    nt = mat.node_tree
+    for node in list(nt.nodes):
+        nt.nodes.remove(node)
+    out = nt.nodes.new("ShaderNodeOutputMaterial")
+    emit = nt.nodes.new("ShaderNodeEmission")
+    tex = nt.nodes.new("ShaderNodeTexImage")
+    tex.image = source
+    uv = nt.nodes.new("ShaderNodeUVMap")
+    uv.uv_map = "UVMap"
+    nt.links.new(uv.outputs["UV"], tex.inputs["Vector"])
+    nt.links.new(tex.outputs["Color"], emit.inputs["Color"])
+    nt.links.new(emit.outputs["Emission"], out.inputs["Surface"])
+    target = nt.nodes.new("ShaderNodeTexImage")
+    target.image = into
+    nt.nodes.active = target
+    face.data.materials.append(mat)
+    bpy.ops.object.bake(type="EMIT", margin=4, use_clear=False)
+    baked = _pixels(into)
+    bpy.data.materials.remove(mat)
+    face.data.materials.clear()
+    # The layer's UVs go into their half of the atlas; the original UVs go.
+    face.data.uv_layers["UVMap"].active = True
+    data = face.data.uv_layers["FaceUV"].data
+    packed = face.data.uv_layers["UVMap"].data
+    for i in range(len(data)):
+        u, v = data[i].uv
+        packed[i].uv = (0.5 * half + 0.5 * u, v)
+    face.data.uv_layers.remove(face.data.uv_layers["FaceUV"])
+    return face, baked
+
+
+def _lift(obj, distance):
+    """Push a layer off the skin along its normals."""
+    bm = bmesh.new()
+    bm.from_mesh(obj.data)
+    bm.normal_update()
+    for v in bm.verts:
+        v.co += v.normal * distance
+    bm.to_mesh(obj.data)
+    bm.free()
+
+
+def _merge(body, layer, material):
+    """Add a layer's faces to the body, wearing the material."""
+    body.data.materials.append(material)
+    slot = len(body.data.materials) - 1
+    bm = bmesh.new()
+    bm.from_mesh(body.data)
+    before = len(bm.faces)
+    bm.from_mesh(layer.data)
+    bm.faces.ensure_lookup_table()
+    for face in bm.faces[before:]:
+        face.material_index = slot
+    bm.to_mesh(body.data)
+    bm.free()
+    c.remove(layer)
+
+
+def _median_color(px, inside):
+    return np.median(px[inside][:, :3], axis=0).astype(np.float32)
+
+
+def _dress_body(body, prefix, half, face_source, atlas, face_atlas, iris_atlas):
+    """One body: its tint regions and gray texture into the atlas, its
+    face layers baked, its UVs into its half of the atlas. The faces keep
+    their region as the material index; the caller adds the materials."""
+    labels = regions.classify(body)
+    print(f"REGIONS {body.name}: {regions.histogram(labels)}")
+    image = regions.base_color_image(body)
+    polys = _head_polygons(body, labels, prefix)
+
+    # The skin's colour, read where the face is, from the face's source.
+    small = face_source.copy()
+    small.scale(BODY_TEXTURE, BODY_TEXTURE)
+    inside = _uv_raster(body, polys, BODY_TEXTURE)
+    skin = _median_color(_pixels(small), inside)
+    bpy.data.images.remove(small)
+
+    # The face layers: baked from the source, the features cut out by
+    # colour, the iris found inside the whites.
+    baked_image = bpy.data.images.new(f"{body.name}FaceBake", FACE_TEXTURE, FACE_TEXTURE, alpha=True)
+    baked_image.colorspace_settings.name = "sRGB"
+    fill = np.tile(np.append(skin, 1.0), (FACE_TEXTURE * FACE_TEXTURE, 1)).astype(np.float32)
+    baked_image.pixels.foreach_set(fill.ravel())
+    face, baked = _face_layer(body, polys, face_source, baked_image, half)
+    bpy.data.images.remove(baked_image)
+    rgb = baked[:, :, :3]
+    alpha = _features(rgb, skin)
+    iris = _iris(rgb, alpha)
+    print(f"FACE {body.name}: features {float((alpha > 0.5).mean()):.3f} of the layer, iris {float((iris > 0.5).mean()):.4f}")
+    x0 = half * FACE_TEXTURE
+    face_atlas[:, x0 : x0 + FACE_TEXTURE, :3] = rgb
+    face_atlas[:, x0 : x0 + FACE_TEXTURE, 3] = alpha
+    iris_atlas[:, x0 : x0 + FACE_TEXTURE, :3] = 1.0
+    iris_atlas[:, x0 : x0 + FACE_TEXTURE, 3] = iris
+    iris_layer = face.copy()
+    iris_layer.data = face.data.copy()
+    bpy.context.scene.collection.objects.link(iris_layer)
+    _lift(face, FACE_LIFT)
+    _lift(iris_layer, IRIS_LIFT)
+
+    # The body's texture: gray, the painted face filled with skin, into
+    # its half of the atlas; the faces sorted into the tint materials.
+    image.scale(BODY_TEXTURE, BODY_TEXTURE)
+    body_px = _pixels(image)
+    features = _features(body_px[:, :, :3], _median_color(body_px, inside)) * inside
+    means = regions.normalize(image, fill=features)
+    print(f"TEXTURE {body.name}: region means before {means}")
+    x0 = half * BODY_TEXTURE
+    atlas[:, x0 : x0 + BODY_TEXTURE] = _pixels(image)
+    for other in list(body.data.materials):
+        if other is not None:
+            bpy.data.materials.remove(other)
+    body.data.materials.clear()
+    body.data.polygons.foreach_set("material_index", labels.astype(np.int32))
+    uv = body.data.uv_layers.active.data
+    for i in range(len(uv)):
+        u, v = uv[i].uv
+        uv[i].uv = (0.5 * half + 0.5 * (u % 1.0), v)
+    body.data.update()
+    return face, iris_layer
+
+
+def _atlas_image(name, width, height, pixels, alpha=True):
+    image = bpy.data.images.new(name, width, height, alpha=alpha)
+    image.colorspace_settings.name = "sRGB"
+    image.pixels.foreach_set(pixels.ravel())
+    image.update()
+    # Packed, so the saved .blend shows it (a generated image is not saved).
+    image.pack()
+    return image
+
+
+# ---------------------------------------------------------------- hair
 
 
 def hair_name(style, length):
@@ -196,18 +670,35 @@ def hair_name(style, length):
     return f"Hair_{style}_{length}"
 
 
-def build_hair(style, long, part):
+def mane_name(mane):
+    """The mesh name for a shared mane: Hair_mane_wild…"""
+    return f"Hair_mane_{mane}"
+
+
+def _hair_fit(body, prefix):
+    """Where the scripted hair goes on this skull, and how big: the pivot
+    in three.js hero space, and the scale from the scripted skull."""
+    on_head = _on_bone(body, prefix + "head")
+    heads = [v.co for v in body.data.vertices if on_head[v.index]]
+    lo = Vector((min(p.x for p in heads), min(p.y for p in heads), min(p.z for p in heads)))
+    hi = Vector((max(p.x for p in heads), max(p.y for p in heads), max(p.z for p in heads)))
+    centre = (lo + hi) / 2
+    scale = min(1.0, max(0.6, (hi.x - lo.x) / SCRIPTED_SKULL))
+    pivot = TO_THREE @ centre - Vector((0.0, SCRIPTED_SKULL_LIFT * scale, 0.0))
+    print(f"HAIR FIT {body.name}: skull {hi.x - lo.x:.3f} wide, {hi.z - lo.z:.3f} tall; scale {scale:.2f}, pivot {tuple(round(v, 3) for v in pivot)}")
+    return tuple(pivot), scale
+
+
+def build_hair(style, long, part, pivot, k):
     """One Hair Style, carried over from the code-built hair: spikes and caps
-    placed from the head pivot in three.js hero space."""
-    pivot = PIVOTS["hair"][:3]
+    placed from the hair pivot in three.js hero space, scaled by k."""
 
     def spike(x, y, z, tilt_x, tilt_z, radius=0.14, height=0.55):
-        part(c.hair_cone("Spike", pivot, x, y, z, tilt_x, tilt_z, radius, height), "hair", "hair")
+        part(c.hair_cone("Spike", pivot, x * k, y * k, z * k, tilt_x, tilt_z, radius * k, height * k))
 
     def cap(radius_scale, flatten, y):
         px, py, pz = pivot
-        cap_obj = c.sphere("Cap", 0.37 * radius_scale, P(px, py + y, pz), scale=(1.0, 1.0, flatten), segments=24, rings=14)
-        part(cap_obj, "hair", "hair")
+        part(c.sphere("Cap", 0.37 * k * radius_scale, c.three_point(px, py + y * k, pz), scale=(1.0, 1.0, flatten), segments=24, rings=14))
 
     if style == "spiky":
         spike(0, 0.74, 0, 0, 0)
@@ -251,22 +742,16 @@ def build_hair(style, long, part):
         spike(-0.12, 0.38, 0.27, -1.2, 0.3, 0.07, 0.18)
 
 
-def mane_name(mane):
-    """The mesh name for a shared mane: Hair_mane_wild…"""
-    return f"Hair_mane_{mane}"
-
-
-def build_mane(mane, part):
+def build_mane(mane, part, pivot, k):
     """A Form's shared mane: original shapes, bigger than any Hair Style, so
-    the ascension reads at a glance. Fits both bodies (same hair bone)."""
-    pivot = PIVOTS["hair"][:3]
+    the ascension reads at a glance."""
 
     def spike(x, y, z, tilt_x, tilt_z, radius=0.14, height=0.55):
-        part(c.hair_cone("Mane", pivot, x, y, z, tilt_x, tilt_z, radius, height), "hair", "hair")
+        part(c.hair_cone("Mane", pivot, x * k, y * k, z * k, tilt_x, tilt_z, radius * k, height * k))
 
     def cap(radius_scale, flatten, y, z=0.0):
         px, py, pz = pivot
-        part(c.sphere("ManeCap", 0.37 * radius_scale, P(px, py + y, pz + z), scale=(1.0, 1.0, flatten), segments=24, rings=14), "hair", "hair")
+        part(c.sphere("ManeCap", 0.37 * k * radius_scale, c.three_point(px, py + y * k, pz + z * k), scale=(1.0, 1.0, flatten), segments=24, rings=14))
 
     if mane == "wild":
         # A huge spiked mane: a crown of spikes, then long ones sweeping back
@@ -302,8 +787,7 @@ def build_mane(mane, part):
                 if z > 0.18:
                     continue  # the face stays clear
                 px, py, pz = pivot
-                petal = c.sphere("Petal", 0.15, P(px + x, py + height, pz + z), segments=16, rings=10)
-                part(petal, "hair", "hair")
+                part(c.sphere("Petal", 0.15 * k, c.three_point(px + x * k, py + height * k, pz + z * k), segments=16, rings=10))
     else:  # legend
         # A tall crown of upright flame spikes, and long spikes behind.
         for i in range(9):
@@ -316,197 +800,182 @@ def build_mane(mane, part):
             spike(side * 0.33, 0.42, 0.02, 0.05, -side * 1.0, 0.1, 0.55)
 
 
-# ---------------------------------------------------------------- clips
-#
-# Poses in three.js joint terms (the rotations reactions.ts used to write),
-# turned into quaternions by common.three_rotation. 24 frames a second.
+def _hair_pieces(rigs, bodies):
+    """The scripted Hair Styles and manes on each body's hair bone: one
+    set per body, painted into one atlas, inked, split into one piece per
+    name and body, each rigid on its bone."""
+    hair_material = c.paint_material("Hair", HAIR, grain=0.2, edge=0.35, crevice=0.4, top=0.3, stroke_scale=14.0)
+    parts = []
+    tag = {"part": None, "bone": None}
+
+    def part(obj):
+        obj["bone"] = tag["bone"]
+        obj["part"] = tag["part"]
+        parts.append(c.assign(obj, hair_material))
+        return obj
+
+    names = []
+    for body_name, prefix in BODIES.items():
+        pivot, k = _hair_fit(bodies[body_name], prefix)
+        tag["bone"] = prefix + "hair"
+        for style in HAIR_STYLES:
+            for length in HAIR_LENGTHS:
+                tag["part"] = piece_name(hair_name(style, length), body_name)
+                names.append((tag["part"], body_name))
+                build_hair(style, length == "long", part, pivot, k)
+        for mane in MANES:
+            tag["part"] = piece_name(mane_name(mane), body_name)
+            names.append((tag["part"], body_name))
+            build_mane(mane, part, pivot, k)
+    hair = c.join("HeroHair", parts)
+    c.bake_painted(hair, size=HAIR_TEXTURE, regions={"Hair": "Hair"}).pack()
+    c.add_ink_hull(hair, INK_WIDTH)
+    pieces = [(c.split_group(hair, name, name, center=False), body_name) for name, body_name in names]
+    c.remove(hair)
+    for piece, body_name in pieces:
+        for name, _ in names:
+            group = piece.vertex_groups.get(name)
+            if group is not None:
+                piece.vertex_groups.remove(group)
+        piece.parent = rigs[body_name]
+        piece.modifiers.new("Rig", "ARMATURE").object = rigs[body_name]
 
 
-FPS = 24
-
-# The guard stance (the renderer posed it in code before these clips):
-# left foot forward, knees soft, fists raised. Rotations in three.js joint
-# terms, as reactions.ts wrote them.
-STANCE = {
-    "torso": (0.06, 0.0, 0.0),
-    "head": (-0.04, 0.0, 0.0),
-    "armL": (-0.55, 0.0, 0.3),
-    "armR": (-0.55, 0.0, -0.3),
-    "elbowL": (-1.55, 0.0, 0.0),
-    "elbowR": (-1.55, 0.0, 0.0),
-    "legL": (-0.22, 0.0, 0.0),
-    "legR": (0.26, 0.0, 0.0),
-    "kneeL": (0.38, 0.0, 0.0),
-    "kneeR": (0.34, 0.0, 0.0),
-}
+# ---------------------------------------------------------------- the rig for the renderer
 
 
-class Pose:
-    """One frame's pose: the stance, then overrides. The root carries the
-    moves the renderer used to make with the whole hero: loc (x, up,
-    forward), rot, and a squash-and-stretch scale."""
-
-    def __init__(self):
-        self.rot = {bone: list(r) for bone, r in STANCE.items()}
-        self.loc = [0.0, 0.0, 0.0]
-        self.root_rot = [0.0, 0.0, 0.0]
-        self.scale = [1.0, 1.0, 1.0]
-
-    def set(self, bone, x=None, y=None, z=None):
-        r = self.rot[bone]
-        for i, v in enumerate((x, y, z)):
-            if v is not None:
-                r[i] = v
-
-    def squash(self, amount):
-        """amount > 0 squashes (shorter, wider); < 0 stretches."""
-        self.scale = [1 + amount * 0.5, 1 - amount, 1 + amount * 0.5]
-
-    def keys(self):
-        out = {bone: {"rot": tuple(r)} for bone, r in self.rot.items()}
-        out["root"] = {"loc": tuple(self.loc), "rot": tuple(self.root_rot), "scale": tuple(self.scale)}
-        return out
+def _rounded(v):
+    return [round(float(x), 4) + 0.0 for x in v]
 
 
-def sampled_clip(rig, name, seconds, pose_at):
-    """Key every frame of pose_at(t) for t in 0..1: the clip plays exactly
-    the curve the renderer used to compute, now baked into the model."""
-    frames = max(1, round(seconds * FPS))
-    keys = {}
-    for f in range(frames + 1):
-        for bone, pose in pose_at(f / frames).keys().items():
-            keys.setdefault(bone, []).append((f, pose))
-    c.add_clip(rig, name, frames, keys)
+def strike_offsets(rig, prefix=""):
+    """The fist and boot centres in their joint's rest frame: the middle
+    of the hand or foot bone. A bone's frame keeps its coordinates in
+    three.js (the exporter turns the frame's axes, see _write_rig_json),
+    so these serve the renderer as they are."""
+    out = {}
+    for joint, tip in STRIKES:
+        bone = rig.data.bones[prefix + tip]
+        middle = (bone.head_local + bone.tail_local) / 2
+        out[prefix + joint] = rig.data.bones[prefix + joint].matrix_local.inverted() @ middle
+    return out
 
 
-ATTACK_ANTICIPATION = 0.12
-ATTACK_STRIKE = 0.55
-# The dash-in: how far forward the root travels at the strike's peak. The
-# hero stands 4.8 m from the Rival (renderer/constants.ts), and a
-# fist or boot must enter the Rival's hurtbox (src/scene/Rival.tsx)
-# for the strike to land on contact (ADR 0009).
-DASH = (3.5, 3.75, 4.0, 3.95)
+def _write_rig_json(rigs):
+    """The renderer's copy of each body's rig (baked output): the prefix
+    on its bone names, each joint's rest position and rotation in hero
+    space with its nearest named parent, and the strike offsets in each
+    joint's own frame.
+
+    The glTF exporter writes a bone's rest as its Blender rest with the
+    axis change applied after it (matrix_local @ axis_basis_change), and
+    the scene's change of basis before it; together they turn the bone's
+    axes into three.js axes: R_three = TO_THREE @ R_blender. An upright
+    bone of zero roll (the hair bone) rests at identity, as the scripted
+    hero's bones did.
+    """
+    named = set(JOINTS.values()) | {"hair"}
+    data = {
+        "about": "Baked output of scripts/blender/hero.py (ADR 0012): each body's rig at rest in three.js hero space. Do not edit by hand.",
+        "height": FIGHTER_HEIGHT,
+        "bodies": {},
+    }
+    for body_name, prefix in BODIES.items():
+        rig = rigs[body_name]
+        joints = {}
+        for name in [*JOINTS.values(), "hair"]:
+            bone = rig.data.bones[prefix + name]
+            parent = bone.parent
+            while parent is not None and parent.name[len(prefix) :] not in named:
+                parent = parent.parent
+            q = (TO_THREE @ bone.matrix_local.to_3x3()).to_quaternion()
+            joints[name] = {
+                "parent": parent.name[len(prefix) :] if parent else None,
+                "position": _rounded(TO_THREE @ bone.head_local),
+                "quaternion": _rounded((q.x, q.y, q.z, q.w)),
+            }
+        strikes = [
+            {"joint": joint[len(prefix) :], "offset": _rounded(offset)}
+            for joint, offset in strike_offsets(rig, prefix).items()
+        ]
+        data["bodies"][body_name] = {"prefix": prefix, "joints": joints, "strikes": strikes}
+    with open(RIG_JSON, "w", encoding="utf-8", newline="\n") as f:
+        json.dump(data, f, indent=2)
+        f.write("\n")
+    print(f"wrote {RIG_JSON}")
 
 
-def attack_pose(kind):
-    """The four strikes: an anticipation crouch, then the wind-up (w) and
-    the strike (s) that snaps out to the hit and settles home."""
-    total = ATTACK_ANTICIPATION + ATTACK_STRIKE
-
-    def pose_at(tc):
-        p = Pose()
-        t_abs = tc * total
-        if t_abs < ATTACK_ANTICIPATION:
-            k = t_abs / ATTACK_ANTICIPATION
-            p.loc[1] = -k * 0.16
-            p.squash(k * 0.08)
-            p.set("torso", x=0.06 + k * 0.3)
-            p.set("legL", x=-0.22 - k * 0.5)
-            p.set("legR", x=0.26 - k * 0.35)
-            p.set("kneeL", x=0.38 + k * 0.85)
-            p.set("kneeR", x=0.34 + k * 0.85)
-            p.set("armL", x=-0.55 - k * 0.4)
-            p.set("armR", x=-0.55 - k * 0.4)
-            return p
-        t = (t_abs - ATTACK_ANTICIPATION) / ATTACK_STRIKE
-        w = t / 0.3 if t < 0.3 else max(0.0, 1 - (t - 0.3) / 0.2)
-        s = 0.0 if t < 0.3 else math.sin(((t - 0.3) / 0.7) * math.pi)
-        # A little squash while coiled, a stretch into the strike.
-        p.squash(w * 0.05 - s * 0.07)
-        if kind == 0:  # dash punch: coil back, lunge in with a straight right
-            p.loc[2] = -w * 0.35 + s * DASH[0]
-            p.set("torso", s * 0.2, w * 0.5 - s * 0.55, 0)
-            p.set("armR", 0.6 * w - 1.62 * s, 0, -0.15)
-            p.set("elbowR", x=-1.55 + 1.5 * s)
-            p.set("armL", -0.4, 0, 0.35)
-        elif kind == 1:  # flying kick: crouch, launch, right leg pistons out
-            p.loc[2] = -w * 0.3 + s * DASH[1]
-            p.loc[1] = s * 0.9
-            p.set("torso", x=w * 0.3 - s * 0.55)
-            p.set("legR", x=0.4 * w - 1.5 * s)
-            p.set("kneeR", x=1.3 * w + 0.08)
-            p.set("legL", x=0.3)
-            p.set("kneeL", x=0.38 + 1.2 * s)
-            p.set("armL", 0.8 * s, 0, 0.5)
-            p.set("armR", 0.8 * s, 0, -0.5)
-        elif kind == 2:  # spin strike: wind opposite, whirl through with arms wide
-            p.loc[2] = -w * 0.3 + s * DASH[2]
-            # One full turn, eased so that at the strike's peak (t = 0.65) the
-            # hero has turned three quarters: an outflung fist then points at
-            # the Rival (a backfist), not sideways past its hurtbox.
-            u = 0.0 if t < 0.3 else (t - 0.3) / 0.7
-            p.root_rot[1] = -w * 0.6 + (u + 0.25 * math.sin(math.pi * u)) * 2 * math.pi
-            p.set("torso", y=-w * 0.5)
-            p.set("armL", -0.2, 0, 0.3 + 1.1 * s)
-            p.set("armR", -0.2, 0, -0.3 - 1.1 * s)
-            p.set("elbowL", x=-1.55 + 1.4 * s)
-            p.set("elbowR", x=-1.55 + 1.4 * s)
-        else:  # rising uppercut: deep crouch, then the fist drives skyward
-            p.loc[2] = s * DASH[3]
-            p.loc[1] = -w * 0.22 + s * 1.2
-            p.set("torso", x=w * 0.45 - s * 0.3)
-            p.set("legL", x=-0.22 - w * 0.5)
-            p.set("legR", x=0.26 - w * 0.3 - s * 0.7)
-            p.set("kneeL", x=0.38 + w * 0.9)
-            p.set("kneeR", x=0.34 + w * 0.9)
-            p.set("armR", 0.7 * w - 2.5 * s, 0, -0.1)
-            p.set("elbowR", x=-1.0 + 0.9 * s)
-            p.set("armL", x=-0.3 + s * 0.5)
-        return p
-
-    return pose_at
+# ---------------------------------------------------------------- build
 
 
-def stance():
-    """The fighting stance as {bone: three.js Euler}: mocap clips blend
-    from it and back to it, so Idle takes over without a pop."""
-    return {bone: pose["rot"] for bone, pose in Pose().keys().items()}
+def build():
+    with open(os.path.join(SOURCES, "models.json"), encoding="utf-8") as f:
+        briefs = json.load(f)["models"]
+    boy_brief, girl_brief = briefs["hero-boy"], briefs["hero-girl"]
 
+    rig, boy = _import_body(boy_brief)
+    rig_girl, girl = _import_body(girl_brief)
+    boy.name = boy.data.name = "BodyBoy"
+    girl.name = girl.data.name = "BodyGirl"
+    rigs = {"BodyBoy": rig, "BodyGirl": rig_girl}
+    bodies = {"BodyBoy": boy, "BodyGirl": girl}
+    matrix, scale = _hero_space(rig, boy)
+    _transform(rig, boy, matrix)
+    _transform(rig_girl, girl, _hero_space(rig_girl, girl)[0])
+    _compare_rigs(rig, rig_girl)
+    for body_name, prefix in BODIES.items():
+        _rename_bones(rigs[body_name], bodies[body_name], prefix)
+    # The girl's own preset idle is not used: the boy's clips serve both.
+    for track in list(rig_girl.animation_data.nla_tracks):
+        rig_girl.animation_data.nla_tracks.remove(track)
+    bpy.data.actions.remove(rig_girl.animation_data.action)
+    rig.name = "HeroRig"
+    rig_girl.name = "GirlRig"
+    rig_girl.parent = rig
+    rig_girl.matrix_parent_inverse.identity()
 
-def blast_pose(t):
-    """A full-power blast: both fists drawn to one side, then both palms
-    thrust forward, the body leaning in, stretched long."""
-    p = Pose()
-    if t < 0.3:
-        k = math.sin(t / 0.3 * math.pi * 0.5)
-        p.squash(k * 0.08)
-        p.loc[1] = -k * 0.1
-        p.set("torso", y=-k * 0.6)
-        p.set("armL", -0.9 * k - 0.55 * (1 - k), 0, 0.3 - 0.5 * k)
-        p.set("armR", -0.9 * k - 0.55 * (1 - k), 0, -0.3 + 0.1 * k)
-        p.set("elbowL", x=-1.55 - 0.3 * k)
-        p.set("elbowR", x=-1.55 - 0.3 * k)
-        return p
-    k = min(1.0, (t - 0.3) / 0.15)
-    back = max(0.0, (t - 0.75) / 0.25)
-    out = k * (1 - back)
-    p.squash(-out * 0.08)
-    p.loc[2] = out * 0.3
-    p.set("torso", out * 0.25, -0.6 * (1 - k), 0)
-    p.set("armL", -1.55 * out - 0.55 * (1 - out), 0, 0.3 - 0.25 * out)
-    p.set("armR", -1.55 * out - 0.55 * (1 - out), 0, -0.3 + 0.25 * out)
-    p.set("elbowL", x=-1.55 * (1 - out))
-    p.set("elbowR", x=-1.55 * (1 - out))
-    p.set("legL", x=-0.22 - 0.3 * out)
-    p.set("kneeL", x=0.38 + 0.3 * out)
-    return p
+    # The girl's face: her retexture, the same UV layout. Only its
+    # base-color image stays.
+    added = c.import_glb(os.path.join(SOURCES, girl_brief["retexture"]["file"]))
+    retextured = next(o for o in added if o.type == "MESH")
+    girl_face = regions.base_color_image(retextured)
+    girl_face.use_fake_user = True
+    spare_materials = [m for m in retextured.data.materials if m is not None]
+    for obj in added:
+        data = obj.data
+        bpy.data.objects.remove(obj, do_unlink=True)
+        if data is not None and data.users == 0:
+            (bpy.data.meshes if isinstance(data, bpy.types.Mesh) else bpy.data.armatures).remove(data)
+    for material in spare_materials:
+        bpy.data.materials.remove(material)
 
+    atlas = np.zeros((BODY_TEXTURE, 2 * BODY_TEXTURE, 4), dtype=np.float32)
+    face_atlas = np.zeros((FACE_TEXTURE, 2 * FACE_TEXTURE, 4), dtype=np.float32)
+    iris_atlas = np.zeros((FACE_TEXTURE, 2 * FACE_TEXTURE, 4), dtype=np.float32)
+    layers = {}
+    sources = {"BodyBoy": regions.base_color_image(boy), "BodyGirl": girl_face}
+    for half, (body_name, prefix) in enumerate(BODIES.items()):
+        body = bodies[body_name]
+        layers[body_name] = _dress_body(body, prefix, half, sources[body_name], atlas, face_atlas, iris_atlas)
+    atlas_image = _atlas_image("HeroPainted", 2 * BODY_TEXTURE, BODY_TEXTURE, atlas, alpha=False)
+    materials = {name: c.painted_material(c.PAINTED + name, atlas_image) for name in regions.REGIONS}
+    for body in bodies.values():
+        for name in regions.REGIONS:
+            body.data.materials.append(materials[name])
+    face_material = c.painted_material("Face", _atlas_image("HeroFace", 2 * FACE_TEXTURE, FACE_TEXTURE, face_atlas), alpha=True)
+    iris_material = c.painted_material("Iris", _atlas_image("HeroIris", 2 * FACE_TEXTURE, FACE_TEXTURE, iris_atlas), alpha=True)
+    for other in list(bpy.data.images):
+        if other.users == 0 or other == girl_face:
+            bpy.data.images.remove(other)
 
-# The motion of Idle, Charge, Transform, Stagger, and Victory is HY-Motion's
-# (mocap.py, ADR 0010): each clip's brief and chosen candidate are in
-# sources/hy-motion/clips.json under the clip's name in lower case. Idle is
-# a relaxed guard that breathes; Charge powers up after the strike that
-# earns a new Form; Transform crouches and erupts in the Landmark scene;
-# Stagger stumbles back at a wrong answer; Victory punches a fist to the
-# sky on Results. Each blends from the stance and back to it.
-HY_CLIPS = ("Idle", "Stagger", "Transform", "Charge", "Victory")
+    # The ink hull first (the face layers are not inked), then the layers.
+    for body_name, body in bodies.items():
+        c.ink_hull_skinned(body, rigs[body_name], INK_WIDTH)
+        face, iris = layers[body_name]
+        _merge(body, face, face_material)
+        _merge(body, iris, iris_material)
 
-
-def add_clips(rig):
-    """Idle loops; every other clip plays once, started by an effect
-    (ADR 0003)."""
-    for kind in range(4):
-        sampled_clip(rig, f"Attack{kind}", ATTACK_ANTICIPATION + ATTACK_STRIKE, attack_pose(kind))
-    sampled_clip(rig, "Blast", 0.8, blast_pose)
-    for name in HY_CLIPS:
-        mocap.hy_clip(rig, name, name.lower(), stance())
+    _hair_pieces(rigs, bodies)
+    _clips(rigs, boy_brief, scale)
+    _write_rig_json(rigs)
+    return rig

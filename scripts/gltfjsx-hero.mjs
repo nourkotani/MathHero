@@ -7,8 +7,9 @@
 //    (git ignores build/).
 // 2. This script keeps gltfjsx's node types and mesh tree and applies the
 //    game's edits: the inlined model import, meshopt without Draco, the
-//    hero's tint materials and the baked ink, one `visible` per part from
-//    the director, bloom on the painted hair, and no frustum culling.
+//    hero's tint materials, the face layers and the baked ink, one
+//    `visible` per part from the director, bloom on the painted hair, and
+//    no frustum culling.
 // 3. Prettier formats the result into src/scene/models/HeroModel.tsx.
 
 import { spawnSync } from 'node:child_process';
@@ -22,13 +23,19 @@ const MODEL = 'src/renderer/models/hero.glb';
 const RAW = join(ROOT, 'build', 'gltfjsx', 'HeroModel.raw.tsx');
 const OUT = join(ROOT, 'src', 'scene', 'models', 'HeroModel.tsx');
 
-/** Blender's painted regions → the hero's tint materials (renderer/hero.ts). */
+/** Blender's painted regions → the hero's tint materials (renderer/hero.ts),
+ *  and the face layers (ADR 0012) → the layer materials. */
 const REGIONS = {
   PaintedOutfit: 'materials.body',
   PaintedSkin: 'materials.skin',
   PaintedTrim: 'materials.trim',
   PaintedHair: 'materials.hair',
+  Face: 'materials.face',
+  Iris: 'materials.iris',
 };
+/** The face layers draw after the body, the iris above the face. They
+ *  are light on the skin: no shadow, no ink. */
+const LAYERS = { Face: 1, Iris: 2 };
 
 mkdirSync(dirname(RAW), { recursive: true });
 const gltfjsx = spawnSync(
@@ -64,32 +71,39 @@ for (; end < lines.length; end++) {
   if (depth === 0) break;
 }
 
+// A body is a part on its own; a piece fitted to a body (hero.py
+// piece_name) is `<part>-<body>`, shown with that body. gltfjsx keys a
+// node with a hyphen in brackets: nodes['Hair_spiky_short-BodyBoy_1'].
 const tree = [];
 for (const line of lines.slice(start, end + 1)) {
-  const part = line.match(/^(\s*)<group name="((?:Body|Garment|Hair_)\w+)">$/);
-  if (part) {
-    tree.push(`${part[1]}<group name="${part[2]}" visible={show('${part[2]}')}>`);
+  const body = line.match(/^(\s*)<group name="(Body\w+)">$/);
+  if (body) {
+    tree.push(`${body[1]}<group name="${body[2]}" visible={show('${body[2]}')}>`);
+    continue;
+  }
+  const piece = line.match(/^(\s*)<group name="((?:Garment|Hair_)\w+)-(Body\w+)">$/);
+  if (piece) {
+    const [, indent, part, of] = piece;
+    tree.push(`${indent}<group name="${part}-${of}" visible={show('${part}', '${of}')}>`);
     continue;
   }
   const mesh = line.match(
-    /^(\s*)<skinnedMesh name="(\w+)" geometry=\{nodes\.\w+\.geometry\} material=\{materials\.(\w+)\} skeleton=\{nodes\.\w+\.skeleton\} \/>$/,
+    /^(\s*)<skinnedMesh name="([\w-]+)" geometry=\{(nodes(?:\.\w+|\['[\w-]+'\]))\.geometry\} material=\{materials\.(\w+)\} skeleton=\{nodes(?:\.\w+|\['[\w-]+'\])\.skeleton\} \/>$/,
   );
   if (!mesh) {
     tree.push(line);
     continue;
   }
-  const [, indent, name, material] = mesh;
-  const props = [
-    `name="${name}"`,
-    `geometry={nodes.${name}.geometry}`,
-    `skeleton={nodes.${name}.skeleton}`,
-  ];
+  const [, indent, name, node, material] = mesh;
+  const props = [`name="${name}"`, `geometry={${node}.geometry}`, `skeleton={${node}.skeleton}`];
   if (material === 'Ink') {
     props.push('material={ink}', 'userData={INK}');
   } else {
     const region = REGIONS[material];
     if (!region) throw new Error(`hero.glb has an unknown material: ${material}`);
-    props.push(`material={${region}}`, 'castShadow');
+    props.push(`material={${region}}`);
+    if (material in LAYERS) props.push(`renderOrder={${LAYERS[material]}}`);
+    else props.push('castShadow');
     if (material === 'PaintedHair') props.push('layers={BLOOM}');
   }
   props.push('frustumCulled={false}');
@@ -103,11 +117,11 @@ src/renderer/models/hero.glb, which gltfjsx turns into a component. Do not
 edit this file by hand (ADR 0007, ADR 0009); change the script and run it
 again after every re-bake of the hero.
 The script's edits: the inlined model import (no network), meshopt
-without Draco (no web worker), the hero's tint materials (renderer/hero.ts)
-and the ink of materials.ts in place of Blender's, one \`visible\` per part
-from the director's parts, bloom on the painted hair, no frustum culling
-(the attack clips carry the root 4 m), and the group ref from the parent
-(it drives useAnimations).
+without Draco (no web worker), the hero's tint materials and face layers
+(renderer/hero.ts) and the ink of materials.ts in place of Blender's, one
+\`visible\` per part from the director's parts, bloom on the painted hair,
+no frustum culling (the attack clips carry the root 4 m), and the group
+ref from the parent (it drives useAnimations).
 */
 
 import { useGLTF } from '@react-three/drei';
@@ -160,8 +174,10 @@ export function HeroModel({
   const clone = useMemo(() => SkeletonUtils.clone(scene), [scene]);
   const { nodes } = useGraph(clone) as unknown as GLTFResult;
   const ink = useMemo(() => bakedInkSurface(), []);
-  const show = (part: string) =>
-    part === parts.body || part === parts.garment || part === parts.hair;
+  // A piece fitted to one body (\`<part>-<body>\`) shows with that body.
+  const show = (part: string, of?: string) =>
+    (of === undefined || of === parts.body) &&
+    (part === parts.body || part === parts.garment || part === parts.hair);
   return (
     <group ref={groupRef} dispose={null}>
       <group name="Scene">

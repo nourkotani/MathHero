@@ -54,21 +54,6 @@ HY_CLIPS = {"Launch": "launch", "Recover": "recover"}
 PELVIS = mocap.TRIPO["bones"]["pelvis"]
 
 
-def _objects():
-    return set(bpy.context.scene.objects)
-
-
-def _import(path):
-    before = _objects()
-    bpy.ops.import_scene.gltf(filepath=path)
-    return _objects() - before
-
-
-def _height(meshes):
-    zs = [(m.matrix_world @ v.co).z for m in meshes for v in m.data.vertices]
-    return max(zs) - min(zs)
-
-
 def _painted_only(mesh):
     """Keep the base-color texture, at game size, in a "Painted" material."""
     mat = next(m for m in mesh.data.materials if m is not None)
@@ -92,69 +77,11 @@ def _painted_only(mesh):
             bpy.data.images.remove(other)
 
 
-def _ink_hull(mesh, rig, width):
-    """The inverted hull, applied with the operator so vertex weights stay.
-
-    common.add_ink_hull rebuilds the mesh, which drops the vertex groups; the
-    scripted models get their hull before they are rigged, this one after.
-    """
-    armatures = [m for m in mesh.modifiers if m.type == "ARMATURE"]
-    for mod in armatures:
-        mesh.modifiers.remove(mod)
-    mesh.data.materials.append(c.ink_material())
-    bpy.context.view_layer.objects.active = mesh
-    hull = mesh.modifiers.new("Ink", "SOLIDIFY")
-    hull.thickness = width
-    hull.offset = 1.0
-    hull.use_flip_normals = True
-    hull.use_rim = False
-    hull.use_even_offset = False
-    hull.material_offset = len(mesh.data.materials) - 1
-    bpy.ops.object.modifier_apply(modifier=hull.name)
-    skin = mesh.modifiers.new("Armature", "ARMATURE")
-    skin.object = rig
-
-
-def _play(rig, action):
-    rig.animation_data.action = action
-    if action.slots:
-        rig.animation_data.action_slot = action.slots[0]
-
-
-def _sample(rig, action, first, count):
-    """The pose of every bone at count frames from the source frame first:
-    [{bone: (location, quaternion, scale, pose matrix)}] as the action
-    plays them, plus the pelvis bone's world position per frame."""
-    scene = bpy.context.scene
-    _play(rig, action)
-    frames = []
-    for i in range(count):
-        f = first + i
-        scene.frame_set(int(f), subframe=f - int(f))
-        pose = {}
-        for pb in rig.pose.bones:
-            pose[pb.name] = (pb.location.copy(), pb.rotation_quaternion.copy(), pb.scale.copy(), pb.matrix.copy())
-        frames.append(pose)
-    rig.animation_data.action = None
-    return frames
-
-
-def _blend(pose, target, weight):
-    """Between two sampled poses: the rotation slerped, the rest lerped."""
-    out = {}
-    for bone, (loc, quat, scale, matrix) in pose.items():
-        t_loc, t_quat, t_scale, _ = target[bone]
-        if quat.dot(t_quat) < 0:
-            t_quat = -t_quat
-        out[bone] = (loc.lerp(t_loc, weight), quat.slerp(t_quat, weight), scale.lerp(t_scale, weight), matrix)
-    return out
-
-
 def _window(rig, action, spec, stance=None):
     """Replace a preset clip with the window of it the game plays."""
     start, end = spec["window"]
     count = int(round((end - start) * c.FPS)) + 1
-    frames = _sample(rig, action, action.frame_range[0] + start * c.FPS, count)
+    frames = c.sample_poses(rig, action, action.frame_range[0] + start * c.FPS, count)
     if spec.get("pin"):
         # Hold the pelvis where Idle keeps it: take its horizontal travel
         # out of its location, in the bone's own frame (its pose matrix
@@ -173,7 +100,7 @@ def _window(rig, action, spec, stance=None):
         for i in range(count):
             over = i - (count - 1 - span)
             if over > 0:
-                frames[i] = _blend(frames[i], target, mocap._smooth(over / span))
+                frames[i] = c.blend_poses(frames[i], target, mocap._smooth(over / span))
     name = action.name
     keys = {bone: [] for bone in frames[0]}
     for i, pose in enumerate(frames):
@@ -187,7 +114,7 @@ def _idle_start(rig):
     """Idle's first frame, sampled: the pose the Rival rests in."""
     rig.animation_data_create()
     idle = bpy.data.actions["Idle"]
-    return _sample(rig, idle, idle.frame_range[0], 1)[0]
+    return c.sample_poses(rig, idle, idle.frame_range[0], 1)[0]
 
 
 def stance(rig):
@@ -210,7 +137,7 @@ def _clips(rig, brief):
         if info.get("geometry"):
             action = rig.animation_data.action
         else:
-            added = _import(path)
+            added = c.import_glb(path)
             other = next(o for o in added if o.type == "ARMATURE")
             action = other.animation_data.action
             for obj in added:
@@ -222,7 +149,7 @@ def _clips(rig, brief):
             if clip == "Idle":
                 settle = _idle_start(rig)
             continue
-        _play(rig, action)
+        c.play_action(rig, action)
         track = rig.animation_data.nla_tracks.new()
         track.name = clip
         track.strips.new(clip, int(action.frame_range[0]), action)
@@ -237,18 +164,18 @@ def build():
     with open(os.path.join(SOURCES, "models.json"), encoding="utf-8") as f:
         brief = json.load(f)["models"]["fighter"]
     base = next(info for info in brief["clips"].values() if info.get("geometry"))
-    added = _import(os.path.join(SOURCES, base["file"]))
+    added = c.import_glb(os.path.join(SOURCES, base["file"]))
     rig = next(o for o in added if o.type == "ARMATURE")
     # The importer also adds an "Icosphere", its display shape for bones:
     # only the meshes the rig carries are the fighter.
     meshes = [o for o in added if o.type == "MESH" and o.parent == rig]
     for obj in added - {rig, *meshes}:
         bpy.data.objects.remove(obj, do_unlink=True)
-    width = HERO_INK * _height(meshes) / FIGHTER_HEIGHT
+    width = HERO_INK * c.mesh_height(meshes) / FIGHTER_HEIGHT
     for mesh in meshes:
         mesh.name = mesh.data.name = "Fighter"  # Tripo names it by task id
         _painted_only(mesh)
-        _ink_hull(mesh, rig, width)
+        c.ink_hull_skinned(mesh, rig, width)
     _clips(rig, brief)
     rig.name = "FighterRig"
     return rig
