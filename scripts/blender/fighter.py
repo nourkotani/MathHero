@@ -44,13 +44,18 @@ HERO_INK = 0.012  # hero.py INK_WIDTH, in game units
 #           the cross-fade to Idle never pops.
 #   pin:    the hips stay on Idle's spot; the swagger walks 2.5 m although
 #           the retarget asked for it in place (tripo.mjs --animate-in-place).
+#   center: the whole window moves onto the rest spot. Tripo's idle stands
+#           0.137 m to one side of it, and the hit clips start on it, so the
+#           Rival snapped sideways at every hit.
 WINDOWS = {
-    "Idle": {"window": (0.0, 4.0), "loop": 0.5},
+    "Idle": {"window": (0.0, 4.0), "loop": 0.5, "center": True},
     "Taunt": {"window": (0.0, 1.5), "settle": 0.3, "pin": True},
 }
 
-# The Rival's HY-Motion clips: the director's name and the brief's.
-HY_CLIPS = {"Launch": "launch", "Recover": "recover"}
+# The Rival's HY-Motion clips: the director's name and the brief's. The
+# preset Idle window stays only as the stance they blend from and to: the
+# HY-Motion idle replaces it (the preset stood almost still).
+HY_CLIPS = {"Idle": "rival-idle", "Launch": "launch", "Recover": "recover"}
 PELVIS = mocap.TRIPO["bones"]["pelvis"]
 
 
@@ -77,22 +82,32 @@ def _painted_only(mesh):
             bpy.data.images.remove(other)
 
 
+def _move_pelvis(pose, gone):
+    """Move the pelvis back by `gone` (armature space), in the bone's own
+    frame: its pose matrix without its own basis."""
+    loc, quat, scale, matrix = pose[PELVIS]
+    chain = matrix @ Matrix.LocRotScale(loc, quat, scale).inverted()
+    pose[PELVIS] = (loc - chain.to_3x3().inverted() @ gone, quat, scale, matrix)
+
+
 def _window(rig, action, spec, stance=None):
     """Replace a preset clip with the window of it the game plays."""
     start, end = spec["window"]
     count = int(round((end - start) * c.FPS)) + 1
     frames = c.sample_poses(rig, action, action.frame_range[0] + start * c.FPS, count)
+    if spec.get("center"):
+        # One offset for every frame: the sway stays, the spot moves.
+        offset = frames[0][PELVIS][3].to_translation() - rig.data.bones[PELVIS].head_local
+        offset.z = 0.0
+        for pose in frames:
+            _move_pelvis(pose, offset)
     if spec.get("pin"):
-        # Hold the pelvis where Idle keeps it: take its horizontal travel
-        # out of its location, in the bone's own frame (its pose matrix
-        # without its own basis).
+        # Hold the pelvis where Idle keeps it: take its horizontal travel out.
         home = (stance or frames[0])[PELVIS][3].to_translation()
         for pose in frames:
-            loc, quat, scale, matrix = pose[PELVIS]
-            gone = matrix.to_translation() - home
+            gone = pose[PELVIS][3].to_translation() - home
             gone.z = 0.0
-            chain = matrix @ Matrix.LocRotScale(loc, quat, scale).inverted()
-            pose[PELVIS] = (loc - chain.to_3x3().inverted() @ gone, quat, scale, matrix)
+            _move_pelvis(pose, gone)
     tail = spec.get("loop") or spec.get("settle") or 0.0
     target = frames[0] if "loop" in spec else stance
     if tail:
@@ -157,7 +172,17 @@ def _clips(rig, brief):
     rig.animation_data.action = None
     rest = stance(rig)
     for clip, name in HY_CLIPS.items():
+        _drop_clip(rig, clip)
         mocap.hy_clip(rig, clip, name, rest, mocap.TRIPO)
+
+
+def _drop_clip(rig, name):
+    """Remove a clip and its NLA track, so a HY-Motion clip can take its name."""
+    for track in list(rig.animation_data.nla_tracks):
+        if track.name == name:
+            rig.animation_data.nla_tracks.remove(track)
+    if name in bpy.data.actions:
+        bpy.data.actions.remove(bpy.data.actions[name])
 
 
 def build():

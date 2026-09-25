@@ -238,6 +238,47 @@
         "candidate": "p0s0",
         "by": "npm run motion (score -2.550), 2026-09-25"
       }
+    },
+    "rival-idle": {
+      "used_by": "fighter.py: the Rival's Idle clip (between cues; it loops). The Tripo idle preset stood almost still.",
+      "target": "fighter",
+      "prompts": [
+        "A martial artist waits in a confident fighting stance, bouncing lightly on the balls of the feet, rolling the shoulders and flexing the fists, ready to fight.",
+        "A fighter stands in a guard with both fists up, shifts weight from foot to foot, and nods the head with confidence.",
+        "A cocky fighter bounces in place in a loose boxing guard, breathing hard, eyes on the opponent."
+      ],
+      "frames": 120,
+      "samples": 4,
+      "master_seed": 20260932,
+      "window": [
+        0,
+        4
+      ],
+      "length": 4,
+      "blend": [
+        0.15,
+        0.25
+      ],
+      "travel": "pin",
+      "score": {
+        "motion": {
+          "target": 0.35,
+          "weight": 2
+        },
+        "air": {
+          "target": 0,
+          "weight": 2
+        },
+        "profile": -3,
+        "lean_fwd": -1,
+        "drift": -1
+      },
+      "note": "Livelier than the preset idle, which stood almost still (0.01-0.02 per frame). Blends from the stance and back to it, so it loops.",
+      "chosen": {
+        "file": "rival-idle.npz",
+        "candidate": "p1s1",
+        "by": "npm run motion (score -0.661), 2026-09-25"
+      }
     }
   }
 }
