@@ -36,6 +36,38 @@
         "candidate": "p2s2",
         "by": "npm run motion (score -3.540), 2026-09-24"
       }
+    },
+    "victory": {
+      "used_by": "hero.py: the Victory clip (Results)",
+      "prompts": [
+        "A young hero wins: hops up and punches one fist high into the sky, then lands in a proud fighting stance.",
+        "A cheerful fighter celebrates victory, jumps with both fists raised above the head, then stands tall and proud.",
+        "A martial artist raises a clenched fist triumphantly to the sky after a win, then settles into a confident ready stance."
+      ],
+      "frames": 60,
+      "samples": 4,
+      "master_seed": 20260926,
+      "window": [
+        0,
+        2
+      ],
+      "length": 1.6,
+      "score": {
+        "fist_high": 2,
+        "air": {
+          "target": 0.25,
+          "weight": 2
+        },
+        "lean_fwd": -2,
+        "drift": -1,
+        "motion": 0.2
+      },
+      "note": "No profile weight: Victory plays on Results, where the camera frames the hero from the side, so turning toward the camera celebrates toward the player.",
+      "chosen": {
+        "file": "victory.npz",
+        "candidate": "p0s3",
+        "by": "npm run motion (score 1.708), 2026-09-25"
+      }
     }
   }
 }

@@ -11,10 +11,11 @@ candidates, one row each, best on top). Run by scripts/motion.mjs.
 The measures, in the hero's space (it faces the Dummy along Blender -Y):
   reach    furthest a fist or boot gets toward the Dummy (m)
   back     furthest the root goes backward (m)
-  profile  mean turn of the torso away from the side view (rad)
+  profile  mean turn of the torso away from the side view, either way (rad)
   hunch    most the torso bends from upright, any way (rad)
   lean_back  most the torso leans back, away from the Dummy (rad)
   lean_fwd   most the torso bends forward, toward the Dummy (rad)
+  fist_high  most a fist rises above the head pivot (m)
   air      highest the root rises (m)
   drift    how far the root had to be eased back home (m)
   motion   mean speed of the fists and boots (m/s)
@@ -53,6 +54,7 @@ def measure(rig, action, drift):
     world = rig.matrix_world
     start, end = (int(v) for v in action.frame_range)
     reach = back = air = hunch = turn = travel = lean_back = lean_fwd = 0.0
+    fist_high = -math.inf
     last = None
     for f in range(start, end + 1):
         scene.frame_set(f)
@@ -71,6 +73,8 @@ def measure(rig, action, drift):
         lean_fwd = max(lean_fwd, lean)
         lean_back = max(lean_back, -lean)
         points = [world @ (bones[b].matrix @ Vector(off)) for b, off in STRIKE.items()]
+        head = world @ bones["head"].head
+        fist_high = max(fist_high, max(p.z for p in points[:2]) - head.z)  # the fists
         reach = max(reach, max(p.dot(FORWARD) for p in points))
         if last is not None:
             travel += sum((p - q).length for p, q in zip(points, last)) / len(points)
@@ -83,6 +87,7 @@ def measure(rig, action, drift):
         "hunch": hunch,
         "lean_back": lean_back,
         "lean_fwd": lean_fwd,
+        "fist_high": fist_high,
         "air": air,
         "drift": drift,
         "motion": travel * c.FPS / max(1, frames - 1),

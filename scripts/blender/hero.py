@@ -547,20 +547,9 @@ def blast_pose(t):
     return p
 
 
-def victory_pose(t):
-    """Results: a hop and a fist punched to the sky, then a proud stance."""
-    p = Pose()
-    hop = math.sin(min(1.0, t / 0.45) * math.pi)
-    up = min(1.0, t / 0.25)
-    p.loc[1] = hop * 0.35
-    p.squash(-hop * 0.06)
-    p.set("torso", x=0.06 - 0.15 * up)
-    p.set("head", x=-0.04 - 0.2 * up)
-    p.set("armR", -0.55 - 2.35 * up, 0, -0.3 + 0.1 * up)
-    p.set("elbowR", x=-1.55 + 1.35 * up)
-    p.set("armL", -0.2, 0, 0.55)
-    p.set("elbowL", x=-1.8)
-    return p
+# Results: a hop and a fist punched to the sky, then back to the guard. The
+# motion is HY-Motion's (mocap.py, ADR 0010): "victory" in
+# sources/hy-motion/clips.json.
 
 
 def add_clips(rig):
@@ -584,4 +573,4 @@ def add_clips(rig):
     sampled_clip(rig, "Transform", TRANSFORM, transform_pose)
     sampled_clip(rig, "Charge", 0.5, charge_pose)
     sampled_clip(rig, "Blast", 0.8, blast_pose)
-    sampled_clip(rig, "Victory", 1.2, victory_pose)
+    mocap.hy_clip(rig, "Victory", "victory", stance())

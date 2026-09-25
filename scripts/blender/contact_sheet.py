@@ -1,7 +1,9 @@
 """Render key frames of hero clips into one contact sheet (ADR 0010).
 
 One row per clip, seven frames across it, an orthographic side view that
-covers the dash toward the Training Dummy (-Y in Blender). Workbench
+covers the dash toward the Training Dummy (-Y in Blender). The camera sees
+the hero's right side, as the game's camera does, so the hero faces right
+toward the Dummy, as in the game. Workbench
 engine, flat colors per painted region, and the baked ink hulls removed:
 the sheet is for judging poses, not the look. It changes only the open
 session; nothing is saved.
@@ -50,8 +52,8 @@ def _prepare(scene):
     cam = bpy.data.objects.new("SheetCam", bpy.data.cameras.new("SheetCam"))
     cam.data.type = "ORTHO"
     cam.data.ortho_scale = 7.4
-    cam.location = (10.0, -1.3, 1.5)
-    cam.rotation_euler = (1.5708, 0.0, 1.5708)  # look along -X
+    cam.location = (-10.0, -1.3, 1.5)
+    cam.rotation_euler = (1.5708, 0.0, -1.5708)  # look along +X, at the hero's right
     scene.collection.objects.link(cam)
     scene.camera = cam
     scene.render.engine = "BLENDER_WORKBENCH"
