@@ -344,6 +344,251 @@
           "geometry": true
         }
       }
+    },
+    "hero-hair": {
+      "role": "the hero's Hair Style pieces and the Forms' manes (ADR 0012): one prompt per part (see parts); hair only, with no head; made without texture, painted near-white by the bake so the hair color tints it; rigid on the hair bone",
+      "parts": [
+        "Hair_spiky_short",
+        "Hair_spiky_long",
+        "Hair_flame_short",
+        "Hair_flame_long",
+        "Hair_ponytail_short",
+        "Hair_ponytail_long",
+        "Hair_buzz_short",
+        "Hair_buzz_long",
+        "Hair_mane_wild",
+        "Hair_mane_crimson",
+        "Hair_mane_rose",
+        "Hair_mane_legend"
+      ],
+      "prompts": [
+        "Original anime hairstyle for a game hero, short spiky upswept hair with sharp stylized spikes, the hair alone as one separate hollow piece, no head, no face, no ears, no neck, highly detailed sculpted stylized hair in the style of an anime fighting game",
+        "Original anime hairstyle for a game hero, long spiky upswept hair with sharp stylized spikes that flow down the back to the shoulder blades, the hair alone as one separate hollow piece, no head, no face, no ears, no neck, highly detailed sculpted stylized hair in the style of an anime fighting game",
+        "Original anime hairstyle for a game hero, shown alone as an empty hollow wig with nothing inside: short hair whose own locks sweep up and back into tall pointed flame shapes, all of it hair, no fire, no ornaments, no earrings, no head, no face, no ears, no neck, highly detailed sculpted stylized hair in the style of an anime fighting game",
+        "Original anime hairstyle for a game hero, tall hair swept up into a large blazing flame shape with long flickering spikes rising high above the head, the hair alone as one separate hollow piece, no head, no face, no ears, no neck, highly detailed sculpted stylized hair in the style of an anime fighting game",
+        "Original anime hairstyle for a game hero, hair tied back into a short high ponytail with spiky bangs over the forehead, the hair alone as one separate hollow piece, no head, no face, no ears, no neck, highly detailed sculpted stylized hair in the style of an anime fighting game",
+        "Original anime hairstyle for a game hero, hair tied back into a long high ponytail that reaches the waist, with spiky bangs over the forehead, the hair alone as one separate hollow piece, no head, no face, no ears, no neck, highly detailed sculpted stylized hair in the style of an anime fighting game",
+        "Original anime hairstyle for a game hero, a very short buzz cut, a thin close-cropped cap of hair that hugs the skull, the hair alone as one separate hollow piece, no head, no face, no ears, no neck, highly detailed sculpted stylized hair in the style of an anime fighting game",
+        "Original anime hairstyle for a game hero, short cropped hair, a little longer and spiky on top, a close-fitting cap of hair, the hair alone as one separate hollow piece, no head, no face, no ears, no neck, highly detailed sculpted stylized hair in the style of an anime fighting game",
+        "Original anime hairstyle for a game hero, a huge wild untamed mane of long spiky hair with towering spikes that flows far down the back, the hair alone as one separate hollow piece, no head, no face, no ears, no neck, highly detailed sculpted stylized hair in the style of an anime fighting game",
+        "Original anime hairstyle for a game hero, shown alone as an empty hollow wig with nothing inside: a long smooth mane swept straight back from the forehead, calm and elegant, that flows down to the waist, no head, no face, no ears, no neck, highly detailed sculpted stylized hair in the style of an anime fighting game",
+        "Original anime hairstyle for a game hero, shown alone as an empty hollow wig with nothing inside: a long voluminous mane with soft layered waves and upswept spikes that flows down the back, no head, no face, no ears, no neck, highly detailed sculpted stylized hair in the style of an anime fighting game",
+        "Original anime hairstyle for a game hero, an enormous majestic mane of long flowing spiky hair that reaches past the waist, serene and grand, the hair alone as one separate hollow piece, no head, no face, no ears, no neck, highly detailed sculpted stylized hair in the style of an anime fighting game"
+      ],
+      "negative_prompt": "head, face, skull, ears, neck, eyes, nose, mouth, bust, portrait, body, skin, mannequin, fire, flames, earring, jewelry, ornament, horns, hat, text, logo, blurry, low detail, photorealistic",
+      "seeds": [
+        11
+      ],
+      "options": {
+        "model": "tripo-v3.1",
+        "params": {
+          "geometry_quality": "detailed",
+          "texture": false,
+          "face_limit": 200000
+        }
+      },
+      "candidates": {
+        "p0s0": {
+          "task_id": "079ef15f-617f-4954-be27-6c10cac08847",
+          "status": "success",
+          "credits_consumed": 40,
+          "prompt": 0,
+          "seed": 11,
+          "file": "hero-hair/candidates/p0s0.glb"
+        },
+        "p1s0": {
+          "task_id": "974a4026-ead8-4885-b3dd-fdc0326e919b",
+          "status": "success",
+          "credits_consumed": 40,
+          "prompt": 1,
+          "seed": 11,
+          "file": "hero-hair/candidates/p1s0.glb"
+        },
+        "p3s0": {
+          "task_id": "753d986a-6090-430b-9fa9-b12cd2e872c5",
+          "status": "success",
+          "credits_consumed": 40,
+          "prompt": 3,
+          "seed": 11,
+          "file": "hero-hair/candidates/p3s0.glb"
+        },
+        "p4s0": {
+          "task_id": "81bf9bdc-4c20-4219-9856-3a6af8309b7a",
+          "status": "success",
+          "credits_consumed": 40,
+          "prompt": 4,
+          "seed": 11,
+          "file": "hero-hair/candidates/p4s0.glb"
+        },
+        "p5s0": {
+          "task_id": "f41bc15c-586d-49b5-ab61-7abd16b141f8",
+          "status": "success",
+          "credits_consumed": 40,
+          "prompt": 5,
+          "seed": 11,
+          "file": "hero-hair/candidates/p5s0.glb"
+        },
+        "p6s0": {
+          "task_id": "cfc50529-af6d-45b0-a74f-a6d64dfeaffe",
+          "status": "success",
+          "credits_consumed": 40,
+          "prompt": 6,
+          "seed": 11,
+          "file": "hero-hair/candidates/p6s0.glb",
+          "rejected": "A head came with the hair. The bake makes the buzz cuts from the body's own skull instead (a thin shell of hair lifted off the head): a buzz cut hugs the skull, so it fits each body exactly."
+        },
+        "p7s0": {
+          "task_id": "4dbce1cd-a31a-46df-bb50-68e75758cdd2",
+          "status": "success",
+          "credits_consumed": 40,
+          "prompt": 7,
+          "seed": 11,
+          "file": "hero-hair/candidates/p7s0.glb",
+          "rejected": "A head came with the hair. The bake makes the buzz cuts from the body's own skull instead (a thin shell of hair lifted off the head): a buzz cut hugs the skull, so it fits each body exactly."
+        },
+        "p8s0": {
+          "task_id": "e8e539c0-abe3-4af8-bcec-c84b0f2a076b",
+          "status": "success",
+          "credits_consumed": 40,
+          "prompt": 8,
+          "seed": 11,
+          "file": "hero-hair/candidates/p8s0.glb"
+        },
+        "p11s0": {
+          "task_id": "f9b0da3f-8491-47dd-b1b3-ac3b2248f543",
+          "status": "success",
+          "credits_consumed": 40,
+          "prompt": 11,
+          "seed": 11,
+          "file": "hero-hair/candidates/p11s0.glb"
+        },
+        "p9s0": {
+          "task_id": "661ad3f3-2374-4af5-af65-a7dd0939f064",
+          "status": "success",
+          "credits_consumed": 40,
+          "prompt": 9,
+          "seed": 11,
+          "file": "hero-hair/candidates/p9s0.glb"
+        },
+        "p10s0": {
+          "task_id": "aeb16be8-a8c2-4fa3-91e6-9aead4629196",
+          "status": "success",
+          "credits_consumed": 40,
+          "prompt": 10,
+          "seed": 11,
+          "file": "hero-hair/candidates/p10s0.glb"
+        },
+        "p2s0": {
+          "task_id": "79d03a57-b1bd-4796-9c2a-59b16fd45fc5",
+          "status": "success",
+          "credits_consumed": 40,
+          "prompt": 2,
+          "seed": 11,
+          "file": "hero-hair/candidates/p2s0.glb"
+        }
+      },
+      "note": "p0s0 (Hair_spiky_short) was the test at 40 credits: Tripo makes hollow hair with no head. The part of candidate p<i>s0 is parts[i]. Some long styles came with a head: see \"rejected\"; their prompts now ask for an empty hollow wig. The buzz cuts (p6, p7) are made by the bake from the skull.",
+      "rejected": [
+        {
+          "task_id": "c706974b-b8cc-4284-9bdf-08d919c15e44",
+          "status": "success",
+          "credits_consumed": 40,
+          "prompt": 2,
+          "seed": 11,
+          "file": "hero-hair/candidates/p2s0-rejected.glb",
+          "candidate": "p2s0",
+          "part": "Hair_flame_short",
+          "old_prompt": "Original anime hairstyle for a game hero, short hair swept straight up into a stylized flame shape with sharp flickering tips, the hair alone as one separate hollow piece, no head, no face, no ears, no neck, highly detailed sculpted stylized hair in the style of an anime fighting game",
+          "why": "side flames that look like horns"
+        },
+        {
+          "task_id": "42b2626d-0563-4d6e-8954-6bdc3e2c8b6a",
+          "status": "success",
+          "credits_consumed": 40,
+          "prompt": 9,
+          "seed": 11,
+          "file": "hero-hair/candidates/p9s0-rejected.glb",
+          "candidate": "p9s0",
+          "part": "Hair_mane_crimson",
+          "old_prompt": "Original anime hairstyle for a game hero, a long smooth mane swept straight back, calm and elegant, that flows down to the waist, the hair alone as one separate hollow piece, no head, no face, no ears, no neck, highly detailed sculpted stylized hair in the style of an anime fighting game",
+          "why": "a head and face came with the hair"
+        },
+        {
+          "task_id": "c7d2d01c-fe76-4b2c-9673-413dc27f772c",
+          "status": "success",
+          "credits_consumed": 40,
+          "prompt": 10,
+          "seed": 11,
+          "file": "hero-hair/candidates/p10s0-rejected.glb",
+          "candidate": "p10s0",
+          "part": "Hair_mane_rose",
+          "old_prompt": "Original anime hairstyle for a game hero, a long voluminous mane with soft layered waves and upswept spikes that flows down the back, the hair alone as one separate hollow piece, no head, no face, no ears, no neck, highly detailed sculpted stylized hair in the style of an anime fighting game",
+          "why": "a head and face came with the hair"
+        },
+        {
+          "task_id": "f6843045-6190-4772-8641-1c0db6ea4e76",
+          "status": "success",
+          "credits_consumed": 40,
+          "prompt": 2,
+          "seed": 11,
+          "file": "hero-hair/candidates/p2s0-rejected2.glb",
+          "candidate": "p2s0",
+          "part": "Hair_flame_short",
+          "old_prompt": "Original anime hairstyle for a game hero, shown alone as an empty hollow wig with nothing inside: short hair swept straight up into one stylized flame shape on top of the head, with sharp flickering tips that point up and no side horns, no head, no face, no ears, no neck, highly detailed sculpted stylized hair in the style of an anime fighting game",
+          "why": "a real fire ornament on top and a gold earring came with the hair"
+        }
+      ]
+    },
+    "hero-garments": {
+      "role": "the hero's garment pieces (ADR 0012): one prompt per part (see parts), worn over the two-tone suit; made without texture, painted by the bake (Outfit and Trim regions); the bake fits each piece to each body",
+      "parts": [
+        "GarmentGi",
+        "GarmentCape",
+        "GarmentArmor"
+      ],
+      "prompts": [
+        "Original anime martial-arts garment for a game hero, shown alone as an empty hollow garment with nothing inside: a sleeveless wrap-front martial-arts gi vest top with a wide sash tied at the waist, no body, no mannequin, no head, no arms, highly detailed stylized game asset",
+        "Original anime superhero garment for a game hero, shown alone as an empty hollow garment with nothing inside: a long flowing hero cape with a high collar and a round clasp on each shoulder, no body, no mannequin, no head, highly detailed stylized game asset",
+        "Original anime superhero garment for a game hero, shown alone as an empty hollow garment with nothing inside: a sleek sculpted chest plate armor with two large round shoulder pauldrons, no body, no mannequin, no head, no arms, highly detailed stylized game asset"
+      ],
+      "negative_prompt": "body, mannequin, torso, head, face, arms, hands, legs, skin, weapon, text, logo, blurry, low detail, photorealistic",
+      "seeds": [
+        11
+      ],
+      "options": {
+        "model": "tripo-v3.1",
+        "params": {
+          "geometry_quality": "detailed",
+          "texture": false,
+          "face_limit": 200000
+        }
+      },
+      "candidates": {
+        "p0s0": {
+          "task_id": "6d394823-f251-446d-b649-fdc211c7307c",
+          "status": "success",
+          "credits_consumed": 40,
+          "prompt": 0,
+          "seed": 11,
+          "file": "hero-garments/candidates/p0s0.glb"
+        },
+        "p1s0": {
+          "task_id": "9d261d49-462e-444c-a792-fddba83360db",
+          "status": "success",
+          "credits_consumed": 40,
+          "prompt": 1,
+          "seed": 11,
+          "file": "hero-garments/candidates/p1s0.glb"
+        },
+        "p2s0": {
+          "task_id": "2dce6fad-e2c0-4ebb-912b-882d8e9b185f",
+          "status": "success",
+          "credits_consumed": 40,
+          "prompt": 2,
+          "seed": 11,
+          "file": "hero-garments/candidates/p2s0.glb"
+        }
+      }
     }
   }
 }

@@ -109,8 +109,10 @@ function tripo(args) {
 }
 
 /** Credits for one text-to-model task with these params (Tripo pricing, 2026-09-25). */
-function estimate(params) {
-  let credits = params.texture === false ? 10 : 20;
+function estimate(params, model) {
+  // tripo-v3.x bills its base of 20 without a texture too (hero-hair p0s0:
+  // 40 credits for detailed geometry and no texture).
+  let credits = params.texture === false && !String(model).startsWith('tripo-v3') ? 10 : 20;
   if (params.geometry_quality === 'detailed') credits += 20;
   if (params.texture_quality === 'detailed') credits += 10;
   if (params.texture_quality === 'extreme') credits += 20;
@@ -142,6 +144,8 @@ if (!brief || !['generate', 'preview', 'pick', 'retexture', 'rig', 'animate'].in
 }
 const work = join(ROOT, 'build', 'tripo', name);
 const candidateIds = brief.prompts.flatMap((_, p) => brief.seeds.map((_, s) => `p${p}s${s}`));
+/** A candidate id's prompt and seed index: p10s1 → [10, 1]. */
+const indexes = (cid) => cid.match(/^p(\d+)s(\d+)$/).slice(1).map(Number);
 /** The model file under dir; the CLI nests it a folder or two down. */
 function findModel(root) {
   const find = (dir) => {
@@ -175,7 +179,7 @@ if (command === 'generate') {
     return !made?.task_id || failed.includes(made.status);
   });
   const makeArgs = (cid) => {
-    const [p, s] = [Number(cid[1]), Number(cid[3])];
+    const [p, s] = indexes(cid);
     const seed = brief.seeds[s];
     const params = {
       ...brief.options.params,
@@ -203,7 +207,7 @@ if (command === 'generate') {
     if (plan.valid === false)
       throw new Error(`${cid}: invalid plan ${JSON.stringify(plan.errors)}`);
   }
-  const cost = todo.length * estimate(brief.options.params);
+  const cost = todo.length * estimate(brief.options.params, brief.options.model);
   const { balance } = tripo(['balance']);
   console.log(`${todo.length} candidates to make: about ${cost} credits; balance ${balance}`);
   if (cost > balance) {
@@ -215,7 +219,8 @@ if (command === 'generate') {
   for (const cid of todo) {
     console.log(`${cid}: making (a few minutes)...`);
     const result = tripo(makeArgs(cid));
-    const model = findModel(join(work, cid));
+    // The task's own folder: a candidate made again downloads beside the old one.
+    const model = findModel(result.output_dir ?? join(work, cid));
     if (model) {
       mkdirSync(candidates, { recursive: true });
       copyFileSync(model, join(candidates, `${cid}.glb`));
@@ -224,8 +229,8 @@ if (command === 'generate') {
       task_id: result.task_id,
       status: result.status,
       credits_consumed: result.credits_consumed,
-      prompt: Number(cid[1]),
-      seed: brief.seeds[Number(cid[3])],
+      prompt: indexes(cid)[0],
+      seed: brief.seeds[indexes(cid)[1]],
       file: model ? `${name}/candidates/${cid}.glb` : undefined,
     };
     save();
