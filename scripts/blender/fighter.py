@@ -4,7 +4,7 @@ The sources are in sources/tripo/fighter/, made by `npm run tripo`: Idle.glb
 carries the model (the chosen candidate decimated to 100k faces, rigged by
 Tripo with its native biped skeleton) and the idle clip; each other file
 carries one preset clip on the same skeleton, no geometry. The clip names
-are the Training Dummy director's (models.json "animations"), so the
+are the Rival director's (models.json "animations"), so the
 opponent reacts to the same cues.
 
 This script makes the game's version, and nothing is edited by hand:

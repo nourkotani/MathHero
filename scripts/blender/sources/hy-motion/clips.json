@@ -68,6 +68,114 @@
         "candidate": "p0s3",
         "by": "npm run motion (score 1.708), 2026-09-25"
       }
+    },
+    "charge": {
+      "used_by": "hero.py: the Charge clip (a new Form, after the strike that earned it)",
+      "prompts": [
+        "A fighter plants both feet wide, pulls both clenched fists down to the hips, tenses the whole body, leans the head back as if shouting, holds, then relaxes into a fighting stance.",
+        "A martial artist powers up: sinks into a wide low stance, fists clenched at the sides, arms and shoulders shaking with effort, chest pushed out, then settles into a guard.",
+        "A cartoon fighter gathers energy, crouches slightly with fists pulled to the waist, trembles with power, throws the chest forward and the head back, then returns to a ready stance."
+      ],
+      "frames": 60,
+      "samples": 4,
+      "master_seed": 20260927,
+      "window": [
+        0,
+        1.6
+      ],
+      "length": 0.8,
+      "score": {
+        "lean_back": {
+          "target": 0.3,
+          "weight": 2
+        },
+        "air": {
+          "target": 0,
+          "weight": 3
+        },
+        "back": {
+          "target": 0,
+          "weight": 1
+        },
+        "profile": -3,
+        "drift": -1,
+        "motion": 0.3
+      },
+      "chosen": {
+        "file": "charge.npz",
+        "candidate": "p2s1",
+        "by": "npm run motion (score -0.058), 2026-09-25"
+      }
+    },
+    "transform": {
+      "used_by": "hero.py: the Transform clip (the Landmark scene on Results)",
+      "prompts": [
+        "A fighter crouches low with fists clenched at the sides and trembles with power, then bursts upright, throws both arms wide and high, head back, and holds the pose.",
+        "A martial artist gathers power in a deep crouch, then rises explosively onto the toes with both fists thrust high above the head and holds the pose proudly.",
+        "A cartoon hero hunches over, shaking with energy, then straightens with a mighty shout, arms spread wide and raised, chest out, and holds the pose."
+      ],
+      "frames": 75,
+      "samples": 4,
+      "master_seed": 20260928,
+      "window": [
+        0,
+        2.4
+      ],
+      "length": 2,
+      "score": {
+        "fist_high": 2,
+        "air": {
+          "target": 0.2,
+          "weight": 2
+        },
+        "lean_fwd": -1,
+        "drift": -1,
+        "motion": 0.2
+      },
+      "note": "No profile weight: the Landmark scene plays on Results, where the camera frames the hero from the side (as Victory).",
+      "chosen": {
+        "file": "transform.npz",
+        "candidate": "p1s3",
+        "by": "npm run motion (score 0.304), 2026-09-25"
+      }
+    },
+    "idle": {
+      "used_by": "hero.py: the Idle clip (between cues; it loops)",
+      "prompts": [
+        "A fighter stands in a relaxed guard with fists up, breathes slowly, and shifts weight gently from foot to foot.",
+        "A martial artist waits in a ready stance, fists raised, bouncing lightly on the balls of the feet and breathing calmly.",
+        "A cartoon fighter holds a loose fighting stance with both fists up, the shoulders rising and falling with each breath."
+      ],
+      "frames": 120,
+      "samples": 4,
+      "master_seed": 20260929,
+      "window": [
+        0,
+        4
+      ],
+      "length": 4,
+      "score": {
+        "air": {
+          "target": 0,
+          "weight": 3
+        },
+        "back": {
+          "target": 0,
+          "weight": 2
+        },
+        "motion": {
+          "target": 0.15,
+          "weight": 2
+        },
+        "profile": -3,
+        "lean_fwd": -1,
+        "drift": -3
+      },
+      "chosen": {
+        "file": "idle.npz",
+        "candidate": "p2s3",
+        "by": "npm run motion (score -0.822), 2026-09-25"
+      }
     }
   }
 }

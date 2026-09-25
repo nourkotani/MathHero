@@ -1,6 +1,6 @@
 // The three.js renderer facade. Interface: (state, effects) in via
 // onStoreUpdate, plus frame(dt) from the shell's animation loop. The scene
-// is assembled from focused modules — stage (environment), hero, dummy,
+// is assembled from focused modules — stage (environment), hero, rival,
 // fx (particles/blasts), reactions (effects → animation) — wired here.
 
 import * as THREE from 'three';
@@ -19,8 +19,8 @@ import {
 import type { GameEffect, GameState, HeroAppearance } from '../core';
 import { createCameraRig } from './cameraRig';
 import type { Focus } from './framing';
-import { CAMERA_FAR, DUMMY_X, HERO_X } from './constants';
-import type { Dummy } from './dummy';
+import { CAMERA_FAR, RIVAL_X, HERO_X } from './constants';
+import type { Rival } from './rival';
 import { createFx } from './fx';
 import { applyLevelToRig, buildHero, createHeroMaterials, FORM_PALETTES, heroParts } from './hero';
 import type { FormPalette, HeroMaterials, HeroRig } from './hero';
@@ -38,7 +38,7 @@ export interface Renderer {
   frame(dtMs: number): void;
   /** World positions of the hero's fists and boots (the hitboxes follow). */
   strikePoints(): THREE.Vector3[];
-  /** A hero fist or boot touched the Dummy's hurtbox. */
+  /** A hero fist or boot touched the Rival's hurtbox. */
   strikeContact(): void;
   /** The render time scale: below 1 while a hitstop freezes the frame. */
   timeScale(): number;
@@ -74,8 +74,8 @@ export interface RenderTarget {
   gl: THREE.WebGLRenderer;
   scene: THREE.Scene;
   camera: THREE.PerspectiveCamera;
-  /** The Training Dummy's director; the Dummy itself is a React component. */
-  dummy: Dummy;
+  /** The Rival's director; the Rival itself is a React component. */
+  rival: Rival;
 }
 
 /** A WebGL renderer set up for the arena, handed to the R3F root. */
@@ -101,7 +101,7 @@ export function createCamera(canvas: HTMLCanvasElement): THREE.PerspectiveCamera
   );
 }
 
-export function createRenderer({ gl: renderer, scene, camera, dummy }: RenderTarget): Renderer {
+export function createRenderer({ gl: renderer, scene, camera, rival }: RenderTarget): Renderer {
   const canvas = renderer.domElement;
   // One directional shadow grounds the characters (see stage.ts).
   renderer.shadowMap.enabled = true;
@@ -171,19 +171,19 @@ export function createRenderer({ gl: renderer, scene, camera, dummy }: RenderTar
 
   const fx = createFx(scene, (big) => {
     if (big) {
-      dummy.launch();
+      rival.launch();
       rig.addShake(0.4);
-      fx.comicBurst(new THREE.Vector3(DUMMY_X - 0.3, 1.7, 0));
+      fx.comicBurst(new THREE.Vector3(RIVAL_X - 0.3, 1.7, 0));
       impactFrame();
     } else {
       // Small blasts only exist while transformed — always a strong hit.
-      dummy.hit(true);
+      rival.hit(true);
     }
   });
 
   const reactions = createReactions({
     getHero: () => hero,
-    dummy,
+    rival,
     fx,
     juice: {
       addShake: (amount) => rig.addShake(amount),
@@ -199,7 +199,7 @@ export function createRenderer({ gl: renderer, scene, camera, dummy }: RenderTar
 
   let elapsed = 0;
   let urgent = false; // final ten seconds of the Round
-  let previewing = false; // hero creation: face the camera, not the dummy
+  let previewing = false; // hero creation: face the camera, not the rival
   let inRound = false; // fps sampling only counts real play
 
   function applyLook(state: GameState) {

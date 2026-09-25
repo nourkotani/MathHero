@@ -8,13 +8,13 @@ own bones. The brief's "score" weighs the measures (see term). Writes
 <out_dir>/scores.json (best first) and <out_dir>/sheet.png (the best
 candidates, one row each, best on top). Run by scripts/motion.mjs.
 
-The measures, in the hero's space (it faces the Dummy along Blender -Y):
-  reach    furthest a fist or boot gets toward the Dummy (m)
+The measures, in the hero's space (it faces the Rival along Blender -Y):
+  reach    furthest a fist or boot gets toward the Rival (m)
   back     furthest the root goes backward (m)
   profile  mean turn of the torso away from the side view, either way (rad)
   hunch    most the torso bends from upright, any way (rad)
-  lean_back  most the torso leans back, away from the Dummy (rad)
-  lean_fwd   most the torso bends forward, toward the Dummy (rad)
+  lean_back  most the torso leans back, away from the Rival (rad)
+  lean_fwd   most the torso bends forward, toward the Rival (rad)
   fist_high  most a fist rises above the head pivot (m)
   air      highest the root rises (m)
   drift    how far the root had to be eased back home (m)
@@ -69,7 +69,7 @@ def measure(rig, action, drift):
         turn += abs(math.atan2(ahead.x, -ahead.y))
         up = torso @ Vector((0.0, 1.0, 0.0))
         hunch = max(hunch, up.angle(UP))
-        lean = math.atan2(up.dot(FORWARD), up.z)  # + toward the Dummy
+        lean = math.atan2(up.dot(FORWARD), up.z)  # + toward the Rival
         lean_fwd = max(lean_fwd, lean)
         lean_back = max(lean_back, -lean)
         points = [world @ (bones[b].matrix @ Vector(off)) for b, off in STRIKE.items()]

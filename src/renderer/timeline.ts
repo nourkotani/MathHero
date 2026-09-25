@@ -1,7 +1,7 @@
 // The shared animation helper every juice behavior runs on: a Clip is a
 // fixed-duration pose function of normalized time, and a Channel is a
 // single-slot player where a new clip replaces the current one. Attacks,
-// staggers, Training Dummy reactions, and camera punches are all clips —
+// staggers, Rival reactions, and camera punches are all clips —
 // adding a new move is a new clip, not new machinery.
 
 export interface Clip {
@@ -38,7 +38,8 @@ export function createChannel(): Channel {
     update(dt, elapsed) {
       if (clip === null) return;
       time += dt;
-      const t = Math.min(1, time / clip.duration);
+      // A clip of no length (its model not decoded yet) ends at once.
+      const t = clip.duration > 0 ? Math.min(1, time / clip.duration) : 1;
       clip.apply(t, elapsed);
       if (t >= 1) {
         const done = clip.onDone;

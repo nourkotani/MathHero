@@ -2,7 +2,7 @@
 // arena region. A pure function of the aspect, so the rule is tested with
 // plain math and the rig only eases toward its answer.
 
-import { DUMMY_X, HERO_X } from './constants';
+import { RIVAL_X, HERO_X } from './constants';
 import { STYLE } from './style';
 
 export type Focus = 'fight' | 'hero';
@@ -16,8 +16,8 @@ export interface Framing {
 
 /** What each focus must show, in world units (x span, y span). */
 const SUBJECTS: Record<Focus, { left: number; right: number; bottom: number; top: number }> = {
-  // Both fighters, heads, fists, and a little of the Dummy's recoil room.
-  fight: { left: HERO_X - 0.9, right: DUMMY_X + 1.1, bottom: 0.3, top: 3.3 },
+  // Both fighters, heads, fists, and a little of the Rival's recoil room.
+  fight: { left: HERO_X - 0.9, right: RIVAL_X + 1.1, bottom: 0.3, top: 3.3 },
   // The hero alone: Hero creation, Results, and the level-up ceremonies.
   hero: { left: HERO_X - 1.0, right: HERO_X + 1.0, bottom: 0.3, top: 3.4 },
 };

@@ -5,11 +5,11 @@
 
 import * as THREE from 'three';
 import type { GameEffect, StreakForm } from '../core';
-import { DUMMY_X, HERO_X } from './constants';
+import { RIVAL_X, HERO_X } from './constants';
 import { STYLE } from './style';
 import { applyFormToRig, composeLook } from './hero';
 import type { FormPalette, HeroRig } from './hero';
-import type { Dummy } from './dummy';
+import type { Rival } from './rival';
 import type { Fx } from './fx';
 import { createChannel } from './timeline';
 import type { Clip } from './timeline';
@@ -34,7 +34,7 @@ export interface Juice {
 
 export interface Reactions {
   handleEffects(effects: GameEffect[]): void;
-  /** A hero fist or boot touched the Dummy's hurtbox. */
+  /** A hero fist or boot touched the Rival's hurtbox. */
   strikeContact(): void;
   /** The Player's permanent identity: chosen hair, level glow, earned Form. */
   setPlayerLook(hair: number, glow: number, palette: FormPalette | null): void;
@@ -45,11 +45,11 @@ export interface Reactions {
 
 export function createReactions(opts: {
   getHero(): HeroRig;
-  dummy: Dummy;
+  rival: Rival;
   fx: Fx;
   juice: Juice;
 }): Reactions {
-  const { getHero, dummy, fx, juice } = opts;
+  const { getHero, rival, fx, juice } = opts;
 
   const heroChannel = createChannel();
   let attackCycle = 0;
@@ -74,8 +74,8 @@ export function createReactions(opts: {
   let pendingStrike: { kind: number; landed: boolean; active: boolean } | null = null;
 
   /**
-   * The moment a strike lands: impact sparks fly off the dummy and the
-   * Dummy recoils. A hero fist or boot touching the Dummy's hurtbox
+   * The moment a strike lands: impact sparks fly off the Rival and it
+   * recoils. A hero fist or boot touching the Rival's hurtbox
    * (src/scene/HeroHitboxes.tsx) calls this; so does the fallback in
    * attackClip, so no strike ever goes without its hit.
    */
@@ -86,8 +86,8 @@ export function createReactions(opts: {
     const kind = strike.kind;
     const hit = look();
     const transformed = currentForm !== 'base';
-    dummy.hit(transformed);
-    const impact = new THREE.Vector3(DUMMY_X - 0.55, 1.7, 0);
+    rival.hit(transformed);
+    const impact = new THREE.Vector3(RIVAL_X - 0.55, 1.7, 0);
     fx.burst(hit.hitColor, transformed ? 18 : 12, impact, 3.2);
     // Every strike lands with the anime flash frame; transformed
     // heroes also punch a shockwave through the air.
@@ -111,7 +111,7 @@ export function createReactions(opts: {
   /**
    * One of four strikes. The pose is an authored Blender clip (Attack0–3:
    * an anticipation crouch, the wind-up, the dash-in strike, and home).
-   * The strike lands when a fist or boot touches the Dummy (landStrike);
+   * The strike lands when a fist or boot touches the Rival (landStrike);
    * this clip opens the contact window and lands it late if nothing touched.
    */
   function attackClip(kind: number): Clip {
@@ -122,13 +122,14 @@ export function createReactions(opts: {
     }
     const strike = { kind, landed: false, active: false };
     pendingStrike = strike;
-    const { duration, anticipation } = STYLE.juice.attack;
-    const total = anticipation + duration;
-    getHero().play(`Attack${kind}`);
+    const { anticipation } = STYLE.juice.attack;
+    const clip = `Attack${kind}`;
+    getHero().play(clip);
     return {
-      duration: total,
+      duration: getHero().clipLength(clip),
       apply(tc) {
-        const t = (tc * total - anticipation) / duration;
+        // The strike phase: 0 when the wind-up ends, 1 when the clip ends.
+        const t = (tc - anticipation) / (1 - anticipation);
         // The wind-up never lands: contact counts from the strike on.
         if (t >= STYLE.juice.attack.contactFrom) strike.active = true;
         if (t >= STYLE.juice.attack.landBy && pendingStrike === strike) landStrike();
@@ -146,7 +147,7 @@ export function createReactions(opts: {
   function staggerClip(): Clip {
     getHero().play('Stagger');
     return {
-      duration: STYLE.juice.stagger.duration,
+      duration: getHero().clipLength('Stagger'),
       apply(t) {
         const hero = getHero();
         const recoil = Math.sin(t * Math.PI);
@@ -173,7 +174,7 @@ export function createReactions(opts: {
     getHero().showHair(getHero().hairBefore);
     getHero().play('Transform');
     return {
-      duration: 2.0,
+      duration: getHero().clipLength('Transform'),
       // However the scene ends, the hero leaves it wearing the new hair.
       onDone: () => getHero().showHair(getHero().hairNow),
       apply(t) {
@@ -212,7 +213,7 @@ export function createReactions(opts: {
             break;
           case 'ANSWER_WRONG':
             heroChannel.play(staggerClip(), 'stagger');
-            dummy.taunt();
+            rival.taunt();
             juice.addShake(0.15);
             break;
           case 'TRANSFORMED':
@@ -250,7 +251,7 @@ export function createReactions(opts: {
             // drops a queued Charge.
             hero.play('Blast');
             // The hero threw a beam, not a punch: the strike it replaced
-            // never lands, and the blast's own hit launches the Dummy.
+            // never lands, and the blast's own hit launches the Rival.
             if (pendingStrike) pendingStrike.landed = true;
             fx.fireBlast(true);
             juice.punchCamera();

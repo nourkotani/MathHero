@@ -1,5 +1,5 @@
 // Cel treatment for characters: ink outlines (inverted hull) and shadow
-// casting. One call per character root — hero, Training Dummy, and anything
+// casting. One call per character root — hero, Rival, and anything
 // outlined later all go through here, so line work is a capability, not
 // per-mesh bespoke code.
 

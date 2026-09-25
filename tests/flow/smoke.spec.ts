@@ -10,7 +10,7 @@ test('boot, one Round by touch, then Results, with no page errors', async ({ pag
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
   // R3F reports a failed scene component on the console, not as a page
-  // error (ADR 0009): a missing JSX element blanks the Dummy silently.
+  // error (ADR 0009): a missing JSX element blanks the Rival silently.
   page.on('console', (message) => {
     if (message.type() === 'error') errors.push(message.text());
   });

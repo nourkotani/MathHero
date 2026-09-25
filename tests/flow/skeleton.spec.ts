@@ -188,7 +188,7 @@ test('the built file is truly single: nothing is requested beyond the document',
   expect(extra).toEqual([]);
 });
 
-test('the baked Training Dummy loads from the single file', async ({ page }) => {
+test('the baked Rival loads from the single file', async ({ page }) => {
   // The model is inlined meshopt glTF (ADR 0007), decoded on the main
   // thread. A missing decoder, a worker, or a bad inline reports here.
   const failures: string[] = [];

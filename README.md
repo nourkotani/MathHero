@@ -25,12 +25,12 @@ Each device keeps its own heroes. To move a hero, tap **Save backup** on one dev
 Man, where do I start —
 
 - **You build your own hero!** Girl or boy, spiky hair or a long ponytail, gi or battle armor, your colors, your skin tone — and you watch your hero change LIVE while you pick. So cool!
-- **Every correct answer is an ATTACK!** Punches! Kicks! Energy blasts! Your hero unloads on the Training Dummy and sends it FLYING. (Don't feel bad for the dummy. The dummy loves it.)
+- **Every correct answer is an ATTACK!** Punches! Kicks! Energy blasts! Your hero unloads on the Rival and sends him FLYING. (Don't feel bad for him. He loves it.)
 - **The Power Streak is everything.** Answer 3 in a row and your aura IGNITES. Hit 6 and your hair starts glowing with crackling energy. Hit 10 and — ohhh you're not ready — **SUPER MODE**: golden flames and a giant energy blast on every single answer. Your points multiply the whole way up, ×2, ×3, ×4!
 - **Get one wrong? Shake it off!** Your hero staggers, you see the right answer, and you jump back in. Every master was once a beginner — that's just training!
 - **You LEVEL UP forever.** Every point you ever score builds your Hero Level. New aura colors, an energy crown, lightning wisps, energy wings… the stronger you get, the cooler you look. No shop, no coins — just training!
 - **The game trains you where you're weakest.** It quietly notices which Facts slow you down (looking at you, 7×8) and brings them back until you've CRUSHED them. That's Adaptive Selection — it's like a sparring partner who knows all your openings.
-- **Race your family!** Personal Bests for every Difficulty, and a Family Leaderboard so you and your sibling can battle for the top spot. Rivals make you stronger!
+- **Race your family!** Personal Bests for every Difficulty, and a Family Leaderboard so you and your sibling can battle for the top spot. Your family is your competition!
 - **Practice mode** when you wanna spar without the clock, and Easy / Medium / Hard when you're ready for a real Round.
 
 ## 👨‍👩‍👧 For the grown-ups (hi, grown-ups!)

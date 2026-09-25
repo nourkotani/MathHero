@@ -12,9 +12,11 @@
 //
 // The brief is in scripts/blender/sources/tripo/models.json. Candidates
 // download into build/tripo/<name>/<id>/ (git ignores build/): the model,
-// Tripo's preview.png, and task.json. Each task's id, status, and cost go
-// back into the brief: a cloud seed does not survive a vendor model update,
-// so the task id is the record. A finished candidate is never made again.
+// Tripo's preview.png, and task.json. The tool keeps each candidate's model
+// at full detail in sources/tripo/<name>/candidates/ (git LFS), the chosen
+// one and the others alike. Each task's id, status, and cost go back into
+// the brief: a cloud seed does not survive a vendor model update, so the
+// task id is the record. A finished candidate is never made again.
 //
 // The key is TRIPO_API_KEY. It must be a paid key: free-tier outputs are
 // public and CC BY. A process started before the key was set does not see
@@ -30,7 +32,7 @@ import {
   readFileSync,
   writeFileSync,
 } from 'node:fs';
-import { dirname, join, relative } from 'node:path';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -138,7 +140,12 @@ function findModel(root) {
   };
   return find(root);
 }
-const modelFile = (cid) => findModel(join(work, cid));
+const candidates = join(SOURCES, name, 'candidates');
+/** A candidate's model: the committed copy, else the download. */
+const modelFile = (cid) => {
+  const kept = join(candidates, `${cid}.glb`);
+  return existsSync(kept) ? kept : findModel(join(work, cid));
+};
 
 if (command === 'generate') {
   const todo = candidateIds.filter((cid) => brief.candidates[cid]?.status !== 'success');
@@ -183,13 +190,18 @@ if (command === 'generate') {
   for (const cid of todo) {
     console.log(`${cid}: making (a few minutes)...`);
     const result = tripo(makeArgs(cid));
+    const model = findModel(join(work, cid));
+    if (model) {
+      mkdirSync(candidates, { recursive: true });
+      copyFileSync(model, join(candidates, `${cid}.glb`));
+    }
     brief.candidates[cid] = {
       task_id: result.task_id,
       status: result.status,
       credits_consumed: result.credits_consumed,
       prompt: Number(cid[1]),
       seed: brief.seeds[Number(cid[3])],
-      files: result.output_dir ? relative(ROOT, result.output_dir).replace(/\\/g, '/') : undefined,
+      file: model ? `${name}/candidates/${cid}.glb` : undefined,
     };
     save();
     console.log(

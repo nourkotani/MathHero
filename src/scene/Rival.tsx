@@ -1,9 +1,9 @@
 /** @jsxImportSource react */
-// The Training Dummy's body is now the Tripo fighter (ADR 0011): a
-// cosmetic opponent that takes the hero's strikes. The director
-// (renderer/dummy.ts) picks the clip; this component plays it with drei's
-// useAnimations and fades from the old clip to the new one. A Rapier sensor
-// is the hurtbox: a hero fist or boot that enters it lands the strike.
+// The Rival's body is the Tripo fighter (ADR 0011): a cosmetic opponent
+// that takes the hero's strikes. The director (renderer/rival.ts) picks
+// the clip; this component plays it with drei's useAnimations and fades
+// from the old clip to the new one. A Rapier sensor is the hurtbox: a hero
+// fist or boot that enters it lands the strike.
 //
 // Tripo has no preset for the launch and the drop back in, so those cues
 // play a stand-in clip while this component flies the fighter out of the
@@ -15,8 +15,8 @@ import { CuboidCollider, RigidBody } from '@react-three/rapier';
 import { ActiveCollisionTypes } from '@dimforge/rapier3d-compat';
 import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
-import { DUMMY_X, FIGHTER_HEIGHT } from '../renderer/constants';
-import type { DummyDirector } from '../renderer/dummy';
+import { RIVAL_X, FIGHTER_HEIGHT } from '../renderer/constants';
+import type { RivalDirector } from '../renderer/rival';
 import { STYLE } from '../renderer/style';
 import { FIGHTER_SOURCE_HEIGHT, FighterModel, useFighterClips } from './models/FighterModel';
 
@@ -34,12 +34,12 @@ const HURTBOX_CENTER_Y = FIGHTER_HEIGHT / 2;
 const easeIn = (t: number) => t * t;
 const easeOut = (t: number) => 1 - (1 - t) * (1 - t);
 
-export function Fighter({
+export function Rival({
   director,
   timeScale,
   onStruck,
 }: {
-  director: DummyDirector;
+  director: RivalDirector;
   /** The render time scale (the hitstop freeze), read every frame. */
   timeScale: () => number;
   /** A hero fist or boot entered the hurtbox. */
@@ -77,9 +77,9 @@ export function Fighter({
     cueRef.current = cue;
     since.current = 0;
     const action = actions[clipFor(cue.clip)];
-    action?.reset().fadeIn(STYLE.dummyBlend).play();
+    action?.reset().fadeIn(STYLE.rivalBlend).play();
     return () => {
-      action?.fadeOut(STYLE.dummyBlend);
+      action?.fadeOut(STYLE.rivalBlend);
     };
   }, [actions, cue]);
 
@@ -104,13 +104,13 @@ export function Fighter({
   });
 
   return (
-    <group position={[DUMMY_X, 0.3, 0]}>
+    <group position={[RIVAL_X, 0.3, 0]}>
       <group ref={flight}>
         {/* Tripo faces +X: turn to face the hero (-X), a three-quarter view
             toward the camera, and scale the ~1 m model to the game. */}
         <FighterModel
           groupRef={model}
-          rotation-y={Math.PI + STYLE.dummyTurn}
+          rotation-y={Math.PI + STYLE.rivalTurn}
           scale={FIGHTER_HEIGHT / FIGHTER_SOURCE_HEIGHT}
         />
       </group>

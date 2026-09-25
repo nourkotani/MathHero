@@ -1,9 +1,9 @@
 """Render key frames of hero clips into one contact sheet (ADR 0010).
 
 One row per clip, seven frames across it, an orthographic side view that
-covers the dash toward the Training Dummy (-Y in Blender). The camera sees
+covers the dash toward the Rival (-Y in Blender). The camera sees
 the hero's right side, as the game's camera does, so the hero faces right
-toward the Dummy, as in the game. Workbench
+toward the Rival, as in the game. Workbench
 engine, flat colors per painted region, and the baked ink hulls removed:
 the sheet is for judging poses, not the look. It changes only the open
 session; nothing is saved.

@@ -5,7 +5,7 @@
 import * as THREE from 'three';
 import { flipbookMaterial, glowSurface, markBloom, sparkSprite, warmFlipbook } from './materials';
 import { isOutlineHull } from './cel';
-import { DUMMY_X, HERO_X } from './constants';
+import { RIVAL_X, HERO_X } from './constants';
 import { STYLE } from './style';
 import blastCoreUrl from './textures/blast-core.png';
 import burstUrl from './textures/burst.png';
@@ -256,7 +256,7 @@ export function createFx(scene: THREE.Scene, onBlastImpact: (big: boolean) => vo
           flips.splice(i, 1);
         }
       }
-      // Energy blasts fly toward the dummy and burst on impact.
+      // Energy blasts fly toward the Rival and burst on impact.
       for (let i = blasts.length - 1; i >= 0; i--) {
         const blast = blasts[i];
         if (!blast) continue;
@@ -287,7 +287,7 @@ export function createFx(scene: THREE.Scene, onBlastImpact: (big: boolean) => vo
           0.3,
           blast.big ? 0.08 : 0.05,
         );
-        if (blast.mesh.position.x >= DUMMY_X - 0.3) {
+        if (blast.mesh.position.x >= RIVAL_X - 0.3) {
           // The whole impact wears the blast's own color, so a surge hero's
           // purple shot bursts purple instead of reverting to stock blue.
           const color = blast.color;

@@ -34,7 +34,7 @@ export function Hero({ mount, timeScale }: { mount: HeroMount; timeScale: () => 
       (tint as THREE.MeshToonMaterial).map = painted.map;
       tint.needsUpdate = true;
     }
-    director.ready(clips.map((clip) => clip.name));
+    director.ready(clips.map((clip) => ({ name: clip.name, duration: clip.duration })));
     mount.modelReady(model.current);
     return () => mount.modelReady(null);
   }, [baked, clips, director, materials, mount]);

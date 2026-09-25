@@ -41,7 +41,7 @@ export function loadModel(
           obj.castShadow = true;
         }
         // A skinned mesh keeps its rest-pose bounds; a clip that flies the
-        // model away (the Dummy's launch) must not be culled mid-air.
+        // model away (the Rival's launch) must not be culled mid-air.
         if (obj instanceof THREE.SkinnedMesh) obj.frustumCulled = false;
         baked.dispose();
       });

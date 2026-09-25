@@ -382,8 +382,8 @@ def sampled_clip(rig, name, seconds, pose_at):
 ATTACK_ANTICIPATION = 0.12
 ATTACK_STRIKE = 0.55
 # The dash-in: how far forward the root travels at the strike's peak. The
-# hero stands 4.8 m from the Training Dummy (renderer/constants.ts), and a
-# fist or boot must enter the Dummy's hurtbox (src/scene/Fighter.tsx)
+# hero stands 4.8 m from the Rival (renderer/constants.ts), and a
+# fist or boot must enter the Rival's hurtbox (src/scene/Rival.tsx)
 # for the strike to land on contact (ADR 0009).
 DASH = (3.5, 3.75, 4.0, 3.95)
 
@@ -433,7 +433,7 @@ def attack_pose(kind):
             p.loc[2] = -w * 0.3 + s * DASH[2]
             # One full turn, eased so that at the strike's peak (t = 0.65) the
             # hero has turned three quarters: an outflung fist then points at
-            # the Dummy (a backfist), not sideways past its hurtbox.
+            # the Rival (a backfist), not sideways past its hurtbox.
             u = 0.0 if t < 0.3 else (t - 0.3) / 0.7
             p.root_rot[1] = -w * 0.6 + (u + 0.25 * math.sin(math.pi * u)) * 2 * math.pi
             p.set("torso", y=-w * 0.5)
@@ -457,65 +457,10 @@ def attack_pose(kind):
     return pose_at
 
 
-# A wrong answer: knocked off balance, stumbling back with the arms
-# windmilling, then back into the guard. A gentle flinch, never scary. The
-# motion is HY-Motion's (mocap.py, ADR 0010): the brief and the chosen
-# candidate are "stagger" in sources/hy-motion/clips.json.
-
-
 def stance():
     """The fighting stance as {bone: three.js Euler}: mocap clips blend
     from it and back to it, so Idle takes over without a pop."""
     return {bone: pose["rot"] for bone, pose in Pose().keys().items()}
-
-
-TRANSFORM = 2.0
-
-
-def transform_pose(t):
-    """The Landmark transformation: coil low gathering light, then erupt
-    skyward, arms thrown wide, easing home over the tail."""
-    p = Pose()
-    if t < 0.4:
-        k = t / 0.4
-        p.loc[1] = -k * 0.2
-        p.squash(k * 0.1)
-        p.set("torso", x=0.06 + k * 0.35)
-        p.set("kneeL", x=0.38 + k * 0.9)
-        p.set("kneeR", x=0.34 + k * 0.9)
-        p.set("armL", -0.2, 0, 0.75)
-        p.set("armR", -0.2, 0, -0.75)
-        return p
-    e = min(1.0, (t - 0.4) / 0.25)
-    settle = (t - 0.8) / 0.2 if t > 0.8 else 0.0
-    lift = math.sin(e * math.pi * 0.5) * (1 - settle)
-    p.loc[1] = lift * 0.55
-    p.squash(-lift * 0.08)
-    p.set("torso", x=0.06 - lift * 0.3)
-    p.set("head", x=-lift * 0.35)
-    p.set("armL", -2.6 * lift - 0.2, 0, 0.9 * lift + 0.3)
-    p.set("armR", -2.6 * lift - 0.2, 0, -0.9 * lift - 0.3)
-    p.set("elbowL", x=-0.3 * (1 - lift) - 1.55 * (1 - lift))
-    p.set("elbowR", x=-0.3 * (1 - lift) - 1.55 * (1 - lift))
-    return p
-
-
-def charge_pose(t):
-    """Powering up as the Power Streak climbs: a low crouch, fists pulled
-    to the hips, chest out, head back, then home to the guard."""
-    p = Pose()
-    k = math.sin(t * math.pi)
-    p.loc[1] = -k * 0.14
-    p.squash(k * 0.07)
-    p.set("torso", x=0.06 - k * 0.28)
-    p.set("head", x=-0.04 - k * 0.3)
-    p.set("armL", -0.55 + k * 0.85, 0, 0.3 + k * 0.25)
-    p.set("armR", -0.55 + k * 0.85, 0, -0.3 - k * 0.25)
-    p.set("elbowL", x=-1.55 + k * 0.6)
-    p.set("elbowR", x=-1.55 + k * 0.6)
-    p.set("kneeL", x=0.38 + k * 0.5)
-    p.set("kneeR", x=0.34 + k * 0.5)
-    return p
 
 
 def blast_pose(t):
@@ -547,30 +492,21 @@ def blast_pose(t):
     return p
 
 
-# Results: a hop and a fist punched to the sky, then back to the guard. The
-# motion is HY-Motion's (mocap.py, ADR 0010): "victory" in
-# sources/hy-motion/clips.json.
+# The motion of Idle, Charge, Transform, Stagger, and Victory is HY-Motion's
+# (mocap.py, ADR 0010): each clip's brief and chosen candidate are in
+# sources/hy-motion/clips.json under the clip's name in lower case. Idle is
+# a relaxed guard that breathes; Charge powers up after the strike that
+# earns a new Form; Transform crouches and erupts in the Landmark scene;
+# Stagger stumbles back at a wrong answer; Victory punches a fist to the
+# sky on Results. Each blends from the stance and back to it.
+HY_CLIPS = ("Idle", "Stagger", "Transform", "Charge", "Victory")
 
 
 def add_clips(rig):
     """Idle loops; every other clip plays once, started by an effect
     (ADR 0003)."""
-    keys = {}
-    breaths = {0: 0.0, 12: 1.0, 24: 0.0, 36: -1.0, 48: 0.0}
-    looks = {0: 0.0, 12: 0.05, 24: 0.0, 36: -0.05, 48: 0.0}
-    for f, breath in breaths.items():
-        p = Pose()
-        p.set("torso", x=0.06 + breath * 0.02)
-        p.set("head", y=looks[f])
-        p.set("armL", x=-0.55 + breath * 0.04)
-        p.set("armR", x=-0.55 + breath * 0.04)
-        for bone, pose in p.keys().items():
-            keys.setdefault(bone, []).append((f, pose))
-    c.add_clip(rig, "Idle", 48, keys)
     for kind in range(4):
         sampled_clip(rig, f"Attack{kind}", ATTACK_ANTICIPATION + ATTACK_STRIKE, attack_pose(kind))
-    mocap.hy_clip(rig, "Stagger", "stagger", stance())
-    sampled_clip(rig, "Transform", TRANSFORM, transform_pose)
-    sampled_clip(rig, "Charge", 0.5, charge_pose)
     sampled_clip(rig, "Blast", 0.8, blast_pose)
-    mocap.hy_clip(rig, "Victory", "victory", stance())
+    for name in HY_CLIPS:
+        mocap.hy_clip(rig, name, name.lower(), stance())

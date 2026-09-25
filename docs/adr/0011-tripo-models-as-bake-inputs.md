@@ -21,7 +21,7 @@ A generated model is one fixed character. The hero keeps every appearance choice
 - **One preset per retarget task.** A task with several presets bills for each of them but returns only the last clip. `animate` sends one task per clip. The first clip carries the geometry; the others carry the animation only.
 - **The bake fits the model to the game.** `scripts/blender/fighter.py` moves every clip onto one armature under the director's clip names. It keeps only the base-color texture at 2048 px, as for every model; Tripo's metallic, roughness, and normal maps are not used. It adds a baked ink hull as wide on screen as the hero's. The model keeps Tripo's size (about 1 m) and facing (+X); `src/scene/Fighter.tsx` scales it and turns it toward the hero.
 - **Stand-in clips.** Tripo has no preset for the Dummy's launch and its drop back in. Those cues play a hit clip while the component flies the fighter out of the frame and back.
-- **The sources go through git LFS.** The rigged model and its clips (`sources/tripo/<name>/*.glb`) are committed as LFS files. The game model in `src/renderer/models/` is never an LFS file: the build would inline the pointer text in its place.
+- **The sources go through git LFS.** Every candidate at full detail (`sources/tripo/<name>/candidates/`, the chosen one and the others), the rigged model, and its clips (`sources/tripo/<name>/*.glb`) are committed as LFS files. The game model in `src/renderer/models/` is never an LFS file: the build would inline the pointer text in its place.
 
 ## Consequences
 

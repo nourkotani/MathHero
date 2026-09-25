@@ -83,8 +83,8 @@ An alternative to Difficulty on the Pre-round screen: the Round asks only one ch
 ### Mastery Grid
 A per-Player 12×12 times-table chart on the Title screen, coloring each Fact green/yellow/red by mastery state — a progress report for the parent, driven by the same data Adaptive Selection uses. A Skill toggle (defaulting to the session's active Skill) switches which Skill's mastery it shows.
 
-### Training Dummy
-A cosmetic opponent in the arena. Every correct answer zaps/knocks it back; super-mode blasts launch it dramatically. It has no health bar and no effect on scoring — the score is purely about math.
+### Rival
+The cosmetic opponent in the arena, formerly the Training Dummy. Every correct answer strikes it; a full-power blast launches it out of the frame and it drops back in; it taunts when the hero staggers at a wrong answer. It has no health bar and no effect on scoring. Its body is a Tripo-generated fighter (ADR 0011, ADR 0012).
 
 ### Personal Best
 A Player's highest Round score, tracked separately per Skill × Difficulty. Beating one triggers its own celebration.

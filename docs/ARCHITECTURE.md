@@ -71,7 +71,7 @@ Violations only surface in the built artifact, which is why the flow-test suite 
 ## Rendering & performance
 
 - Budget: **60fps on the family's devices** — powerful desktops and iPhones first; the iPad relies on the quality ladder.
-- The hero and the arena are baked from committed Blender scripts into inlined glTF ([ADR 0007](./adr/0007-scripted-blender-models-as-baked-output.md)). The Training Dummy's body is a Tripo-generated fighter, which a committed Blender script fits to the game ([ADR 0011](./adr/0011-tripo-models-as-bake-inputs.md)). Light-based effects (aura, arcs, motes, cosmetics, blasts) stay procedural (materials, shaders, particles). Painted textures are **baked, not authored**: `scripts/bake-textures.mjs` generates them deterministically (seeded noise, no external art) into `src/renderer/textures/`, and the build inlines them into the single file ([ADR 0005](./adr/0005-baked-painted-textures-and-tier-ladder.md)). No hand-drawn asset files; the only downloaded ones are the bake inputs of ADR 0010 and ADR 0011.
+- The hero and the arena are baked from committed Blender scripts into inlined glTF ([ADR 0007](./adr/0007-scripted-blender-models-as-baked-output.md)). The Rival's body is a Tripo-generated fighter, which a committed Blender script fits to the game ([ADR 0011](./adr/0011-tripo-models-as-bake-inputs.md)). Light-based effects (aura, arcs, motes, cosmetics, blasts) stay procedural (materials, shaders, particles). Painted textures are **baked, not authored**: `scripts/bake-textures.mjs` generates them deterministically (seeded noise, no external art) into `src/renderer/textures/`, and the build inlines them into the single file ([ADR 0005](./adr/0005-baked-painted-textures-and-tier-ladder.md)). No hand-drawn asset files; the only downloaded ones are the bake inputs of ADR 0010 and ADR 0011.
 - Transformation glow is real selective bloom via the pmndrs `postprocessing` composer; the strongest tier adds sun shafts and speed-lines, and sustained low fps sheds one tier at a time down to the additive-sprite fallback ([ADR 0004](./adr/0004-composer-bloom-with-sprite-fallback.md), amended by [ADR 0005](./adr/0005-baked-painted-textures-and-tier-ladder.md)).
 - All readable text (questions, score, menus, HUD) lives in the Preact DOM overlay, never rendered inside the canvas.
 
@@ -87,7 +87,7 @@ One versioned Save File document (schema-version field + forward migrations) hol
 
 - `core` — pure Game Core: state, events, effects, question selection, scoring, streaks, XP/levels, mastery, save-document (de)serialization.
 - `scene` — the React Three Fiber root on the `#scene` canvas (ADR 0009): renderer, camera, frame loop, and the React components of the 3D scene.
-- `renderer` — three.js scene parts that the R3F root mounts: arena, hero, Training Dummy, transformation and blast effects.
+- `renderer` — three.js scene parts that the R3F root mounts: arena, hero, Rival, transformation and blast effects.
 - `ui` — Preact screens (Title, Hero creation, Pre-round, HUD, Results, Mastery Grid) and the number pad.
 - `audio` — WebAudio synthesizers keyed on effects.
 - `persistence` — localStorage adapter, export/import, migrations.

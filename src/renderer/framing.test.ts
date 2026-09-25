@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
-import { CAMERA_FAR, DUMMY_X, HERO_X, SKY_RADIUS } from './constants';
+import { CAMERA_FAR, RIVAL_X, HERO_X, SKY_RADIUS } from './constants';
 import { sideViewFraming } from './framing';
 
 /** Where a world point lands on screen, in normalized device coordinates. */
@@ -16,7 +16,7 @@ function project(aspect: number, focus: 'fight' | 'hero', point: THREE.Vector3):
 // The outer corners of both fighters: feet on the stone (y 0.3), heads and
 // raised fists up to y 3.2, a little body width either side.
 const HERO_EDGES = [new THREE.Vector3(HERO_X - 0.7, 0.3, 0), new THREE.Vector3(HERO_X - 0.7, 3.2, 0)];
-const DUMMY_EDGES = [new THREE.Vector3(DUMMY_X + 0.9, 0.3, 0), new THREE.Vector3(DUMMY_X + 0.9, 3.2, 0)];
+const RIVAL_EDGES = [new THREE.Vector3(RIVAL_X + 0.9, 0.3, 0), new THREE.Vector3(RIVAL_X + 0.9, 3.2, 0)];
 
 const ASPECTS = {
   'phone portrait arena': 402 / (874 * 0.42),
@@ -30,7 +30,7 @@ const ASPECTS = {
 describe('the side-view framing', () => {
   for (const [name, aspect] of Object.entries(ASPECTS)) {
     it(`keeps both fighters fully in frame: ${name}`, () => {
-      for (const point of [...HERO_EDGES, ...DUMMY_EDGES]) {
+      for (const point of [...HERO_EDGES, ...RIVAL_EDGES]) {
         const ndc = project(aspect, 'fight', point);
         expect(Math.abs(ndc.x), `x of ${point.toArray()}`).toBeLessThan(0.97);
         expect(Math.abs(ndc.y), `y of ${point.toArray()}`).toBeLessThan(0.97);
@@ -38,11 +38,11 @@ describe('the side-view framing', () => {
     });
   }
 
-  it('puts the hero on the left and the Training Dummy on the right', () => {
+  it('puts the hero on the left and the Rival on the right', () => {
     const hero = project(16 / 9, 'fight', new THREE.Vector3(HERO_X, 1.5, 0));
-    const dummy = project(16 / 9, 'fight', new THREE.Vector3(DUMMY_X, 1.5, 0));
+    const rival = project(16 / 9, 'fight', new THREE.Vector3(RIVAL_X, 1.5, 0));
     expect(hero.x).toBeLessThan(0);
-    expect(dummy.x).toBeGreaterThan(0);
+    expect(rival.x).toBeGreaterThan(0);
   });
 
   it('is a side view: the camera looks across the arena, not down on it', () => {

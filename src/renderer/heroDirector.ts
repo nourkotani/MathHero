@@ -33,7 +33,10 @@ export interface HeroDirector {
   cue(): HeroCue;
   parts(): HeroParts;
   /** The component tells the director which clips the model carries. */
-  ready(clips: readonly string[]): void;
+  ready(clips: ReadonlyArray<{ name: string; duration: number }>): void;
+  /** Seconds the clip lasts, read from the model (the clip owns its length,
+   *  ADR 0012); 0 before the model decodes, when no clip plays. */
+  length(clip: string): number;
   /** The component listens here for each change of cue or parts. */
   onChange(listener: () => void): void;
 }
@@ -42,7 +45,7 @@ export function createHeroDirector(parts: HeroParts): HeroDirector {
   let current: HeroCue = { clip: 'Idle', count: 0 };
   let shown = parts;
   let next: string | null = null;
-  let known = new Set<string>();
+  let known = new Map<string, number>();
   let listener: (() => void) | null = null;
 
   function start(clip: string) {
@@ -85,8 +88,9 @@ export function createHeroDirector(parts: HeroParts): HeroDirector {
     cue: () => current,
     parts: () => shown,
     ready(clips) {
-      known = new Set(clips);
+      known = new Map(clips.map((clip) => [clip.name, clip.duration]));
     },
+    length: (clip) => known.get(clip) ?? 0,
     onChange(change) {
       listener = change;
     },

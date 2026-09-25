@@ -274,6 +274,8 @@ export interface HeroRig {
    * clip already playing to end first (a charge never cuts off a strike).
    */
   play(name: string, queued?: boolean): void;
+  /** Seconds an authored clip lasts, from the model; 0 before it decodes. */
+  clipLength(name: string): number;
   hairMaterials: Surface[];
   bodyMaterial: Surface;
   trimMaterial: Surface;
@@ -563,6 +565,7 @@ export function buildHero({
     play(name, queued = false) {
       director.play(name, queued);
     },
+    clipLength: (name) => director.length(name),
     showHair(name) {
       director.showHair(name);
     },

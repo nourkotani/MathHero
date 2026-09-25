@@ -35,7 +35,7 @@ function createToonRamp(bands: readonly number[]): THREE.DataTexture {
 let sharedRamp: THREE.DataTexture | null = null;
 
 /**
- * Lit surfaces on the hero and the Training Dummy: banded toon shading, so
+ * Lit surfaces on the hero and the Rival: banded toon shading, so
  * the characters read as anime cels against the softer painted environment.
  * An optional baked multiply-map adds fabric weave, hair strands, or worn
  * padding — white where the player's chosen color must stay full; it can

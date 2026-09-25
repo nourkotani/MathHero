@@ -1,7 +1,7 @@
 /** @jsxImportSource react */
 // The hero's hitboxes (ADR 0009): one Rapier sensor ball on each fist and
 // each boot. Each frame the balls follow the bones of the hero's authored
-// clip. The Dummy's hurtbox reports the contact; the core already decided
+// clip. The Rival's hurtbox reports the contact; the core already decided
 // that the strike happens (ADR 0003), and the contact only times it.
 
 import { useFrame } from '@react-three/fiber';

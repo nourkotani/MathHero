@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { createHeroDirector } from './heroDirector';
 
 const PARTS = { body: 'BodyBoy', garment: 'GarmentGi', hair: 'Hair_spiky_short' };
-const CLIPS = ['Idle', 'Attack0', 'Attack1', 'Charge', 'Stagger', 'Blast', 'Transform', 'Victory'];
+const CLIPS = ['Idle', 'Attack0', 'Attack1', 'Charge', 'Stagger', 'Blast', 'Transform', 'Victory'].map(
+  (name, i) => ({ name, duration: 0.5 + i }),
+);
 
 function ready() {
   const hero = createHeroDirector(PARTS);
@@ -18,6 +20,14 @@ describe('the hero director', () => {
     hero.ready(CLIPS);
     hero.play('Attack0');
     expect(hero.cue().clip).toBe('Attack0');
+  });
+
+  it("reads each clip's length from the model, and knows none before it", () => {
+    const hero = createHeroDirector(PARTS);
+    expect(hero.length('Stagger')).toBe(0);
+    hero.ready(CLIPS);
+    expect(hero.length('Stagger')).toBe(4.5);
+    expect(hero.length('Moonwalk')).toBe(0);
   });
 
   it('ignores a clip the model does not carry', () => {

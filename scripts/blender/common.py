@@ -5,7 +5,7 @@ re-bake from an unchanged script gives the same model. Rules:
 
 - No randomness without a fixed seed; no reads of the clock.
 - Blender is Z-up; the glTF export turns it Y-up. The hero stands on the
-  left and faces +X; the Training Dummy faces the hero, toward -X.
+  left and faces +X; the Rival faces the hero, toward -X.
 - The painted look is baked into one albedo texture per model (Cycles,
   emission pass): base color, soft top light, crevice shade, and bright
   painted edges. The runtime adds the soft light ramp and the rim light.

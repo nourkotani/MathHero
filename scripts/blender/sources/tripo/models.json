@@ -2,7 +2,7 @@
   "about": "Tripo-generated models (ADR 0011). Each model has a brief (prompts, negative prompt, seeds, options), which `npm run tripo -- generate <name>` turns into candidates through the official Tripo CLI (`tripo make`), one per prompt and seed. Use a paid key only: free-tier outputs are public and CC BY. Prompts describe features, never franchise, character, or trademark names (CLAUDE.md).",
   "models": {
     "fighter": {
-      "role": "the sparring opponent, in place of the Training Dummy; its clips take the Dummy director clip names",
+      "role": "the sparring opponent, in place of the Rival; its clips take the Rival director clip names",
       "prompts": [
         "Original anime martial-arts hero, adult male, heroic muscular proportions, tall spiky upswept black hair with one teal streak, sleeveless white training gi top over a fitted charcoal bodysuit, crimson waist sash, cloth forearm wraps, fingerless armored gauntlets, knee-high reinforced boots, confident determined expression, full body, standing A-pose with arms slightly away from the body, highly detailed stylized game character",
         "Original comic-book superhero martial artist, adult male, athletic muscular build, short spiky silver-white hair, sleek navy and crimson armored bodysuit with sculpted chest plates and segmented shoulder guards, wide belt with a round star emblem, glowing teal seams on the gauntlets, heavy boots, brow visor plate, full body, standing A-pose with arms slightly away from the body, highly detailed stylized game character"
@@ -29,7 +29,7 @@
           "credits_consumed": 50,
           "prompt": 0,
           "seed": 11,
-          "files": "build/tripo/fighter/p0s0/tripo-out/fighter-p0s0-3b00916d"
+          "file": "fighter/candidates/p0s0.glb"
         },
         "p0s1": {
           "task_id": "1e16037c-f99a-4bb2-8df0-f0bf4bc69614",
@@ -37,7 +37,7 @@
           "credits_consumed": 50,
           "prompt": 0,
           "seed": 42,
-          "files": "build/tripo/fighter/p0s1/tripo-out/fighter-p0s1-1e16037c"
+          "file": "fighter/candidates/p0s1.glb"
         },
         "p1s0": {
           "task_id": "b5b4d850-059a-4f7c-b4b2-b9a7b55a4a92",
@@ -45,7 +45,7 @@
           "credits_consumed": 50,
           "prompt": 1,
           "seed": 11,
-          "files": "build/tripo/fighter/p1s0/tripo-out/fighter-p1s0-b5b4d850"
+          "file": "fighter/candidates/p1s0.glb"
         },
         "p1s1": {
           "task_id": "11eb3bde-6ab8-46bd-bb3a-a901bebdaf02",
@@ -53,7 +53,7 @@
           "credits_consumed": 50,
           "prompt": 1,
           "seed": 42,
-          "files": "build/tripo/fighter/p1s1/tripo-out/fighter-p1s1-11eb3bde"
+          "file": "fighter/candidates/p1s1.glb"
         }
       },
       "chosen": {
@@ -113,6 +113,71 @@
           "file": "fighter/Taunt.glb",
           "geometry": false
         }
+      }
+    },
+    "hero-boy": {
+      "role": "the hero's boy body (ADR 0012): the one armature both bodies share, and the rig every hero clip is made on; the bake sorts its faces into the Skin, Outfit, and Trim regions by hue",
+      "prompts": [
+        "Original anime martial-arts hero, teenage boy, stylized arcade fighter proportions with a slightly large head, big hands and big boots, athletic build, plain pure white martial-arts gi top and loose trousers, bright cyan belt, bright cyan wristbands and bright cyan boots, light peach skin, completely bald smooth head, smooth simple face with no painted eyes, eyebrows or mouth, full body, standing A-pose with arms slightly away from the body, highly detailed stylized game character, flat even colors"
+      ],
+      "negative_prompt": "hair, eyebrows, eyes, mouth, beard, text, letters, logo, weapon, cape, armor, jewelry, patterns, extra limbs, extra fingers, blurry, low detail, photorealistic real person, dark colors",
+      "seeds": [
+        11,
+        42
+      ],
+      "options": {
+        "model": "tripo-v3.1",
+        "params": {
+          "geometry_quality": "detailed",
+          "texture_quality": "detailed",
+          "texture": true,
+          "pbr": true,
+          "face_limit": 800000
+        }
+      },
+      "candidates": {},
+      "rig": {
+        "model": "v1.0-20240301",
+        "spec": "tripo",
+        "faces": 30000
+      },
+      "animations": {
+        "Idle": "preset:biped:idle",
+        "Attack0": "preset:biped:box_01",
+        "Attack1": "preset:biped:front_kick_01",
+        "Attack2": "preset:biped:box_02",
+        "Attack3": "preset:biped:box_03",
+        "Blast": "preset:biped:cast_a_spell"
+      }
+    },
+    "hero-girl": {
+      "role": "the hero's girl body (ADR 0012): the bake fits it to the boy's armature, so it plays the same clips",
+      "prompts": [
+        "Original anime martial-arts hero, teenage girl, stylized arcade fighter proportions with a slightly large head, big hands and big boots, athletic build, plain pure white martial-arts gi top and loose trousers, bright cyan belt, bright cyan wristbands and bright cyan boots, light peach skin, completely bald smooth head, smooth simple face with no painted eyes, eyebrows or mouth, full body, standing A-pose with arms slightly away from the body, highly detailed stylized game character, flat even colors"
+      ],
+      "negative_prompt": "hair, eyebrows, eyes, mouth, beard, text, letters, logo, weapon, cape, armor, jewelry, patterns, extra limbs, extra fingers, blurry, low detail, photorealistic real person, dark colors",
+      "seeds": [
+        11,
+        42
+      ],
+      "options": {
+        "model": "tripo-v3.1",
+        "params": {
+          "geometry_quality": "detailed",
+          "texture_quality": "detailed",
+          "texture": true,
+          "pbr": true,
+          "face_limit": 800000
+        }
+      },
+      "candidates": {},
+      "rig": {
+        "model": "v1.0-20240301",
+        "spec": "tripo",
+        "faces": 30000
+      },
+      "animations": {
+        "Idle": "preset:biped:idle"
       }
     }
   }
