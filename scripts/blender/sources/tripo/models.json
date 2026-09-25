@@ -111,7 +111,8 @@
           "task_id": "60f97813-b052-4c06-8533-eea5e1a79df3",
           "credits_consumed": 10,
           "file": "fighter/Taunt.glb",
-          "geometry": false
+          "geometry": false,
+          "note": "preset:biped:swagger walks 2.5 m over 3.67 s although tripo.mjs passes --animate-in-place; fighter.py windows it to 1.5 s and pins the hips."
         }
       }
     },

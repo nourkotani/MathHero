@@ -505,7 +505,7 @@ def join(name, objects):
     return joined
 
 
-def bake_painted(obj, size=1024, regions=None):
+def bake_painted(obj, size=1024, regions=None, unwrap=True):
     """Bake the parts' paint materials into one albedo, then wear it.
 
     After the bake, every face wears the single "Painted" material with the
@@ -515,27 +515,43 @@ def bake_painted(obj, size=1024, regions=None):
     "Painted<Region>" instead (same image), so the runtime can tint each
     region with a chosen color. Paint tintable regions near white: the bake
     then holds only their light and shade.
+
+    unwrap: make the UV islands anew. False keeps the islands the mesh has
+    (a sourced model's own, larger than a fresh unwrap of a dense mesh)
+    and only packs them into the square together, closer, over a
+    background of the paint's own light gray (fill), so the many small
+    islands of a sourced model never pick up a dark edge from the gaps.
     """
     bpy.ops.object.select_all(action="DESELECT")
     obj.select_set(True)
     bpy.context.view_layer.objects.active = obj
 
     # One UV island layout for the whole model, deterministic for a mesh.
-    obj.data.uv_layers.new(name="UVMap")
+    if unwrap:
+        obj.data.uv_layers.new(name="UVMap")
     bpy.ops.object.mode_set(mode="EDIT")
     bpy.ops.mesh.select_all(action="SELECT")
-    bpy.ops.uv.smart_project(angle_limit=math.radians(60), island_margin=0.01, rotate_method="AXIS_ALIGNED_Y")
-    bpy.ops.uv.pack_islands(margin=0.004, rotate=False)
+    if unwrap:
+        bpy.ops.uv.smart_project(angle_limit=math.radians(60), island_margin=0.01, rotate_method="AXIS_ALIGNED_Y")
+        bpy.ops.uv.pack_islands(margin=0.004, rotate=False)
+    else:
+        # The mesh's selection drives the UV operators. Each part came with
+        # its own square of UVs: even out their scales before the pack.
+        bpy.context.scene.tool_settings.use_uv_select_sync = True
+        bpy.ops.uv.average_islands_scale()
+        bpy.ops.uv.pack_islands(margin=0.001, rotate=True)
     bpy.ops.object.mode_set(mode="OBJECT")
 
     image = bpy.data.images.new(f"{obj.name}Painted", size, size, alpha=False)
     image.colorspace_settings.name = "sRGB"
+    if not unwrap:
+        image.generated_color = (0.8, 0.8, 0.8, 1.0)
     for mat in obj.data.materials:
         node = mat.node_tree.nodes.new("ShaderNodeTexImage")
         node.image = image
         mat.node_tree.nodes.active = node
 
-    bpy.ops.object.bake(type="EMIT", margin=8, use_clear=True)
+    bpy.ops.object.bake(type="EMIT", margin=8, use_clear=unwrap)
 
     regions = regions or {}
     old = list(obj.data.materials)

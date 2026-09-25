@@ -32,17 +32,26 @@ This script makes the game's version, and nothing is edited by hand:
   stance (the preset idle's first frame), the strike dash added to the
   root so the fists and boots reach the Rival (PRESETS table);
 - the HY-Motion clips (ADR 0010) through mocap's scheme for each rig;
-- the scripted Hair Styles and manes, fitted rigidly to each body's hair
-  bone until the Tripo hair pieces land (ticket D);
+- the hair pieces and manes from Tripo (sources/tripo/hero-hair, ticket
+  D), each decimated, placed on each skull by HAIR_FIT, its fringe lifted
+  off the eyes, and rigid on the body's hair bone; under each one, the
+  scalp cap: the head's own faces above the hairline, a little off the
+  skin, on the head bone, so no bald patch shows between the locks. The
+  cap alone is the short buzz cut; a thicker one with tufts is the long;
+- the garments from Tripo (sources/tripo/hero-garments), fitted to each
+  body band by band (GARMENT_FIT), moved out of the skin, and skinned to
+  that body's own bones by weight transfer from its mesh; the cape is
+  fitted on the body in the stance (the arms down) and brought back to
+  rest, so it hangs around the arms;
+- one painted atlas for everything: the bodies in the top row, the baked
+  paint of the hair, garments, and caps in the bottom row;
 - a baked ink hull, as on the scripted models;
 - each body's joints at rest and its strike offsets, written to
   src/renderer/models/hero-rig.json for the renderer.
 
 Part names (the director shows one body, one garment, one hair): a body
 is BodyBoy or BodyGirl; a piece fitted to a body is `<part>-<body>`, for
-example Hair_spiky_short-BodyGirl. There is no garment piece yet: every
-garment choice shows the body's own suit (ticket D adds the pieces under
-the same naming).
+example Hair_spiky_short-BodyGirl or GarmentCape-BodyBoy.
 """
 
 import json
@@ -64,11 +73,11 @@ RIG_JSON = os.path.normpath(os.path.join(HERE, "..", "..", "src", "renderer", "m
 
 FIGHTER_HEIGHT = 2.6  # game units: src/renderer/constants.ts FIGHTER_HEIGHT
 INK_WIDTH = 0.012
-# Textures: each body gets BODY_TEXTURE px of a 2 x 1 atlas; each face
-# FACE_TEXTURE px of another; the hair pieces bake into their own.
+# Textures: one 2 x 2 atlas of BODY_TEXTURE px squares: the bodies in the
+# top row; in the bottom row the hair paint, then the garments' and the
+# caps'. Each face gets FACE_TEXTURE px of another atlas.
 BODY_TEXTURE = 1024
 FACE_TEXTURE = 512
-HAIR_TEXTURE = 1024
 # How far off the skin the face layers float (inside the ink hull).
 FACE_LIFT = 0.008
 IRIS_LIFT = 0.011
@@ -79,18 +88,89 @@ IRIS_LIFT = 0.011
 BODIES = {"BodyBoy": "", "BodyGirl": "girl_"}
 GIRL = BODIES["BodyGirl"]
 
-# Near-white paint for the hair: the bake keeps only light and shade.
+# Near-white paint for the pieces, as on the scripted hero: the bake keeps
+# only light and shade, and the runtime tint gives the color.
 HAIR = (0.84, 0.84, 0.84)
-# Hair Styles (ADR 0008): the four styles, each short or long.
-HAIR_STYLES = ("spiky", "flame", "ponytail", "buzz")
+OUTFIT = (0.82, 0.82, 0.82)
+TRIM = (0.86, 0.86, 0.86)
+# The buzz cut's lengths (ADR 0008); the other Hair Styles and the manes
+# are the Tripo parts (models.json, brief hero-hair).
 HAIR_LENGTHS = ("short", "long")
-# The shared manes (spec #45): from Wild Mane on, every Hair Style ascends
-# into its Form's mane.
-MANES = ("wild", "crimson", "rose", "legend")
-# The scripted skull the hair was drawn on: its diameter, and how far its
-# centre sat above the hair pivot (hero.py before ADR 0012).
-SCRIPTED_SKULL = 0.68
-SCRIPTED_SKULL_LIFT = 0.16
+
+# Face budgets (ADR 0012): a hair piece or mane at most 4,000, its scalp
+# cap included; a garment piece at most 8,000. The garments take 7,000 so
+# that the largest look (a body, a garment, and a hair, each inked) draws
+# under the 84,000 triangles a frame allows.
+HAIR_FACES = 3300
+CAP_FACES = 700
+GARMENT_FACES = 7000
+
+# The scalp cap: how far off the skin it lies (the short buzz cut, and the
+# cap under every hair piece), and the long buzz: a thicker shell, with
+# short tufts on its upper part.
+CAP_LIFT = 0.008
+BUZZ_LIFT = 0.02
+BUZZ_THICKNESS = 0.016
+TUFTS = 48
+
+# Where each Tripo hair piece sits on a skull, in units of the skull's
+# width (_skull): its size; how much wider than that it is; how far back
+# and how high its top centre is from the skull's top centre; and its tilt
+# in degrees (negative lifts the front). Found by eye on both bodies.
+HAIR_FIT = {
+    "Hair_spiky_short": (2.1, 1.25, 0.3, 0.45, -20.0),
+    "Hair_spiky_long": (2.6, 1.15, 0.12, 0.8, 0.0),
+    "Hair_flame_short": (2.3, 1.2, 0.25, 0.35, -10.0),
+    "Hair_flame_long": (2.4, 1.15, 0.35, 0.8, -15.0),
+    "Hair_ponytail_short": (2.5, 1.2, 0.3, 0.5, -12.0),
+    "Hair_ponytail_long": (2.6, 1.2, 0.25, 0.4, -12.0),
+    "Hair_mane_wild": (3.6, 1.1, 0.06, 1.06, -2.0),
+    "Hair_mane_crimson": (3.9, 1.2, 0.35, 0.05, -20.0),
+    "Hair_mane_rose": (3.0, 1.15, 0.05, 0.68, 0.0),
+    "Hair_mane_legend": (3.0, 1.2, 0.05, 0.4, 0.0),
+}
+# Pieces that Tripo made with no opening for the face: the hair in front
+# of the face is cut away.
+FACE_WINDOW = ("Hair_mane_legend",)
+
+# How each garment fits a body (_fit_garment). top: the body landmark (and
+# an offset) its top goes to; anchor: a share of its height, down from the
+# top, and the landmark that share goes to; margin: room between the body
+# and the cloth; hug: the share, from the top, that follows the body's
+# shape (below it the cloth hangs as it came); start: the share above which
+# the shape is not measured (a collar says nothing of the chest); smooth:
+# the share of the height the scale is averaged over; front: the garment
+# has no back, so its front lies on the body's front; offset: how far out
+# of the skin the shrinkwrap puts the cloth; flare: below a landmark, the
+# cloth behind the body swings back by this much per unit of drop (_flare).
+GARMENT_FIT = {
+    "GarmentGi": {"top": ("neck", 0.1), "anchor": (0.6, "hip", 0.08), "margin": 0.03, "start": 0.15, "hug": 0.85, "smooth": 0.25},
+    "GarmentCape": {"top": ("neck", 0.14), "anchor": (1.0, "knee", 0.1), "margin": 0.04, "hug": 0.3, "smooth": 0.15, "offset": 0.03, "flare": ("hip", 0.15, 0.35)},
+    "GarmentArmor": {"top": ("shoulder_z", 0.14), "anchor": (1.0, "chest", -0.15), "margin": 0.03, "smooth": 0.3, "front": True},
+}
+# The paint of each garment, from the colors Tripo gave it: the accent
+# (belt, lapels, bands, clasps; the plates' recesses) where the color is
+# grayer than the first saturation given, or darker than the value given
+# and grayer than the second saturation (a shaded fold of the main color
+# stays saturated); the main elsewhere. Main and accent go to the tint
+# regions named. The cape and the armor wear the trim color, so they stand
+# out from the suit.
+GARMENT_PAINT = {
+    "GarmentGi": ("Outfit", "Trim", 0.3, 0.4, 0.55),
+    "GarmentCape": ("Trim", "Outfit", 0.3, 0.4, 0.55),
+    "GarmentArmor": ("Trim", "Outfit", 0.0, 0.2, 1.1),
+}
+# How far out of the skin a garment lies at least: past the body's own
+# ink hull (INK_WIDTH), so the hull never shows through the cloth.
+CLOTH_OFFSET = 0.02
+# A cape hangs from the trunk and the shoulders only: no leg, forearm, or
+# head bone moves it, so a kick or a raised fist does not drag it along.
+# The upper arms move only the cloth over the shoulders (SHOULDER_BONES
+# above the armpit, _transfer_weights): a flap that hangs beside an arm
+# does not rise with the arm and crumple.
+HANGING = {"GarmentCape": ("Hip", "Pelvis", "Waist", "torso", "Spine02", "NeckTwist01", "NeckTwist02", "L_Clavicle", "R_Clavicle", "L_UpperarmTwist01", "R_UpperarmTwist01")}
+SHOULDER_BONES = ("L_UpperarmTwist01", "R_UpperarmTwist01")
+ARMPIT_DROP = 0.08
 
 # Hero space in Blender: the hero faces three's +Z, which is Blender -Y.
 FORWARD = Vector((0.0, -1.0, 0.0))
@@ -631,14 +711,15 @@ def _dress_body(body, prefix, half, face_source, atlas, face_atlas, iris_atlas):
     _lift(iris_layer, IRIS_LIFT)
 
     # The body's texture: gray, the painted face filled with skin, into
-    # its half of the atlas; the faces sorted into the tint materials.
+    # its square of the atlas's top row; the faces sorted into the tint
+    # materials.
     image.scale(BODY_TEXTURE, BODY_TEXTURE)
     body_px = _pixels(image)
     features = _features(body_px[:, :, :3], _median_color(body_px, inside)) * inside
     means = regions.normalize(image, fill=features)
     print(f"TEXTURE {body.name}: region means before {means}")
     x0 = half * BODY_TEXTURE
-    atlas[:, x0 : x0 + BODY_TEXTURE] = _pixels(image)
+    atlas[BODY_TEXTURE:, x0 : x0 + BODY_TEXTURE] = _pixels(image)
     for other in list(body.data.materials):
         if other is not None:
             bpy.data.materials.remove(other)
@@ -647,7 +728,7 @@ def _dress_body(body, prefix, half, face_source, atlas, face_atlas, iris_atlas):
     uv = body.data.uv_layers.active.data
     for i in range(len(uv)):
         u, v = uv[i].uv
-        uv[i].uv = (0.5 * half + 0.5 * (u % 1.0), v)
+        uv[i].uv = (0.5 * half + 0.5 * (u % 1.0), 0.5 + 0.5 * min(max(v, 0.0), 1.0))
     body.data.update()
     return face, iris_layer
 
@@ -662,7 +743,7 @@ def _atlas_image(name, width, height, pixels, alpha=True):
     return image
 
 
-# ---------------------------------------------------------------- hair
+# ---------------------------------------------------------------- pieces: Tripo hair and garments
 
 
 def hair_name(style, length):
@@ -670,175 +751,739 @@ def hair_name(style, length):
     return f"Hair_{style}_{length}"
 
 
-def mane_name(mane):
-    """The mesh name for a shared mane: Hair_mane_wild…"""
-    return f"Hair_mane_{mane}"
+def _tripo_parts(brief):
+    """The parts of a Tripo brief and the file of each: candidate p<i>s0 is
+    parts[i]; a candidate marked rejected is not used."""
+    out = {}
+    for i, part in enumerate(brief["parts"]):
+        info = brief["candidates"].get(f"p{i}s0")
+        if info is None or info.get("rejected"):
+            continue
+        out[part] = os.path.join(SOURCES, info["file"])
+    return out
 
 
-def _hair_fit(body, prefix):
-    """Where the scripted hair goes on this skull, and how big: the pivot
-    in three.js hero space, and the scale from the scripted skull."""
+def _clean_mesh(obj):
+    """Drop what the importer brought that the bake remakes: the materials
+    and their images, the custom normals. The first UV layer stays: the
+    bake packs the source's own islands (bake_painted unwrap=False)."""
+    mesh = obj.data
+    images = {n.image for m in mesh.materials if m and m.use_nodes for n in m.node_tree.nodes if n.type == "TEX_IMAGE" and n.image}
+    worn = [m for m in mesh.materials if m]
+    mesh.materials.clear()
+    for mat in worn:
+        if mat.users == 0:
+            bpy.data.materials.remove(mat)
+    for image in images:
+        if image.users == 0:
+            bpy.data.images.remove(image)
+    while len(mesh.uv_layers) > 1:
+        mesh.uv_layers.remove(mesh.uv_layers[-1])
+    if mesh.uv_layers:
+        mesh.uv_layers[0].name = "UVMap"
+        mesh.uv_layers.active = mesh.uv_layers[0]
+    if mesh.has_custom_normals:
+        bpy.context.view_layer.objects.active = obj
+        bpy.ops.mesh.customdata_custom_splitnormals_clear()
+    mesh.shade_smooth()
+
+
+def _tripo_piece(path, name, faces):
+    """A Tripo piece at its budget: the importer's UV seams welded (the
+    collapse would keep every seam), decimated, turned to face the hero's
+    forward (Tripo faces +X), its origin at its bounding box's top centre."""
+    added = c.import_glb(path)
+    obj = next(o for o in added if o.type == "MESH")
+    for other in added - {obj}:
+        bpy.data.objects.remove(other, do_unlink=True)
+    mesh = obj.data
+    mesh.transform(obj.matrix_world)
+    obj.matrix_world.identity()
+    mesh.transform(Matrix.Rotation(math.radians(-90.0), 4, "Z"))
+    bm = bmesh.new()
+    bm.from_mesh(mesh)
+    bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=1e-5)
+    bm.to_mesh(mesh)
+    bm.free()
+    before = len(mesh.polygons)
+    decimate = obj.modifiers.new("Decimate", "DECIMATE")
+    decimate.decimate_type = "COLLAPSE"
+    decimate.ratio = min(1.0, faces / before)
+    bpy.context.view_layer.objects.active = obj
+    bpy.ops.object.modifier_apply(modifier=decimate.name)
+    bm = bmesh.new()
+    bm.from_mesh(mesh)
+    bmesh.ops.triangulate(bm, faces=bm.faces)
+    bm.to_mesh(mesh)
+    bm.free()
+    # The collapse moves each face's UV corners on its own, which cuts the
+    # source's UV islands into single faces: weld the corners of a vertex
+    # that lie together again.
+    bpy.ops.object.mode_set(mode="EDIT")
+    bpy.ops.mesh.select_all(action="SELECT")
+    bpy.context.scene.tool_settings.use_uv_select_sync = True
+    bpy.ops.uv.remove_doubles(threshold=0.004, use_shared_vertex=True)
+    bpy.ops.object.mode_set(mode="OBJECT")
+    co = np.empty(len(mesh.vertices) * 3)
+    mesh.vertices.foreach_get("co", co)
+    co = co.reshape(-1, 3)
+    lo, hi = co.min(axis=0), co.max(axis=0)
+    mesh.transform(Matrix.Translation((-(lo[0] + hi[0]) / 2, -(lo[1] + hi[1]) / 2, -hi[2])))
+    obj.name = mesh.name = name
+    print(f"PIECE {name}: {before} -> {len(mesh.polygons)} faces")
+    return obj
+
+
+def _paint_garment(obj, paint, materials):
+    """Each face of a garment wears the paint of its tint region, read from
+    the colors Tripo gave it (GARMENT_PAINT), with the stray faces voted
+    into their neighbours' region."""
+    main, accent, gray_below, dark_below, dark_gray_below = paint
+    image = regions.base_color_image(obj)
+    px = regions._pixels(image)
+    height, width = px.shape[:2]
+    tri = regions._triangle_uvs(obj)
+    centre = tri.mean(axis=1, keepdims=True)
+    points = np.concatenate([centre, centre, centre + (tri - centre) * regions.INNER], axis=1)
+    x = np.clip((points[..., 0] % 1.0) * (width - 1), 0, width - 1).astype(np.int32)
+    y = np.clip((points[..., 1] % 1.0) * (height - 1), 0, height - 1).astype(np.int32)
+    _, sat, val = regions._hsv(px[y, x].mean(axis=1))
+    labels = ((sat < gray_below) | ((val < dark_below) & (sat < dark_gray_below))).astype(np.int8)
+    labels = regions._smooth(obj, labels)
+    _clean_mesh(obj)
+    obj.data.materials.append(materials[main])
+    obj.data.materials.append(materials[accent])
+    obj.data.polygons.foreach_set("material_index", labels.astype(np.int32))
+    print(f"PAINT {obj.name}: {main} {1.0 - labels.mean():.2f}, {accent} {labels.mean():.2f}")
+
+
+def _copy(obj, name):
+    copy = obj.copy()
+    copy.data = obj.data.copy()
+    copy.name = copy.data.name = name
+    bpy.context.scene.collection.objects.link(copy)
+    return copy
+
+
+def _skull(body, prefix):
+    """The bald head, for the hair: the top centre and the width of its upper
+    part (where HAIR_FIT places a piece), the crown's centre and half width
+    (the fringe and the cap), the ears' top, the brow, and the hairline."""
     on_head = _on_bone(body, prefix + "head")
-    heads = [v.co for v in body.data.vertices if on_head[v.index]]
-    lo = Vector((min(p.x for p in heads), min(p.y for p in heads), min(p.z for p in heads)))
-    hi = Vector((max(p.x for p in heads), max(p.y for p in heads), max(p.z for p in heads)))
-    centre = (lo + hi) / 2
-    scale = min(1.0, max(0.6, (hi.x - lo.x) / SCRIPTED_SKULL))
-    pivot = TO_THREE @ centre - Vector((0.0, SCRIPTED_SKULL_LIFT * scale, 0.0))
-    print(f"HAIR FIT {body.name}: skull {hi.x - lo.x:.3f} wide, {hi.z - lo.z:.3f} tall; scale {scale:.2f}, pivot {tuple(round(v, 3) for v in pivot)}")
-    return tuple(pivot), scale
+    co = np.empty(len(body.data.vertices) * 3)
+    body.data.vertices.foreach_get("co", co)
+    co = co.reshape(-1, 3)
+    head = co[on_head]
+    top = float(head[:, 2].max())
+    height = top - float(head[:, 2].min())
+    upper = head[head[:, 2] > top - 0.45 * height]
+    crown = head[head[:, 2] > top - 0.2]
+    crown_x = 0.5 * float(crown[:, 0].min() + crown[:, 0].max())
+    lateral = np.abs(head[:, 0] - crown_x)
+    # The ears stand out farthest from the skull's side.
+    ear_top = float(head[lateral > 0.92 * lateral.max(), 2].max())
+    drop = top - ear_top
+    skull = {
+        "centre": Vector((0.5 * float(upper[:, 0].min() + upper[:, 0].max()), 0.5 * float(upper[:, 1].min() + upper[:, 1].max()), top)),
+        "width": float(upper[:, 0].max() - upper[:, 0].min()),
+        "crown_x": crown_x,
+        "crown_y": 0.5 * float(crown[:, 1].min() + crown[:, 1].max()),
+        "half_width": 0.5 * float(crown[:, 0].max() - crown[:, 0].min()),
+        "ear_top": ear_top,
+        "brow": ear_top + 0.03,
+        # The hairline's height at the front, the side (over the ears), and
+        # the back (the nape).
+        "hairline": (top - 0.35 * drop, ear_top + 0.02, ear_top - 0.12),
+    }
+    print(f"SKULL {body.name}: width {skull['width']:.3f}, ear top {ear_top:.3f}, hairline {tuple(round(z, 3) for z in skull['hairline'])}")
+    return skull
 
 
-def build_hair(style, long, part, pivot, k):
-    """One Hair Style, carried over from the code-built hair: spikes and caps
-    placed from the hair pivot in three.js hero space, scaled by k."""
-
-    def spike(x, y, z, tilt_x, tilt_z, radius=0.14, height=0.55):
-        part(c.hair_cone("Spike", pivot, x * k, y * k, z * k, tilt_x, tilt_z, radius * k, height * k))
-
-    def cap(radius_scale, flatten, y):
-        px, py, pz = pivot
-        part(c.sphere("Cap", 0.37 * k * radius_scale, c.three_point(px, py + y * k, pz), scale=(1.0, 1.0, flatten), segments=24, rings=14))
-
-    if style == "spiky":
-        spike(0, 0.74, 0, 0, 0)
-        spike(0.18, 0.67, 0.05, 0, -0.5)
-        spike(-0.18, 0.67, 0.05, 0, 0.5)
-        spike(0.1, 0.62, -0.18, 0.5, -0.25)
-        spike(-0.1, 0.62, -0.18, 0.5, 0.25)
-        spike(0.05, 0.64, 0.2, -0.45, -0.15)
-        spike(-0.05, 0.64, 0.2, -0.45, 0.15)
-        # Temple spikes flaring past the ears widen the silhouette.
-        spike(0.28, 0.42, 0.03, 0.1, -1.05, 0.1, 0.42)
-        spike(-0.28, 0.42, 0.03, 0.1, 1.05, 0.1, 0.42)
-        spike(0.16, 0.52, 0.22, -0.55, -0.55, 0.09, 0.34)
-        spike(-0.16, 0.52, 0.22, -0.55, 0.55, 0.09, 0.34)
-        if long:
-            # A wild mane cascading down the back.
-            spike(0.14, 0.12, -0.34, 2.7, -0.1, 0.13, 0.85)
-            spike(-0.14, 0.12, -0.34, 2.7, 0.1, 0.13, 0.85)
-            spike(0, 0.02, -0.38, 2.8, 0, 0.15, 1.0)
-    elif style == "flame":
-        # One big swept-back flame of hair, with a defiant front lick.
-        spike(0, 0.67, -0.05, -0.55, 0, 0.24, 1.1 if long else 0.75)
-        spike(0.14, 0.57, -0.12, -0.7, -0.2, 0.18, 0.9 if long else 0.6)
-        spike(-0.14, 0.57, -0.12, -0.7, 0.2, 0.18, 0.9 if long else 0.6)
-        spike(0.06, 0.56, 0.18, -1.0, -0.3, 0.1, 0.4)
-        spike(-0.1, 0.53, 0.16, -0.9, 0.35, 0.08, 0.32)
-    elif style == "ponytail":
-        # High and flat enough that the hairline sits above the brows.
-        cap(1.0, 0.6, 0.34)
-        # Side bangs hug the temples: they frame the face, never cover it.
-        spike(0.3, 0.34, 0.1, -0.1, -1.15, 0.07, 0.3)
-        spike(-0.3, 0.34, 0.1, -0.1, 1.15, 0.07, 0.3)
-        spike(0, 0.47, -0.3, 2.45, 0, 0.12, 0.9 if long else 0.5)
-        if long:
-            spike(0, -0.13, -0.42, 2.9, 0, 0.1, 0.7)
-    else:  # buzz
-        cap(1.06 if long else 1.0, 0.75 if long else 0.6, 0.3 if long else 0.34)
-        # A short widow's-peak fringe so the cut reads on purpose, not bald.
-        spike(0, 0.4, 0.3, -1.25, 0, 0.09, 0.22)
-        spike(0.12, 0.38, 0.27, -1.2, -0.3, 0.07, 0.18)
-        spike(-0.12, 0.38, 0.27, -1.2, 0.3, 0.07, 0.18)
+def _cap(body, prefix, skull, name):
+    """The scalp: the head's faces above the hairline, CAP_LIFT off the
+    skin. The hairline runs around the head, high on the forehead, over
+    the ears, and low at the nape: a + b cos(angle) + c cos(2 angle), the
+    angle from the front."""
+    front, side, back = skull["hairline"]
+    a = 0.5 * (side + 0.5 * (front + back))
+    b = 0.5 * (front - back)
+    cc = 0.5 * (front + back) - a
+    co = np.empty(len(body.data.vertices) * 3)
+    body.data.vertices.foreach_get("co", co)
+    co = co.reshape(-1, 3)
+    r = np.hypot(co[:, 0] - skull["crown_x"], co[:, 1] - skull["crown_y"]) + 1e-9
+    ahead = -(co[:, 1] - skull["crown_y"]) / r
+    line = a + b * ahead + cc * (2.0 * ahead * ahead - 1.0)
+    scalp = _on_bone(body, prefix + "head") & (co[:, 2] > line)
+    bm = bmesh.new()
+    bm.from_mesh(body.data)
+    bmesh.ops.delete(bm, geom=[f for f in bm.faces if not all(scalp[v.index] for v in f.verts)], context="FACES")
+    bmesh.ops.delete(bm, geom=[v for v in bm.verts if not v.link_faces], context="VERTS")
+    bm.normal_update()
+    for v in bm.verts:
+        v.co += v.normal * CAP_LIFT
+    mesh = bpy.data.meshes.new(name)
+    bm.to_mesh(mesh)
+    bm.free()
+    cap = bpy.data.objects.new(name, mesh)
+    bpy.context.scene.collection.objects.link(cap)
+    _clean_mesh(cap)
+    if len(mesh.polygons) > CAP_FACES:
+        decimate = cap.modifiers.new("Decimate", "DECIMATE")
+        decimate.ratio = CAP_FACES / len(mesh.polygons)
+        bpy.context.view_layer.objects.active = cap
+        bpy.ops.object.modifier_apply(modifier=decimate.name)
+    print(f"CAP {name}: {len(mesh.polygons)} faces")
+    return cap
 
 
-def build_mane(mane, part, pivot, k):
-    """A Form's shared mane: original shapes, bigger than any Hair Style, so
-    the ascension reads at a glance."""
-
-    def spike(x, y, z, tilt_x, tilt_z, radius=0.14, height=0.55):
-        part(c.hair_cone("Mane", pivot, x * k, y * k, z * k, tilt_x, tilt_z, radius * k, height * k))
-
-    def cap(radius_scale, flatten, y, z=0.0):
-        px, py, pz = pivot
-        part(c.sphere("ManeCap", 0.37 * k * radius_scale, c.three_point(px, py + y * k, pz + z * k), scale=(1.0, 1.0, flatten), segments=24, rings=14))
-
-    if mane == "wild":
-        # A huge spiked mane: a crown of spikes, then long ones sweeping back
-        # and down past the shoulders.
-        for i in range(7):
-            a = (i - 3) / 3
-            spike(a * 0.22, 0.7 - abs(a) * 0.08, 0.02, 0.1, -a * 0.6, 0.15, 0.7)
-        # Hanging spikes: centered low, so the wide end sits at the back of
-        # the head and the cone hangs down (a cone centered at head height
-        # stuck half its length up above the crown).
-        for i in range(5):
-            a = (i - 2) / 2
-            spike(a * 0.26, -0.18, -0.4, 2.55 + abs(a) * 0.1, -a * 0.35, 0.16, 1.15)
-        for side in (-1, 1):
-            spike(side * 0.34, 0.36, -0.02, 0.2, -side * 1.2, 0.13, 0.7)
-            spike(side * 0.3, -0.25, -0.3, 2.7, -side * 0.4, 0.13, 0.9)
-    elif mane == "crimson":
-        # Sleek blades swept straight back, and one long tail to the waist.
-        cap(1.02, 0.62, 0.33)
-        for i in range(5):
-            a = (i - 2) / 2
-            spike(a * 0.2, 0.5, -0.1, -2.0, -a * 0.25, 0.1, 0.7)
-        spike(0, -0.4, -0.4, 2.95, 0, 0.13, 1.5)
-        for side in (-1, 1):
-            spike(side * 0.31, 0.3, 0.08, -0.15, -side * 1.3, 0.07, 0.45)
-    elif mane == "rose":
-        # A soft curly bloom: round puffs in two rings around the head.
-        cap(1.08, 0.7, 0.32)
-        for ring, (height, reach, count) in enumerate(((0.45, 0.3, 8), (0.22, 0.36, 10))):
-            for i in range(count):
-                a = 2 * 3.14159 * (i + ring * 0.5) / count
-                x, z = reach * math.sin(a), reach * math.cos(a)
-                if z > 0.18:
-                    continue  # the face stays clear
-                px, py, pz = pivot
-                part(c.sphere("Petal", 0.15 * k, c.three_point(px + x * k, py + height * k, pz + z * k), segments=16, rings=10))
-    else:  # legend
-        # A tall crown of upright flame spikes, and long spikes behind.
-        for i in range(9):
-            a = (i - 4) / 4
-            spike(a * 0.26, 0.8 - abs(a) * 0.2, -0.02, -0.05, -a * 0.35, 0.13, 0.95 - abs(a) * 0.3)
-        for i in range(3):
-            a = i - 1
-            spike(a * 0.2, -0.28, -0.4, 2.7, -a * 0.2, 0.16, 1.3)
-        for side in (-1, 1):
-            spike(side * 0.33, 0.42, 0.02, 0.05, -side * 1.0, 0.1, 0.55)
+def _buzz_long(cap, skull, name):
+    """The long buzz cut: the cap made a shell BUZZ_THICKNESS thick, lifted
+    to BUZZ_LIFT, with short tufts on its upper part, tipped back."""
+    buzz = _copy(cap, name)
+    _lift(buzz, BUZZ_LIFT - CAP_LIFT)
+    solid = buzz.modifiers.new("Shell", "SOLIDIFY")
+    solid.thickness = BUZZ_THICKNESS
+    solid.offset = -1.0
+    solid.use_rim = True
+    solid.use_even_offset = False
+    bpy.context.view_layer.objects.active = buzz
+    bpy.ops.object.modifier_apply(modifier=solid.name)
+    bm = bmesh.new()
+    bm.from_mesh(buzz.data)
+    bm.normal_update()
+    tuft_line = skull["ear_top"] + 0.45 * (skull["centre"].z - skull["ear_top"])
+    spots = [v for v in bm.verts if v.co.z > tuft_line and v.normal.z > 0.2]
+    step = max(1, len(spots) // TUFTS)
+    back = Vector((0.0, 0.8, 0.0))
+    for v in spots[::step][:TUFTS]:
+        axis = (v.normal + back).normalized()
+        made = bmesh.ops.create_cone(bm, cap_ends=True, segments=5, radius1=0.03, radius2=0.0, depth=0.06, calc_uvs=True)
+        turn = axis.to_track_quat("Z", "Y").to_matrix().to_4x4()
+        bmesh.ops.transform(bm, verts=made["verts"], matrix=Matrix.Translation(v.co + axis * 0.02) @ turn)
+    bmesh.ops.triangulate(bm, faces=bm.faces)
+    bm.to_mesh(buzz.data)
+    bm.free()
+    buzz.data.shade_smooth()
+    print(f"CAP {name}: {len(buzz.data.polygons)} faces")
+    return buzz
 
 
-def _hair_pieces(rigs, bodies):
-    """The scripted Hair Styles and manes on each body's hair bone: one
-    set per body, painted into one atlas, inked, split into one piece per
-    name and body, each rigid on its bone."""
-    hair_material = c.paint_material("Hair", HAIR, grain=0.2, edge=0.35, crevice=0.4, top=0.3, stroke_scale=14.0)
-    parts = []
-    tag = {"part": None, "bone": None}
+def _bake_pieces(units, size, paints):
+    """Paint the pieces into one size x size image: each unit on a cell of a
+    grid far from the bodies (the bake's shading sees no other piece),
+    joined, baked, and split again. Returns {name: piece} and the pixels;
+    each piece keeps its UVs and wears the bake's Painted<Region>
+    materials, which _wear_atlas swaps for the atlas's."""
+    offsets = {}
+    for i, obj in enumerate(units):
+        offsets[obj.name] = Vector((30.0 + 3.0 * (i % 5), 3.0 * (i // 5), 0.0))
+        obj.data.transform(Matrix.Translation(offsets[obj.name]))
+        obj["part"] = obj.name
+    joined = c.join("PieceBake", units)
+    image = c.bake_painted(joined, size=size, regions=paints, unwrap=False)
+    px = _pixels(image)
+    pieces = {}
+    for name, offset in offsets.items():
+        piece = c.split_group(joined, name, name, center=False)
+        piece.data.transform(Matrix.Translation(-offset))
+        for group in list(piece.vertex_groups):
+            piece.vertex_groups.remove(group)
+        pieces[name] = piece
+    c.remove(joined)
+    return pieces, px
 
-    def part(obj):
-        obj["bone"] = tag["bone"]
-        obj["part"] = tag["part"]
-        parts.append(c.assign(obj, hair_material))
-        return obj
 
-    names = []
-    for body_name, prefix in BODIES.items():
-        pivot, k = _hair_fit(bodies[body_name], prefix)
-        tag["bone"] = prefix + "hair"
-        for style in HAIR_STYLES:
-            for length in HAIR_LENGTHS:
-                tag["part"] = piece_name(hair_name(style, length), body_name)
-                names.append((tag["part"], body_name))
-                build_hair(style, length == "long", part, pivot, k)
-        for mane in MANES:
-            tag["part"] = piece_name(mane_name(mane), body_name)
-            names.append((tag["part"], body_name))
-            build_mane(mane, part, pivot, k)
-    hair = c.join("HeroHair", parts)
-    c.bake_painted(hair, size=HAIR_TEXTURE, regions={"Hair": "Hair"}).pack()
-    c.add_ink_hull(hair, INK_WIDTH)
-    pieces = [(c.split_group(hair, name, name, center=False), body_name) for name, body_name in names]
-    c.remove(hair)
-    for piece, body_name in pieces:
-        for name, _ in names:
-            group = piece.vertex_groups.get(name)
-            if group is not None:
+def _wear_atlas(piece, half, materials):
+    """A baked piece into its square of the atlas's bottom row, and onto
+    the atlas's tint materials (slot by slot, so the ink stays last)."""
+    mesh = piece.data
+    uv = mesh.uv_layers.active.data
+    for i in range(len(uv)):
+        u, v = uv[i].uv
+        uv[i].uv = (0.5 * half + 0.5 * u, 0.5 * v)
+    index = np.empty(len(mesh.polygons), dtype=np.int32)
+    mesh.polygons.foreach_get("material_index", index)
+    worn = []
+    remap = {}
+    for slot in sorted(set(index.tolist())):
+        region = mesh.materials[slot].name.split(".")[0][len(c.PAINTED) :]
+        mat = materials[region]
+        if mat not in worn:
+            worn.append(mat)
+        remap[slot] = worn.index(mat)
+    # Clearing the slots resets the faces' indices: set them after.
+    mesh.materials.clear()
+    for mat in worn:
+        mesh.materials.append(mat)
+    mesh.polygons.foreach_set("material_index", [remap[i] for i in index.tolist()])
+
+
+def _lift_fringe(piece, skull, keep=0.15, reach=0.16):
+    """The fringe stops at the brow: hair in front of the face, below the
+    brow and above the chin, is pulled up toward the brow, fading out to
+    the sides of the face."""
+    brow, cx, cy, half = skull["brow"], skull["crown_x"], skull["crown_y"], skull["half_width"]
+    for v in piece.data.vertices:
+        p = v.co
+        if p.z >= brow or p.y > cy or p.z < brow - reach:
+            continue
+        w = 1.0 - min(1.0, max(0.0, (abs(p.x - cx) / half - 0.55) / 0.35))
+        w = w * w * (3.0 - 2.0 * w)
+        if w > 0.0:
+            v.co.z += (brow - (brow - p.z) * keep - p.z) * w
+
+
+def _cut_face_window(piece, skull):
+    """Cut away the hair that hangs in front of the face: forward of the
+    forehead, below the brow, within the face's width."""
+    brow, cx, cy, half = skull["brow"], skull["crown_x"], skull["crown_y"], skull["half_width"]
+    front = cy - 0.6 * half
+    bm = bmesh.new()
+    bm.from_mesh(piece.data)
+    inside = {v.index for v in bm.verts if v.co.y < front and v.co.z < brow and abs(v.co.x - cx) < 0.85 * half}
+    cut = [f for f in bm.faces if all(v.index in inside for v in f.verts)]
+    bmesh.ops.delete(bm, geom=cut, context="FACES")
+    bmesh.ops.delete(bm, geom=[v for v in bm.verts if not v.link_faces], context="VERTS")
+    bm.to_mesh(piece.data)
+    bm.free()
+    print(f"FACE WINDOW {piece.name}: {len(cut)} faces cut")
+
+
+def _hair_pieces(body, body_name, prefix, rig, skull, canon, caps):
+    """Every hair of one body: each Tripo piece placed on the skull, its
+    fringe off the eyes, on the hair bone, over the scalp cap on the head
+    bone; the buzz cuts are the caps alone, on the head bone (they hug the
+    skull, so the Form's growth does not lift them off it)."""
+    frame, width = skull["centre"], skull["width"]
+    pieces = []
+    for part, (size, wide, back, lift, pitch) in HAIR_FIT.items():
+        piece = _copy(canon[part], piece_name(part, body_name) + "Tripo")
+        place = (
+            Matrix.Translation(frame + Vector((0.0, back * width, lift * width)))
+            @ Matrix.Rotation(math.radians(pitch), 4, "X")
+            @ Matrix.Diagonal((size * width * wide, size * width, size * width, 1.0))
+        )
+        piece.data.transform(place)
+        _lift_fringe(piece, skull)
+        if part in FACE_WINDOW:
+            _cut_face_window(piece, skull)
+        piece["bone"] = prefix + "hair"
+        under = _copy(caps["short"], piece_name(part, body_name) + "Cap")
+        under["bone"] = prefix + "head"
+        pieces.append(c.join(piece_name(part, body_name), [piece, under]))
+    for length in HAIR_LENGTHS:
+        buzz = _copy(caps[length], piece_name(hair_name("buzz", length), body_name))
+        buzz.vertex_groups.new(name=prefix + "head").add(range(len(buzz.data.vertices)), 1.0, "REPLACE")
+        pieces.append(buzz)
+    return pieces
+
+
+# ---------------------------------------------------------------- garments
+
+
+def _landmarks(body, prefix, rig, posed=False):
+    """Where a garment goes on a body: heights of its joints, the shoulders'
+    half span, and the torso's cross-section by height (the arms left out):
+    half width, front, and back. posed: the joints as the rig is posed now
+    (body is then the posed copy), not at rest."""
+    if posed:
+        bone = lambda name: rig.matrix_world @ rig.pose.bones[prefix + name].head  # noqa: E731
+    else:
+        bone = lambda name: rig.matrix_world @ rig.data.bones[prefix + name].head_local  # noqa: E731
+    co = np.empty(len(body.data.vertices) * 3)
+    body.data.vertices.foreach_get("co", co)
+    co = co.reshape(-1, 3)
+    shoulder_x = 0.5 * abs(bone("armR").x - bone("armL").x)
+    marks = {
+        "neck": bone("NeckTwist01").z,
+        "hip": bone("Hip").z,
+        "chest": bone("Spine02").z,
+        "knee": 0.5 * (bone("kneeR").z + bone("kneeL").z),
+        "shoulder_z": 0.5 * (bone("armR").z + bone("armL").z),
+    }
+    step = 0.02
+    heights = np.arange(0.3, FIGHTER_HEIGHT - 0.3, step)
+    profile = []
+    for z in heights:
+        band = co[(np.abs(co[:, 2] - z) < step) & (np.abs(co[:, 0]) < shoulder_x + 0.12)]
+        if len(band) < 8:
+            profile.append((np.nan, np.nan, np.nan))
+        else:
+            profile.append((np.percentile(np.abs(band[:, 0]), 99), np.percentile(band[:, 1], 1), np.percentile(band[:, 1], 99)))
+    marks["heights"], marks["profile"] = heights, np.array(profile)
+    return marks
+
+
+def _smooth_along(values, width):
+    kernel = np.ones(width) / width
+    padded = np.pad(values, (width // 2, width - 1 - width // 2), mode="edge")
+    return np.convolve(padded, kernel, mode="valid")
+
+
+def _fit_garment(piece, marks, spec, bands=40):
+    """Fit a garment to a body band by band: its top and one anchor go to
+    the body's landmarks (the height), and each horizontal band is scaled to
+    the torso's cross-section at the height it lands on, plus the margin,
+    centred on it (or its front on the body's front). The scale is measured
+    only where the band holds the whole garment, clamped, and averaged over
+    the height, so a belt knot or a hanging tail does not bend the cloth."""
+    co = np.empty(len(piece.data.vertices) * 3)
+    piece.data.vertices.foreach_get("co", co)
+    co = co.reshape(-1, 3)
+    height = -co[:, 2].min()
+    top = marks[spec["top"][0]] + spec["top"][1]
+    share, mark, offset = spec["anchor"]
+    stretch = (top - marks[mark] - offset) / (share * height)
+    margin = spec["margin"]
+    edges = np.linspace(-height, 0.0, bands + 1)
+    centres = 0.5 * (edges[:-1] + edges[1:])
+    stats = []
+    for lo, hi in zip(edges[:-1], edges[1:]):
+        band = co[(co[:, 2] >= lo - height / bands) & (co[:, 2] < hi + height / bands)]
+        stats.append([np.percentile(band[:, 0], 3), np.percentile(band[:, 0], 97), np.percentile(band[:, 1], 3), np.percentile(band[:, 1], 97)])
+    x_lo, x_hi, y_lo, y_hi = np.array(stats).T
+    body = np.array([[np.interp(top + z * stretch, marks["heights"], marks["profile"][:, k]) for k in range(3)] for z in centres])
+    b_half, b_front, b_back = body.T
+    down = -centres / height
+    core = (down >= spec.get("start", 0.12)) & (down <= spec.get("hug", 1.0))
+    depth = y_hi - y_lo
+    valid = core & (depth > 0.6 * np.median(depth[core])) & ~np.isnan(b_half)
+    sx = (2.0 * b_half + 2.0 * margin) / (x_hi - x_lo)
+    sy = (b_back - b_front + 2.0 * margin) / depth
+    for scale in (sx, sy):
+        middle = np.median(scale[valid])
+        np.clip(scale, 0.8 * middle, 1.3 * middle, out=scale)
+        scale[:] = np.interp(centres, centres[valid], scale[valid])
+    if spec.get("front"):
+        shift_y = b_front - margin - y_lo * sy
+        known = ~np.isnan(shift_y)
+        shift_y = np.interp(centres, centres[known], shift_y[known])
+    else:
+        shift_y = np.interp(centres, centres[valid], (0.5 * (b_front + b_back) - 0.5 * (y_lo + y_hi) * sy)[valid])
+    shift_x = np.interp(centres, centres[valid], (-0.5 * (x_lo + x_hi) * sx)[valid])
+    width = max(3, int(spec.get("smooth", 0.2) * bands) | 1)
+    sx, sy, shift_x, shift_y = (_smooth_along(a, width) for a in (sx, sy, shift_x, shift_y))
+    for v in piece.data.vertices:
+        z = v.co.z
+        v.co = Vector((
+            v.co.x * np.interp(z, centres, sx) + np.interp(z, centres, shift_x),
+            v.co.y * np.interp(z, centres, sy) + np.interp(z, centres, shift_y),
+            top + z * stretch,
+        ))
+    print(f"GARMENT {piece.name}: height x{stretch:.2f}, width x{sx.min():.2f}..{sx.max():.2f}, depth x{sy.min():.2f}..{sy.max():.2f}")
+
+
+def _flare(piece, marks, flare):
+    """Swing a hanging piece's hem out from the legs, like a bell: below the
+    landmark, the cloth moves out from the body's axis by rate per unit of
+    drop, so a thigh that swings or a hip that turns stays inside it."""
+    mark, offset, rate = flare
+    level = marks[mark] + offset
+    profile = marks["profile"]
+    for v in piece.data.vertices:
+        z = v.co.z
+        if z >= level:
+            continue
+        middle = 0.5 * (np.interp(z, marks["heights"], profile[:, 1]) + np.interp(z, marks["heights"], profile[:, 2]))
+        out = Vector((v.co.x, v.co.y - middle, 0.0))
+        if out.length > 1e-6:
+            v.co += out.normalized() * rate * (level - z)
+
+
+def _shrink_out(piece, bare, offset):
+    """Every vertex inside the body, or nearer than offset, goes out to it;
+    then a smooth pass over the moved cloth and the cloth around it heals
+    the folds the push made."""
+    before = np.empty(len(piece.data.vertices) * 3)
+    piece.data.vertices.foreach_get("co", before)
+    wrap = piece.modifiers.new("Out", "SHRINKWRAP")
+    wrap.target = bare
+    wrap.wrap_method = "NEAREST_SURFACEPOINT"
+    wrap.wrap_mode = "OUTSIDE"
+    wrap.offset = offset
+    bpy.context.view_layer.objects.active = piece
+    bpy.ops.object.modifier_apply(modifier=wrap.name)
+    after = np.empty_like(before)
+    piece.data.vertices.foreach_get("co", after)
+    moved = np.linalg.norm((after - before).reshape(-1, 3), axis=1) > 1e-5
+    around = moved.copy()
+    edges = np.empty(len(piece.data.edges) * 2, dtype=np.int64)
+    piece.data.edges.foreach_get("vertices", edges)
+    edges = edges.reshape(-1, 2)
+    for _ in range(2):
+        grow = around.copy()
+        grow[edges[around[edges[:, 0]], 1]] = True
+        grow[edges[around[edges[:, 1]], 0]] = True
+        around = grow
+    heal = piece.vertex_groups.new(name="Heal")
+    heal.add(np.nonzero(around)[0].tolist(), 1.0, "REPLACE")
+    smooth = piece.modifiers.new("Heal", "SMOOTH")
+    smooth.factor = 0.5
+    smooth.iterations = 6
+    smooth.vertex_group = heal.name
+    bpy.ops.object.modifier_apply(modifier=smooth.name)
+    piece.vertex_groups.remove(piece.vertex_groups["Heal"])
+    # The smooth pulls a curve in a little: out once more, with no smooth.
+    again = piece.modifiers.new("Out", "SHRINKWRAP")
+    again.target = bare
+    again.wrap_method = "NEAREST_SURFACEPOINT"
+    again.wrap_mode = "OUTSIDE"
+    again.offset = offset
+    bpy.ops.object.modifier_apply(modifier=again.name)
+    print(f"SHRINK {piece.name}: {int(moved.sum())} of {len(moved)} vertices moved out")
+
+
+def _transfer_weights(piece, bare, prefix, only=None, armpit=None):
+    """Skin a garment to its body's own bones: each vertex takes the weights
+    of the body's surface under it. only: the bones a hanging piece may
+    follow; the other bones' weights go, and so do the upper arms' below
+    the armpit height; a vertex left with none follows the hips."""
+    transfer = piece.modifiers.new("Weights", "DATA_TRANSFER")
+    transfer.object = bare
+    transfer.use_vert_data = True
+    transfer.data_types_verts = {"VGROUP_WEIGHTS"}
+    transfer.vert_mapping = "POLYINTERP_NEAREST"
+    transfer.layers_vgroup_select_src = "ALL"
+    transfer.layers_vgroup_select_dst = "NAME"
+    bpy.context.view_layer.objects.active = piece
+    bpy.ops.object.datalayout_transfer(modifier=transfer.name)
+    bpy.ops.object.modifier_apply(modifier=transfer.name)
+    if only:
+        keep = {prefix + name for name in only}
+        for group in list(piece.vertex_groups):
+            if group.name not in keep:
                 piece.vertex_groups.remove(group)
+        if armpit is not None:
+            low = [v.index for v in piece.data.vertices if v.co.z < armpit]
+            for name in SHOULDER_BONES:
+                group = piece.vertex_groups.get(prefix + name)
+                if group is not None:
+                    group.remove(low)
+        hip = piece.vertex_groups.get(prefix + "Hip") or piece.vertex_groups.new(name=prefix + "Hip")
+        bare_verts = [v.index for v in piece.data.vertices if sum(g.weight for g in v.groups) < 1e-3]
+        if bare_verts:
+            hip.add(bare_verts, 1.0, "REPLACE")
+        bpy.ops.object.vertex_group_normalize_all(lock_active=False)
+
+
+def _pose_stance(rigs, body_name):
+    """Pose one body's rig in the stance: the first frame of the boy's
+    preset idle, which every clip starts from (the girl's rig plays a
+    copy with her prefix). Returns a function that puts the rig back."""
+    boy = rigs["BodyBoy"]
+    idle = boy.animation_data.action
+    # Its paths name the renderer's joints, as _load_clips makes them.
+    for fcurve in c.action_fcurves(idle):
+        for old, new in JOINTS.items():
+            fcurve.data_path = fcurve.data_path.replace(f'["{old}"]', f'["{new}"]')
+    rig = rigs[body_name]
+    prefix = BODIES[body_name]
+    scene = bpy.context.scene
+    frame = scene.frame_current
+    copy = _prefixed_copy(idle, prefix, "-Stance") if prefix else None
+    rig.animation_data_create()
+    before = rig.animation_data.action
+    c.play_action(rig, copy or idle)
+    scene.frame_set(int(idle.frame_range[0]))
+    bpy.context.view_layer.update()
+
+    def back():
+        rig.animation_data.action = before
+        if copy is not None:
+            bpy.data.actions.remove(copy)
+            for pose_bone in rig.pose.bones:
+                pose_bone.location = (0.0, 0.0, 0.0)
+                pose_bone.rotation_quaternion = (1.0, 0.0, 0.0, 0.0)
+                pose_bone.scale = (1.0, 1.0, 1.0)
+        scene.frame_set(frame)
+        bpy.context.view_layer.update()
+
+    return back
+
+
+def _posed_copy(body, name):
+    """A copy of the bare body as its rig is posed now: the armature
+    applied, the vertex groups kept."""
+    posed = _copy(body, name)
+    posed.parent = None
+    posed.matrix_world = body.matrix_world.copy()
+    bpy.context.view_layer.objects.active = posed
+    for mod in list(posed.modifiers):
+        if mod.type == "ARMATURE":
+            bpy.ops.object.modifier_apply(modifier=mod.name)
+        else:
+            posed.modifiers.remove(mod)
+    return posed
+
+
+def _skinning(rig):
+    """Each bone's skinning matrix as the rig is posed now: rest to pose,
+    in the armature's space (the Armature modifier's own)."""
+    world = rig.matrix_world
+    return {pb.name: world @ pb.matrix @ pb.bone.matrix_local.inverted() @ world.inverted() for pb in rig.pose.bones}
+
+
+def _unpose(piece, skinning):
+    """Bring a piece fitted on the posed body back to rest: each vertex
+    through the inverse of its weighted skinning matrix, so the Armature
+    modifier puts it back where it was fitted in that pose."""
+    names = {group.index: group.name for group in piece.vertex_groups}
+    for v in piece.data.vertices:
+        blend = Matrix(((0.0,) * 4,) * 4)
+        total = 0.0
+        for g in v.groups:
+            bone = names[g.group]
+            if g.weight > 0.0 and bone in skinning:
+                blend += skinning[bone] * g.weight
+                total += g.weight
+        if total > 1e-6:
+            v.co = (blend * (1.0 / total)).inverted() @ v.co
+
+
+def _garment_pieces(body, body_name, prefix, marks, canon, rigs):
+    """The garments of one body: each fitted, moved out of the skin, and
+    skinned to the body's bones. Weights come only from this body (ADR
+    0012): a bare copy of it, with no modifier, so the rig's pose plays no
+    part. A hanging piece (the cape) is fitted and skinned on the body in
+    the stance, where the arms hang at the sides, and then brought back to
+    rest: so it hangs around the arms, not through them."""
+    bare = _copy(body, f"Bare{body_name}")
+    bare.modifiers.clear()
+    bare.parent = None
+    bare.matrix_world = body.matrix_world.copy()
+    pieces = []
+    for part, spec in GARMENT_FIT.items():
+        piece = _copy(canon[part], piece_name(part, body_name))
+        if part in HANGING:
+            back = _pose_stance(rigs, body_name)
+            posed = _posed_copy(body, f"Posed{body_name}")
+            skinning = _skinning(rigs[body_name])
+            posed_marks = _landmarks(posed, prefix, rigs[body_name], posed=True)
+            back()
+            _fit_garment(piece, posed_marks, spec)
+            _shrink_out(piece, posed, spec.get("offset", CLOTH_OFFSET))
+            if "flare" in spec:
+                _flare(piece, posed_marks, spec["flare"])
+            _transfer_weights(piece, posed, prefix, HANGING[part], posed_marks["shoulder_z"] - ARMPIT_DROP)
+            _unpose(piece, skinning)
+            c.remove(posed)
+        else:
+            _fit_garment(piece, marks, spec)
+            _shrink_out(piece, bare, spec.get("offset", CLOTH_OFFSET))
+            if "flare" in spec:
+                _flare(piece, marks, spec["flare"])
+            _transfer_weights(piece, bare, prefix, HANGING.get(part))
+        pieces.append(piece)
+    c.remove(bare)
+    return pieces
+
+
+def _cosmetic_anchors(body, prefix, skull, marks):
+    """Where the milestone cosmetics sit on this body, in three.js hero
+    space (the renderer's STYLE.cosmetics keeps their shape and motion): the
+    crown's centre and radius, around the head at the front hairline with
+    room for the hair; the halo's centre above the skull; the wings' root
+    on the shoulder blades and the trail's root on the middle of the back,
+    each a little off the back's surface."""
+    on_head = _on_bone(body, prefix + "head")
+    co = np.empty(len(body.data.vertices) * 3)
+    body.data.vertices.foreach_get("co", co)
+    co = co.reshape(-1, 3)
+    head = co[on_head]
+    top = skull["centre"].z
+    crown_z = skull["hairline"][0]
+    band = head[np.abs(head[:, 2] - crown_z) < 0.02]
+    reach = float(np.hypot(band[:, 0] - skull["crown_x"], band[:, 1] - skull["crown_y"]).max())
+
+    def on_back(z):
+        back = float(np.interp(z, marks["heights"], marks["profile"][:, 2]))
+        return TO_THREE @ Vector((0.0, back + 0.04, z))
+
+    return {
+        "crown": {"position": _rounded(TO_THREE @ Vector((skull["crown_x"], skull["crown_y"], crown_z))), "radius": round(reach + 0.05, 4)},
+        "halo": {"position": _rounded(TO_THREE @ Vector((skull["crown_x"], skull["crown_y"], top + 0.35)))},
+        "wings": {"position": _rounded(on_back(marks["chest"] + 0.12))},
+        "trail": {"position": _rounded(on_back(marks["hip"] + 0.3))},
+    }
+
+
+def _paints(*names):
+    """The bake-only paint of the pieces, as on the scripted hero. Each bake
+    takes its own set: the bake removes the paint it used."""
+    made = {
+        "Hair": lambda: c.paint_material("Hair", HAIR, grain=0.2, edge=0.35, crevice=0.4, top=0.3, stroke_scale=14.0),
+        "Outfit": lambda: c.paint_material("Outfit", OUTFIT, grain=0.14, edge=0.15, crevice=0.5, top=0.16, stroke_scale=7.0),
+        "Trim": lambda: c.paint_material("Trim", TRIM, grain=0.1, edge=0.2, crevice=0.45, top=0.16),
+    }
+    return {name: made[name]() for name in names}
+
+
+def _pieces(rigs, bodies, briefs, atlas, materials):
+    """Every hair and garment piece of both bodies, painted into the atlas's
+    bottom row and skinned, made from the bare bodies (before their
+    regions, ink, and face layers). Returns [(piece, body)], and each
+    body's cosmetic anchors (_cosmetic_anchors)."""
+    hair_parts = _tripo_parts(briefs["hero-hair"])
+    if set(hair_parts) != set(HAIR_FIT):
+        raise ValueError(f"HAIR_FIT {sorted(HAIR_FIT)} does not match the Tripo hair parts {sorted(hair_parts)}")
+    hair_paint, garment_paint = _paints("Hair"), _paints("Hair", "Outfit", "Trim")
+    hair_units, garment_units = [], []
+    for part, path in hair_parts.items():
+        piece = _tripo_piece(path, part, HAIR_FACES)
+        _clean_mesh(piece)
+        piece.data.materials.append(hair_paint["Hair"])
+        hair_units.append(piece)
+    for part, path in _tripo_parts(briefs["hero-garments"]).items():
+        piece = _tripo_piece(path, part, GARMENT_FACES)
+        _paint_garment(piece, GARMENT_PAINT[part], garment_paint)
+        garment_units.append(piece)
+    skulls = {}
+    for body_name, prefix in BODIES.items():
+        skulls[body_name] = _skull(bodies[body_name], prefix)
+        short = _cap(bodies[body_name], prefix, skulls[body_name], f"CapShort{body_name}")
+        short.data.materials.append(garment_paint["Hair"])
+        garment_units += [short, _buzz_long(short, skulls[body_name], f"CapLong{body_name}")]
+    names = {obj.name for obj in hair_units + garment_units}
+    canon, hair_px = _bake_pieces(hair_units, BODY_TEXTURE, {m.name: r for r, m in hair_paint.items()})
+    more, garment_px = _bake_pieces(garment_units, BODY_TEXTURE, {m.name: r for r, m in garment_paint.items()})
+    canon.update(more)
+    if set(canon) != names:
+        raise ValueError(f"the bake lost pieces: {sorted(names - set(canon))}")
+    atlas[:BODY_TEXTURE, :BODY_TEXTURE] = hair_px
+    atlas[:BODY_TEXTURE, BODY_TEXTURE:] = garment_px
+    for name, piece in canon.items():
+        _wear_atlas(piece, 0 if name.startswith("Hair_") else 1, materials)
+    pieces = []
+    anchors = {}
+    for body_name, prefix in BODIES.items():
+        body, rig = bodies[body_name], rigs[body_name]
+        marks = _landmarks(body, prefix, rig)
+        anchors[body_name] = _cosmetic_anchors(body, prefix, skulls[body_name], marks)
+        mine = {"short": canon[f"CapShort{body_name}"], "long": canon[f"CapLong{body_name}"]}
+        pieces += [(p, body_name) for p in _hair_pieces(body, body_name, prefix, rig, skulls[body_name], canon, mine)]
+        pieces += [(p, body_name) for p in _garment_pieces(body, body_name, prefix, marks, canon, rigs)]
+    for piece in canon.values():
+        c.remove(piece)
+    # The bake's own materials: every piece now wears the atlas's.
+    keep = set(materials.values())
+    for mat in list(bpy.data.materials):
+        if mat.users == 0 and mat.name.startswith(c.PAINTED) and mat not in keep:
+            bpy.data.materials.remove(mat)
+    return pieces, anchors
+
+
+def _finish_pieces(pieces, rigs):
+    """Ink every piece (the hull keeps the weights) and hang it on its
+    body's rig."""
+    for piece, body_name in pieces:
+        for i, mat in enumerate(piece.data.materials):
+            if mat is None or not mat.name.startswith(c.PAINTED):
+                raise ValueError(f"{piece.name}: slot {i} wears {mat and mat.name}, not an atlas paint")
+        c.ink_hull_skinned(piece, rigs[body_name], INK_WIDTH)
         piece.parent = rigs[body_name]
-        piece.modifiers.new("Rig", "ARMATURE").object = rigs[body_name]
+        faces = sum(1 for p in piece.data.polygons if piece.data.materials[p.material_index].name != c.INK)
+        print(f"FACES {piece.name}: {faces}")
 
 
 # ---------------------------------------------------------------- the rig for the renderer
@@ -861,11 +1506,11 @@ def strike_offsets(rig, prefix=""):
     return out
 
 
-def _write_rig_json(rigs):
+def _write_rig_json(rigs, anchors):
     """The renderer's copy of each body's rig (baked output): the prefix
     on its bone names, each joint's rest position and rotation in hero
-    space with its nearest named parent, and the strike offsets in each
-    joint's own frame.
+    space with its nearest named parent, the strike offsets in each
+    joint's own frame, and where the cosmetics sit (_cosmetic_anchors).
 
     The glTF exporter writes a bone's rest as its Blender rest with the
     axis change applied after it (matrix_local @ axis_basis_change), and
@@ -898,7 +1543,7 @@ def _write_rig_json(rigs):
             {"joint": joint[len(prefix) :], "offset": _rounded(offset)}
             for joint, offset in strike_offsets(rig, prefix).items()
         ]
-        data["bodies"][body_name] = {"prefix": prefix, "joints": joints, "strikes": strikes}
+        data["bodies"][body_name] = {"prefix": prefix, "joints": joints, "strikes": strikes, "cosmetics": anchors[body_name]}
     with open(RIG_JSON, "w", encoding="utf-8", newline="\n") as f:
         json.dump(data, f, indent=2)
         f.write("\n")
@@ -949,7 +1594,15 @@ def build():
     for material in spare_materials:
         bpy.data.materials.remove(material)
 
-    atlas = np.zeros((BODY_TEXTURE, 2 * BODY_TEXTURE, 4), dtype=np.float32)
+    # One painted atlas: the bodies' squares in the top row, the pieces'
+    # paint in the bottom row. Its materials come first, so they keep their
+    # names: the pieces' bake makes materials of the same names.
+    atlas = np.zeros((2 * BODY_TEXTURE, 2 * BODY_TEXTURE, 4), dtype=np.float32)
+    atlas_image = bpy.data.images.new("HeroPainted", 2 * BODY_TEXTURE, 2 * BODY_TEXTURE, alpha=False)
+    atlas_image.colorspace_settings.name = "sRGB"
+    materials = {name: c.painted_material(c.PAINTED + name, atlas_image) for name in (*regions.REGIONS, "Hair")}
+    pieces, anchors = _pieces(rigs, bodies, briefs, atlas, materials)
+
     face_atlas = np.zeros((FACE_TEXTURE, 2 * FACE_TEXTURE, 4), dtype=np.float32)
     iris_atlas = np.zeros((FACE_TEXTURE, 2 * FACE_TEXTURE, 4), dtype=np.float32)
     layers = {}
@@ -957,8 +1610,10 @@ def build():
     for half, (body_name, prefix) in enumerate(BODIES.items()):
         body = bodies[body_name]
         layers[body_name] = _dress_body(body, prefix, half, sources[body_name], atlas, face_atlas, iris_atlas)
-    atlas_image = _atlas_image("HeroPainted", 2 * BODY_TEXTURE, BODY_TEXTURE, atlas, alpha=False)
-    materials = {name: c.painted_material(c.PAINTED + name, atlas_image) for name in regions.REGIONS}
+    atlas_image.pixels.foreach_set(atlas.ravel())
+    atlas_image.update()
+    # Packed, so the saved .blend shows it (a generated image is not saved).
+    atlas_image.pack()
     for body in bodies.values():
         for name in regions.REGIONS:
             body.data.materials.append(materials[name])
@@ -974,8 +1629,8 @@ def build():
         face, iris = layers[body_name]
         _merge(body, face, face_material)
         _merge(body, iris, iris_material)
+    _finish_pieces(pieces, rigs)
 
-    _hair_pieces(rigs, bodies)
     _clips(rigs, boy_brief, scale)
-    _write_rig_json(rigs)
+    _write_rig_json(rigs, anchors)
     return rig

@@ -84,15 +84,15 @@ export const STYLE = {
     { color: 0x6f5aff, intensity: 2.5, position: [6, 1.0, -4] as const },
   ],
 
-  /** Where the milestone cosmetics sit on the hero, and how they move. */
+  /** How the milestone cosmetics sit on the hero and move. Where each one
+   * is anchored (the crown round the head, the halo above it, the wings
+   * and the trail on the back) is baked per body into hero-rig.json. */
   cosmetics: {
     /** Wings anchor at the shoulder blades, not floating off the back.
      * anchorX is small on purpose: the pair is separated in depth, while
      * the sheets themselves fan back and up across the camera's view. */
     wings: {
       anchorX: 0.15,
-      anchorY: 1.58,
-      anchorZ: -0.26,
       beatSpeed: 1.5,
       /** Feather height as a fraction of its length — wide enough that
        * neighbouring feathers overlap into a sheet. */
@@ -102,13 +102,14 @@ export const STYLE = {
       /** The flare where the wings meet the back. */
       rootFlare: 0.55,
     },
-    /** A crown rests on the head; the halo floats above it. */
-    crown: { radius: 0.33, y: 2.42, spin: 0.35 },
-    halo: { y: 2.95, tilt: 0.16, bob: 0.04 },
+    /** A crown rests on the head at the hairline (lift raises it from
+     * there); the halo floats above it. */
+    crown: { lift: 0, spin: 0.35 },
+    halo: { tilt: 0.16, bob: 0.04 },
     wisps: { bob: 0.07, bobSpeed: 2.1 },
     /** Ribbons leave the middle of the back and rise; thin so they never
      * read as a tail. */
-    trail: { anchorY: 1.2, anchorZ: -0.26, thinness: 0.15, flicker: 0.07, flickerSpeed: 6 },
+    trail: { thinness: 0.15, flicker: 0.07, flickerSpeed: 6 },
   },
 
   /** Hero-Level presence: orbiting power motes + charged trim, by bracket. */

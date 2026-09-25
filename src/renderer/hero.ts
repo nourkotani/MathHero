@@ -186,10 +186,22 @@ interface JointRest {
   position: number[];
   quaternion: number[];
 }
+/** Where a body wears the cosmetics, in hero space: the bake measures its
+ *  skull and back (scripts/blender/hero.py, _cosmetic_anchors). */
+interface CosmeticAnchors {
+  /** The crown's centre, around the head at the front hairline, and its radius. */
+  crown: { position: number[]; radius: number };
+  /** The halo's centre, above the skull. */
+  halo: { position: number[] };
+  /** The wings' root on the shoulder blades, the trail's on the middle of the back. */
+  wings: { position: number[] };
+  trail: { position: number[] };
+}
 interface BodyRig {
   prefix: string;
   joints: Record<string, JointRest>;
   strikes: Array<{ joint: string; offset: number[] }>;
+  cosmetics: CosmeticAnchors;
 }
 const RIG: { bodies: Record<string, BodyRig> } = heroRig;
 
@@ -564,7 +576,7 @@ export function buildHero({
   dressing.push(powerMotes);
 
   const cosmeticMotors: CosmeticMotor[] = [];
-  const cosmetics = buildCosmetics(cosmeticMotors);
+  const cosmetics = buildCosmetics(cosmeticMotors, rig.cosmetics);
   for (const mesh of cosmetics.values()) {
     mesh.visible = false;
     // Cosmetic energy glows for real; children too (wisps, wings, halos).
@@ -682,9 +694,18 @@ function buildAuraGeometry(lobeAmplitude = BASE_LOBES): THREE.BufferGeometry {
  * (see CosmeticMotor); the frame loop animates those and nothing here
  * needs to know when it runs.
  */
-function buildCosmetics(motors: CosmeticMotor[]): Map<string, THREE.Object3D> {
+function buildCosmetics(
+  motors: CosmeticMotor[],
+  anchors: CosmeticAnchors,
+): Map<string, THREE.Object3D> {
   const cosmetics = new Map<string, THREE.Object3D>();
   const S = STYLE.cosmetics;
+  const at = (anchor: { position: number[] }) => new THREE.Vector3().fromArray(anchor.position);
+  const crownAt = at(anchors.crown);
+  const crownRadius = anchors.crown.radius;
+  const haloAt = at(anchors.halo);
+  const wingsAt = at(anchors.wings);
+  const trailAt = at(anchors.trail);
 
   /** Register render-time motion for a piece, capturing its rest pose. */
   const moves = <T extends THREE.Object3D>(object: T, motion: Motion): T => {
@@ -734,7 +755,7 @@ function buildCosmetics(motors: CosmeticMotor[]): Map<string, THREE.Object3D> {
     const group = new THREE.Group();
     for (const side of [-1, 1]) {
       const pivot = new THREE.Group();
-      pivot.position.set(side * S.wings.anchorX, S.wings.anchorY, S.wings.anchorZ);
+      pivot.position.set(wingsAt.x + side * S.wings.anchorX, wingsAt.y, wingsAt.z);
       // The far wing splays a touch so the pair never perfectly overlaps.
       pivot.rotation.y = side * S.wings.splay;
       for (const { length, lift, color } of plan) {
@@ -757,7 +778,7 @@ function buildCosmetics(motors: CosmeticMotor[]): Map<string, THREE.Object3D> {
     // The hot root where the wings meet the back: they grow out of the
     // hero's own energy instead of hovering behind them.
     const root = mote(plan[0]?.color ?? 0xffffff, S.wings.rootFlare);
-    root.position.set(0, S.wings.anchorY, S.wings.anchorZ);
+    root.position.copy(wingsAt);
     group.add(root);
     return group;
   };
@@ -779,7 +800,7 @@ function buildCosmetics(motors: CosmeticMotor[]): Map<string, THREE.Object3D> {
     sheet.position.x = length / 2;
     turn.add(sheet);
     swing.add(turn);
-    swing.position.set(x, S.trail.anchorY, S.trail.anchorZ);
+    swing.position.set(trailAt.x + x, trailAt.y, trailAt.z);
     return moves(swing, { pulse: { amp: S.trail.flicker, speed: S.trail.flickerSpeed } });
   };
 
@@ -806,7 +827,7 @@ function buildCosmetics(motors: CosmeticMotor[]): Map<string, THREE.Object3D> {
   ) => {
     const group = new THREE.Group();
     const circlet = new THREE.Mesh(
-      new THREE.TorusGeometry(S.crown.radius, 0.035, 12, 40),
+      new THREE.TorusGeometry(crownRadius, 0.035, 12, 40),
       glowSurface(band, 0.95),
     );
     circlet.rotation.x = Math.PI / 2;
@@ -817,18 +838,15 @@ function buildCosmetics(motors: CosmeticMotor[]): Map<string, THREE.Object3D> {
         new THREE.ConeGeometry(0.045, prongHeight, 10),
         glowSurface(prong, 0.95),
       );
-      spike.position.set(
-        Math.cos(angle) * S.crown.radius,
-        prongHeight / 2,
-        Math.sin(angle) * S.crown.radius,
-      );
+      spike.position.set(Math.cos(angle) * crownRadius, prongHeight / 2, Math.sin(angle) * crownRadius);
       group.add(spike);
       // A jewel of light at the foot of every prong.
       const gem = mote(jewel, 0.16);
-      gem.position.set(Math.cos(angle) * S.crown.radius, 0.02, Math.sin(angle) * S.crown.radius);
+      gem.position.set(Math.cos(angle) * crownRadius, 0.02, Math.sin(angle) * crownRadius);
       group.add(gem);
     }
-    group.position.y = S.crown.y;
+    group.position.copy(crownAt);
+    group.position.y += S.crown.lift;
     return moves(group, { spin: S.crown.spin });
   };
 
@@ -953,9 +971,9 @@ function buildCosmetics(motors: CosmeticMotor[]): Map<string, THREE.Object3D> {
     const fleck = mote(0xfff3b0, 0.26 - i * 0.02);
     const along = 0.5 + i * 0.32;
     fleck.position.set(
-      i % 2 ? 0.2 : -0.2,
-      S.trail.anchorY + along * 0.62,
-      S.trail.anchorZ - along * 0.78,
+      trailAt.x + (i % 2 ? 0.2 : -0.2),
+      trailAt.y + along * 0.62,
+      trailAt.z - along * 0.78,
     );
     starfall.add(fleck);
   }
@@ -966,7 +984,7 @@ function buildCosmetics(motors: CosmeticMotor[]): Map<string, THREE.Object3D> {
   const twinHalo = new THREE.Group();
   twinHalo.add(ring(0xfff3b0, 0.44, 0));
   twinHalo.add(ring(0xffffff, 0.32, 0.16, 0.8));
-  twinHalo.position.y = S.halo.y;
+  twinHalo.position.copy(haloAt);
   twinHalo.rotation.z = S.halo.tilt;
   cosmetics.set('twin-halo', moves(twinHalo, { spin: 0.6, bob: { amp: S.halo.bob, speed: 1.4 } }));
 
@@ -978,7 +996,7 @@ function buildCosmetics(motors: CosmeticMotor[]): Map<string, THREE.Object3D> {
     spoke.position.set(Math.cos(angle) * 0.56, 0, Math.sin(angle) * 0.56);
     radiant.add(spoke);
   }
-  radiant.position.y = S.halo.y;
+  radiant.position.copy(haloAt);
   radiant.rotation.z = S.halo.tilt;
   cosmetics.set('radiant-halo', moves(radiant, { spin: 0.8, bob: { amp: S.halo.bob, speed: 1.2 } }));
 
@@ -986,7 +1004,7 @@ function buildCosmetics(motors: CosmeticMotor[]): Map<string, THREE.Object3D> {
   aurora.add(ring(0x7dffd0, 0.58, 0));
   aurora.add(ring(0xb18fff, 0.46, 0.14, 0.9));
   aurora.add(ring(0xffe9a3, 0.34, 0.28, 0.8));
-  aurora.position.y = S.halo.y;
+  aurora.position.copy(haloAt);
   aurora.rotation.z = S.halo.tilt;
   cosmetics.set('aurora-halo', moves(aurora, { spin: 0.5, bob: { amp: S.halo.bob, speed: 1.1 } }));
 
@@ -1000,11 +1018,13 @@ function buildCosmetics(motors: CosmeticMotor[]): Map<string, THREE.Object3D> {
   const legendHalo = new THREE.Group();
   legendHalo.add(ring(0xffffff, 0.62, 0));
   legendHalo.add(ring(0xffe9a3, 0.44, 0.18, 0.9));
-  legendHalo.position.y = S.halo.y + 0.18;
+  legendHalo.position.copy(haloAt);
+  legendHalo.position.y += 0.18;
   legendHalo.rotation.z = -S.halo.tilt;
   legend.add(moves(legendHalo, { spin: -0.7, bob: { amp: 0.05, speed: 1.5 } }));
   const legendStar = mote(0xffffff, 0.5);
-  legendStar.position.y = S.halo.y + 0.62;
+  legendStar.position.copy(haloAt);
+  legendStar.position.y += 0.62;
   legend.add(moves(legendStar, { pulse: { amp: 0.16, speed: 2.4 } }));
   cosmetics.set('legend', legend);
 

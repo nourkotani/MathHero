@@ -39,6 +39,10 @@ The name "Training Dummy" no longer fits: the opponent is a fighter who takes hi
 - `mocap.py` gets a map from SMPL joints to Tripo bone names. The same map lets HY-Motion drive the Rival. `npm run motion` takes a target (hero or fighter).
 - `gen:hero` learns the Face and Iris layers and the per-body pieces. The drawn face decals and their six PNGs go.
 - The boy's painted eyes are small, so his iris layer holds almost nothing: a Form's eye color shows on the girl and hardly on the boy.
+- One 2048 px atlas holds the bodies (top half) and the hair and garment pieces (bottom half).
+- A scalp cap lies under every hair piece, so no bald skin shows between the locks; the cap alone is the short buzz cut, and a thicker cap with short tufts is the long one. The buzz cuts ride the head bone, so a Form's hair growth does not change them.
+- The cape is fitted in the idle stance: it follows the trunk, the clavicles, and the upper arms above the armpit, and its hem flares out from the legs, so the kick does not cut through it.
+- `hero-rig.json` also holds each body's cosmetic anchors (crown, halo, wings, trail); `STYLE.cosmetics` keeps only offsets from them.
 - Budgets:
 
 | Item | Budget |
@@ -48,8 +52,8 @@ The name "Training Dummy" no longer fits: the opponent is a fighter who takes hi
 | Faces per hair piece or mane | 4,000 |
 | Body texture | 1024 px |
 | Hero triangles drawn per frame (with the ink hull) | 84,000 |
-| `hero.glb` | about 3.3 MB (3.43 MB with the bodies and the interim hair; 1.18 MB before) |
-| Built file | about 15 MB (15.95 MB with the bodies; 13.1 MB before) |
+| `hero.glb` | about 3.3 MB planned; 6.04 MB with every part (1.18 MB before) |
+| Built file | about 15 MB planned; 18.78 MB with every part (13.1 MB before) |
 | Credits planned (with the reserve for diagnosis) | 950 (1,100): the first plan's 690, the second body prompt (200), and the gi top (60) |
 
 - If the iPad drops under 60 fps, decimate the Rival to 50,000 faces first, then the bodies to 20,000.

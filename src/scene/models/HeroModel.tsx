@@ -32,6 +32,15 @@ type GLTFResult = GLTF & {
     BodyGirl_4: THREE.SkinnedMesh;
     BodyGirl_5: THREE.SkinnedMesh;
     BodyGirl_6: THREE.SkinnedMesh;
+    ['GarmentArmor-BodyGirl_1']: THREE.SkinnedMesh;
+    ['GarmentArmor-BodyGirl_2']: THREE.SkinnedMesh;
+    ['GarmentArmor-BodyGirl_3']: THREE.SkinnedMesh;
+    ['GarmentCape-BodyGirl_1']: THREE.SkinnedMesh;
+    ['GarmentCape-BodyGirl_2']: THREE.SkinnedMesh;
+    ['GarmentCape-BodyGirl_3']: THREE.SkinnedMesh;
+    ['GarmentGi-BodyGirl_1']: THREE.SkinnedMesh;
+    ['GarmentGi-BodyGirl_2']: THREE.SkinnedMesh;
+    ['GarmentGi-BodyGirl_3']: THREE.SkinnedMesh;
     ['Hair_buzz_long-BodyGirl_1']: THREE.SkinnedMesh;
     ['Hair_buzz_long-BodyGirl_2']: THREE.SkinnedMesh;
     ['Hair_buzz_short-BodyGirl_1']: THREE.SkinnedMesh;
@@ -62,6 +71,15 @@ type GLTFResult = GLTF & {
     BodyBoy_4: THREE.SkinnedMesh;
     BodyBoy_5: THREE.SkinnedMesh;
     BodyBoy_6: THREE.SkinnedMesh;
+    ['GarmentArmor-BodyBoy_1']: THREE.SkinnedMesh;
+    ['GarmentArmor-BodyBoy_2']: THREE.SkinnedMesh;
+    ['GarmentArmor-BodyBoy_3']: THREE.SkinnedMesh;
+    ['GarmentCape-BodyBoy_1']: THREE.SkinnedMesh;
+    ['GarmentCape-BodyBoy_2']: THREE.SkinnedMesh;
+    ['GarmentCape-BodyBoy_3']: THREE.SkinnedMesh;
+    ['GarmentGi-BodyBoy_1']: THREE.SkinnedMesh;
+    ['GarmentGi-BodyBoy_2']: THREE.SkinnedMesh;
+    ['GarmentGi-BodyBoy_3']: THREE.SkinnedMesh;
     ['Hair_buzz_long-BodyBoy_1']: THREE.SkinnedMesh;
     ['Hair_buzz_long-BodyBoy_2']: THREE.SkinnedMesh;
     ['Hair_buzz_short-BodyBoy_1']: THREE.SkinnedMesh;
@@ -184,6 +202,84 @@ export function HeroModel({
                 skeleton={nodes.BodyGirl_6.skeleton}
                 material={materials.iris}
                 renderOrder={2}
+                frustumCulled={false}
+              />
+            </group>
+            <group name="GarmentArmor-BodyGirl" visible={show('GarmentArmor', 'BodyGirl')}>
+              <skinnedMesh
+                name="GarmentArmor-BodyGirl_1"
+                geometry={nodes['GarmentArmor-BodyGirl_1'].geometry}
+                skeleton={nodes['GarmentArmor-BodyGirl_1'].skeleton}
+                material={materials.body}
+                castShadow
+                frustumCulled={false}
+              />
+              <skinnedMesh
+                name="GarmentArmor-BodyGirl_2"
+                geometry={nodes['GarmentArmor-BodyGirl_2'].geometry}
+                skeleton={nodes['GarmentArmor-BodyGirl_2'].skeleton}
+                material={materials.trim}
+                castShadow
+                frustumCulled={false}
+              />
+              <skinnedMesh
+                name="GarmentArmor-BodyGirl_3"
+                geometry={nodes['GarmentArmor-BodyGirl_3'].geometry}
+                skeleton={nodes['GarmentArmor-BodyGirl_3'].skeleton}
+                material={ink}
+                userData={INK}
+                frustumCulled={false}
+              />
+            </group>
+            <group name="GarmentCape-BodyGirl" visible={show('GarmentCape', 'BodyGirl')}>
+              <skinnedMesh
+                name="GarmentCape-BodyGirl_1"
+                geometry={nodes['GarmentCape-BodyGirl_1'].geometry}
+                skeleton={nodes['GarmentCape-BodyGirl_1'].skeleton}
+                material={materials.body}
+                castShadow
+                frustumCulled={false}
+              />
+              <skinnedMesh
+                name="GarmentCape-BodyGirl_2"
+                geometry={nodes['GarmentCape-BodyGirl_2'].geometry}
+                skeleton={nodes['GarmentCape-BodyGirl_2'].skeleton}
+                material={materials.trim}
+                castShadow
+                frustumCulled={false}
+              />
+              <skinnedMesh
+                name="GarmentCape-BodyGirl_3"
+                geometry={nodes['GarmentCape-BodyGirl_3'].geometry}
+                skeleton={nodes['GarmentCape-BodyGirl_3'].skeleton}
+                material={ink}
+                userData={INK}
+                frustumCulled={false}
+              />
+            </group>
+            <group name="GarmentGi-BodyGirl" visible={show('GarmentGi', 'BodyGirl')}>
+              <skinnedMesh
+                name="GarmentGi-BodyGirl_1"
+                geometry={nodes['GarmentGi-BodyGirl_1'].geometry}
+                skeleton={nodes['GarmentGi-BodyGirl_1'].skeleton}
+                material={materials.body}
+                castShadow
+                frustumCulled={false}
+              />
+              <skinnedMesh
+                name="GarmentGi-BodyGirl_2"
+                geometry={nodes['GarmentGi-BodyGirl_2'].geometry}
+                skeleton={nodes['GarmentGi-BodyGirl_2'].skeleton}
+                material={materials.trim}
+                castShadow
+                frustumCulled={false}
+              />
+              <skinnedMesh
+                name="GarmentGi-BodyGirl_3"
+                geometry={nodes['GarmentGi-BodyGirl_3'].geometry}
+                skeleton={nodes['GarmentGi-BodyGirl_3'].skeleton}
+                material={ink}
+                userData={INK}
                 frustumCulled={false}
               />
             </group>
@@ -472,6 +568,84 @@ export function HeroModel({
               skeleton={nodes.BodyBoy_6.skeleton}
               material={materials.iris}
               renderOrder={2}
+              frustumCulled={false}
+            />
+          </group>
+          <group name="GarmentArmor-BodyBoy" visible={show('GarmentArmor', 'BodyBoy')}>
+            <skinnedMesh
+              name="GarmentArmor-BodyBoy_1"
+              geometry={nodes['GarmentArmor-BodyBoy_1'].geometry}
+              skeleton={nodes['GarmentArmor-BodyBoy_1'].skeleton}
+              material={materials.body}
+              castShadow
+              frustumCulled={false}
+            />
+            <skinnedMesh
+              name="GarmentArmor-BodyBoy_2"
+              geometry={nodes['GarmentArmor-BodyBoy_2'].geometry}
+              skeleton={nodes['GarmentArmor-BodyBoy_2'].skeleton}
+              material={materials.trim}
+              castShadow
+              frustumCulled={false}
+            />
+            <skinnedMesh
+              name="GarmentArmor-BodyBoy_3"
+              geometry={nodes['GarmentArmor-BodyBoy_3'].geometry}
+              skeleton={nodes['GarmentArmor-BodyBoy_3'].skeleton}
+              material={ink}
+              userData={INK}
+              frustumCulled={false}
+            />
+          </group>
+          <group name="GarmentCape-BodyBoy" visible={show('GarmentCape', 'BodyBoy')}>
+            <skinnedMesh
+              name="GarmentCape-BodyBoy_1"
+              geometry={nodes['GarmentCape-BodyBoy_1'].geometry}
+              skeleton={nodes['GarmentCape-BodyBoy_1'].skeleton}
+              material={materials.body}
+              castShadow
+              frustumCulled={false}
+            />
+            <skinnedMesh
+              name="GarmentCape-BodyBoy_2"
+              geometry={nodes['GarmentCape-BodyBoy_2'].geometry}
+              skeleton={nodes['GarmentCape-BodyBoy_2'].skeleton}
+              material={materials.trim}
+              castShadow
+              frustumCulled={false}
+            />
+            <skinnedMesh
+              name="GarmentCape-BodyBoy_3"
+              geometry={nodes['GarmentCape-BodyBoy_3'].geometry}
+              skeleton={nodes['GarmentCape-BodyBoy_3'].skeleton}
+              material={ink}
+              userData={INK}
+              frustumCulled={false}
+            />
+          </group>
+          <group name="GarmentGi-BodyBoy" visible={show('GarmentGi', 'BodyBoy')}>
+            <skinnedMesh
+              name="GarmentGi-BodyBoy_1"
+              geometry={nodes['GarmentGi-BodyBoy_1'].geometry}
+              skeleton={nodes['GarmentGi-BodyBoy_1'].skeleton}
+              material={materials.body}
+              castShadow
+              frustumCulled={false}
+            />
+            <skinnedMesh
+              name="GarmentGi-BodyBoy_2"
+              geometry={nodes['GarmentGi-BodyBoy_2'].geometry}
+              skeleton={nodes['GarmentGi-BodyBoy_2'].skeleton}
+              material={materials.trim}
+              castShadow
+              frustumCulled={false}
+            />
+            <skinnedMesh
+              name="GarmentGi-BodyBoy_3"
+              geometry={nodes['GarmentGi-BodyBoy_3'].geometry}
+              skeleton={nodes['GarmentGi-BodyBoy_3'].skeleton}
+              material={ink}
+              userData={INK}
               frustumCulled={false}
             />
           </group>

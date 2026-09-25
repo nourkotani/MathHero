@@ -58,6 +58,22 @@ function mergeBodyClips(document) {
   }
 }
 
+/**
+ * The ink hull draws one flat color (renderer/models.ts and the hero's
+ * component both give it bakedInkSurface, an unlit material): its normals
+ * and UVs are never read, so they do not ship.
+ */
+function stripInk(document) {
+  for (const mesh of document.getRoot().listMeshes()) {
+    for (const primitive of mesh.listPrimitives()) {
+      if (primitive.getMaterial()?.getName() !== 'Ink') continue;
+      for (const semantic of ['NORMAL', 'TANGENT', 'TEXCOORD_0']) {
+        primitive.setAttribute(semantic, null);
+      }
+    }
+  }
+}
+
 const only = process.argv.slice(2);
 mkdirSync(RAW_DIR, { recursive: true });
 mkdirSync(OUT_DIR, { recursive: true });
@@ -90,6 +106,7 @@ for (const file of readdirSync(RAW_DIR).filter((f) => f.endsWith('.raw.glb')).so
   if (only.length > 0 && !only.includes(name)) continue;
   const document = await io.read(join(RAW_DIR, file));
   mergeBodyClips(document);
+  stripInk(document);
   // keepUniqueNames: the hero's tint regions (PaintedSkin, PaintedOutfit,
   // PaintedTrim) differ only by name, and the renderer tints them by name.
   await document.transform(

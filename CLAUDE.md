@@ -37,7 +37,7 @@ Blender is the bakery: every model and clip in the game is the output of a commi
 | Tripo sources: every candidate at full detail, the rigged model, one file per clip | `scripts/blender/sources/tripo/<name>/**/*.glb` (git LFS) |
 | HY-Motion briefs, scores, and chosen candidates | `scripts/blender/sources/hy-motion/clips.json`, `*.npz` |
 | Bake scripts | `scripts/blender/` (`bake.py` lists the models; `common.py`, `regions.py`, `mocap.py`, `tripo_prepare.py`, `tripo_preview.py`, `motion_score.py`, `contact_sheet.py`) |
-| Baked output: committed, never LFS, never edited by hand | `src/renderer/models/*.glb`, `src/renderer/models/hero-rig.json` (each body's joints and strike points), `src/scene/models/*.tsx` |
+| Baked output: committed, never LFS, never edited by hand | `src/renderer/models/*.glb`, `src/renderer/models/hero-rig.json` (each body's joints, strike points, and cosmetic anchors), `src/scene/models/*.tsx` |
 
 **Commands**
 
@@ -67,7 +67,8 @@ Blender is the bakery: every model and clip in the game is the output of a commi
 - Rig with model `v1.0-20240301` and spec `tripo`. A Mixamo-named rig matches no biped preset (API error 1004).
 - Send one preset per retarget task. A task with several presets bills each preset but returns only the last clip.
 - Put the Tripo sources in git LFS. Never put `src/renderer/models/` in LFS: the build would inline the pointer text, and the game would break with no error.
-- Never edit a `.blend`, a `.glb`, or a generated component by hand. Change the script and bake again.
+- Never edit a `.blend`, a `.glb`, or a generated component by hand. Change the script and bake again. A bake from unchanged scripts must give the same files, byte for byte.
+- `bake-models.mjs` strips the normals and UVs from every ink hull (they draw one flat color).
 - Each hero body keeps its own Tripo rig and weights; never transfer weights between the bodies (ADR 0012). Garment and hair pieces are fitted per body and named `<part>-<body>`.
 - The clip owns its length; the code reads it (ADR 0012). Do not copy a clip's duration into a constant.
 - HY-Motion runs outside the repo on GPU 1 (memory note `hy-motion-local-setup`). It needs the target's `build/models/<target>.blend`: run `npm run bake:models hero` or `fighter` first. `mocap.py` retargets onto the scripted hero's joints, or onto a Tripo rig through a naming scheme (`mocap.TRIPO`). Its outputs are limited to the license Territory (ADR 0010).
