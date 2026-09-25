@@ -47,6 +47,7 @@ Blender is the bakery: every model and clip in the game is the output of a commi
 | Make the candidates of a brief (plans are checked with `--dry-run`, then the balance) | `npm run tripo -- generate <name>` |
 | Render every candidate from four sides | `npm run tripo -- preview <name>` → `build/tripo/<name>/sheet.png` |
 | Record the choice (the family picks from the sheet) | `npm run tripo -- pick <name> <id>` |
+| Paint the chosen candidate again from the brief's `retexture` text (the UV layout stays; the bake takes only what it needs, such as the face) | `npm run tripo -- retexture <name>` |
 | Decimate, then rig with the native skeleton | `npm run tripo -- rig <name>` |
 | Make one clip per preset | `npm run tripo -- animate <name>` |
 | Make, score, and render HY-Motion candidates for a clip | `npm run motion -- <clip>` |
@@ -59,7 +60,9 @@ Blender is the bakery: every model and clip in the game is the output of a commi
 - Use a paid Tripo key only (`TRIPO_API_KEY` or the CLI config). Free-tier outputs are public and CC BY. Never print, copy, or commit the key.
 - Tripo's web credits and API credits are separate wallets. Buy API credits with `tripo topup`.
 - Prompts describe features only: hair, build, clothing, colors, pose. Never a franchise, character, or trademark name.
+- Keep a negative prompt at 255 characters or fewer. The dry run rejects a longer one.
 - The task id is the record. A cloud seed does not survive a vendor model update. Never make a finished candidate again.
+- If you stop a run, Tripo still finishes and bills each queued task. Find the task with `tripo history`, record its id in the brief, and fetch it with `tripo task watch <id> --download`.
 - Decimate before you rig: the retarget fails on the full model (about 780k faces).
 - Rig with model `v1.0-20240301` and spec `tripo`. A Mixamo-named rig matches no biped preset (API error 1004).
 - Send one preset per retarget task. A task with several presets bills each preset but returns only the last clip.

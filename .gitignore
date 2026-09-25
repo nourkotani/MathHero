@@ -14,3 +14,6 @@ __pycache__/
 
 # Tripo CLI state (the last task id); the records live in models.json.
 .tripo/
+
+# Agent worktrees (Claude Code): each is its own checkout.
+.claude/worktrees/

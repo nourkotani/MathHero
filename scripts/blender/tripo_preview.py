@@ -1,12 +1,15 @@
 """Render Tripo candidates from four sides into one sheet (ADR 0011).
 
-blender --background --factory-startup --python scripts/blender/tripo_preview.py -- <out.png> <id>=<model.glb> ...
+blender --background --factory-startup --python scripts/blender/tripo_preview.py -- <out.png> [--regions] <id>=<model.glb> ...
 
 One row per candidate: front, right, back, left. Tripo exports a model
 facing +X (glTF), which is +X in Blender too, so the front camera stands
 on +X. Workbench engine with the base-color texture, studio light, and
 cavity: the sheet judges shape and paint, not the game's look. Prints one
 CANDIDATE line per model with its face count and size.
+
+--regions shows the tint regions of a hero body in false color (regions.py,
+ADR 0012): skin red, outfit gray, trim blue. A wrong face shows at once.
 """
 
 import math
@@ -16,6 +19,10 @@ import sys
 import bpy
 import numpy as np
 from mathutils import Vector
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+import regions  # noqa: E402
 
 TILE_W, TILE_H = 320, 440
 VIEWS = (("front", 0.0), ("right", 90.0), ("back", 180.0), ("left", 270.0))
@@ -37,11 +44,21 @@ def load(path):
     return faces, lo, hi
 
 
-def setup(scene, lo, hi):
+def show_regions():
+    """Paint every mesh by region; return one REGIONS line per mesh."""
+    lines = []
+    for obj in [o for o in bpy.context.scene.objects if o.type == "MESH"]:
+        labels = regions.classify(obj)
+        regions.show_false_color(obj, labels)
+        lines.append(f"{obj.name} {regions.histogram(labels)}")
+    return lines
+
+
+def setup(scene, lo, hi, false_color=False):
     scene.render.engine = "BLENDER_WORKBENCH"
     shading = scene.display.shading
     shading.light = "STUDIO"
-    shading.color_type = "TEXTURE"
+    shading.color_type = "MATERIAL" if false_color else "TEXTURE"
     shading.show_cavity = True
     scene.render.resolution_x = TILE_W
     scene.render.resolution_y = TILE_H
@@ -58,6 +75,8 @@ def setup(scene, lo, hi):
 
 def main():
     argv = sys.argv[sys.argv.index("--") + 1 :]
+    false_color = "--regions" in argv
+    argv = [a for a in argv if a != "--regions"]
     out, specs = argv[0], argv[1:]
     tiles = os.path.join(os.path.dirname(out), "_tiles")
     os.makedirs(tiles, exist_ok=True)
@@ -67,9 +86,12 @@ def main():
         cid, path = spec.split("=", 1)
         faces, lo, hi = load(path)
         scene = bpy.context.scene
-        cam, centre, distance = setup(scene, lo, hi)
+        cam, centre, distance = setup(scene, lo, hi, false_color)
         size = hi - lo
         print(f"CANDIDATE {cid}: {faces} faces, {size.x:.2f} x {size.y:.2f} x {size.z:.2f} (x y z)")
+        if false_color:
+            for line in show_regions():
+                print(f"REGIONS {cid}: {line}")
         y0 = (rows - 1 - row) * TILE_H  # Blender images store the bottom row first
         for col, (_, azimuth) in enumerate(VIEWS):
             a = math.radians(azimuth)

@@ -118,9 +118,11 @@
     "hero-boy": {
       "role": "the hero's boy body (ADR 0012): the one armature both bodies share, and the rig every hero clip is made on; the bake sorts its faces into the Skin, Outfit, and Trim regions by hue",
       "prompts": [
-        "Original anime martial-arts hero, teenage boy, stylized arcade fighter proportions with a slightly large head, big hands and big boots, athletic build, plain pure white martial-arts gi top and loose trousers, bright cyan belt, bright cyan wristbands and bright cyan boots, light peach skin, completely bald smooth head, smooth simple face with no painted eyes, eyebrows or mouth, full body, standing A-pose with arms slightly away from the body, highly detailed stylized game character, flat even colors"
+        "Original anime martial-arts hero, teenage boy, stylized arcade fighter proportions with a slightly large head, big hands and big boots, athletic build, plain pure white martial-arts gi top and loose trousers, bright cyan belt, bright cyan wristbands and bright cyan boots, light peach skin, completely bald smooth head, smooth simple face with no painted eyes, eyebrows or mouth, full body, standing A-pose with arms slightly away from the body, highly detailed stylized game character, flat even colors",
+        "Original comic-book superhero brawler, teenage boy, short and very stocky powerful build, very broad shoulders, huge muscular bare arms, thick neck and deep chest, sturdy legs, sleeveless fitted superhero bodysuit in pure white with bright cyan panels on the shoulders, the sides and the chest, bright cyan gloves, bright cyan boots and a wide bright cyan belt, light peach skin, completely bald smooth head, smooth blank face with no painted eyes, eyebrows or mouth, full body, standing A-pose with arms slightly away from the body, stylized arcade game proportions with a slightly large head, big hands and big boots, highly detailed stylized game character, flat even colors",
+        "Original anime martial-arts hero, young adult man, heroic muscular proportions, stocky powerful brawler build, very broad shoulders, thick muscular bare arms, deep chest, sturdy legs, sleeveless fitted bodysuit in pure white with bright cyan panels on the shoulders, the sides and the chest, bright cyan gloves, bright cyan knee-high reinforced boots and a wide bright cyan belt, light peach skin, completely bald smooth head, smooth blank face with no painted eyes, eyebrows or mouth, confident posture, full body, standing A-pose with arms slightly away from the body, highly detailed stylized game character, flat even colors"
       ],
-      "negative_prompt": "hair, eyebrows, eyes, mouth, beard, text, letters, logo, weapon, cape, armor, jewelry, patterns, extra limbs, extra fingers, blurry, low detail, photorealistic real person, dark colors",
+      "negative_prompt": "hair, eyebrows, eyes, mouth, beard, chibi, big head, toy, gi, robe, jacket, cape, armor, claws, weapon, jewelry, text, logo, patterns, extra limbs, extra fingers, blurry, low detail, photorealistic, dark colors",
       "seeds": [
         11,
         42
@@ -135,11 +137,64 @@
           "face_limit": 800000
         }
       },
-      "candidates": {},
+      "candidates": {
+        "p0s0": {
+          "task_id": "7aaf45a4-cda9-440c-99fe-04e351a4cdfc",
+          "status": "success",
+          "credits_consumed": 50,
+          "prompt": 0,
+          "seed": 11,
+          "file": "hero-boy/candidates/p0s0.glb"
+        },
+        "p0s1": {
+          "task_id": "0e44383e-daf6-4e85-ad9f-d99569bd01e7",
+          "status": "success",
+          "credits_consumed": 50,
+          "prompt": 0,
+          "seed": 42,
+          "file": "hero-boy/candidates/p0s1.glb"
+        },
+        "p1s0": {
+          "task_id": "5f49b987-badf-40dd-a97e-aac19fcd6d09",
+          "status": "success",
+          "credits_consumed": 50,
+          "prompt": 1,
+          "seed": 11,
+          "file": "hero-boy/candidates/p1s0.glb"
+        },
+        "p1s1": {
+          "task_id": "88017cd3-c48b-4d19-9287-1ce9211cccee",
+          "status": "success",
+          "credits_consumed": 50,
+          "prompt": 1,
+          "seed": 42,
+          "note": "The run was stopped after Tripo had queued this task: the family asked for the Rival style instead. Fetched afterward with `tripo task watch <id> --download`.",
+          "file": "hero-boy/candidates/p1s1.glb"
+        },
+        "p2s0": {
+          "task_id": "cb8ea7b2-cf18-4e73-8aaa-d87a780393a1",
+          "status": "success",
+          "credits_consumed": 50,
+          "prompt": 2,
+          "seed": 11,
+          "file": "hero-boy/candidates/p2s0.glb"
+        },
+        "p2s1": {
+          "task_id": "9354afa2-5f6a-4ed4-b5ad-11d7ec541bac",
+          "status": "success",
+          "credits_consumed": 50,
+          "prompt": 2,
+          "seed": 42,
+          "file": "hero-boy/candidates/p2s1.glb"
+        }
+      },
       "rig": {
         "model": "v1.0-20240301",
         "spec": "tripo",
-        "faces": 30000
+        "faces": 30000,
+        "import_task_id": "852d99be-d9da-4ca8-8870-80bfe88ed7b9",
+        "task_id": "b764b6bd-eb3f-4371-bcae-b13e3dfcb156",
+        "credits_consumed": 25
       },
       "animations": {
         "Idle": "preset:biped:idle",
@@ -148,14 +203,64 @@
         "Attack2": "preset:biped:box_02",
         "Attack3": "preset:biped:box_03",
         "Blast": "preset:biped:cast_a_spell"
+      },
+      "note": "Prompt 0 (a plain gi, arcade proportions) made p0s0 and p0s1; prompt 1 (a stocky comic-book brawler in a two-tone suit, arcade proportions) made p1s0 and p1s1. Both on 2026-09-25. The family then asked for the style of the Rival (the fighter) and his height: prompt 2 uses the fighter prompt's words and keeps the brawler traits. The negative prompt changed with each prompt; each task's payload (tripo task get <id>) holds the one it ran with.",
+      "chosen": {
+        "candidate": "p2s0",
+        "task_id": "cb8ea7b2-cf18-4e73-8aaa-d87a780393a1"
+      },
+      "clips": {
+        "Idle": {
+          "preset": "preset:biped:idle",
+          "task_id": "b72fbc61-be7c-43bf-8fcf-f4be8784f378",
+          "credits_consumed": 10,
+          "file": "hero-boy/Idle.glb",
+          "geometry": true
+        },
+        "Attack0": {
+          "preset": "preset:biped:box_01",
+          "task_id": "db2e7bf8-b1a1-41d1-bd9f-48d191f0ce45",
+          "credits_consumed": 10,
+          "file": "hero-boy/Attack0.glb",
+          "geometry": false
+        },
+        "Attack1": {
+          "preset": "preset:biped:front_kick_01",
+          "task_id": "88bfb69f-f6c2-42bb-8cbb-486a1cfd132a",
+          "credits_consumed": 10,
+          "file": "hero-boy/Attack1.glb",
+          "geometry": false
+        },
+        "Attack2": {
+          "preset": "preset:biped:box_02",
+          "task_id": "d82b15e0-5f6d-4a13-a25b-aa06d9715b74",
+          "credits_consumed": 10,
+          "file": "hero-boy/Attack2.glb",
+          "geometry": false
+        },
+        "Attack3": {
+          "preset": "preset:biped:box_03",
+          "task_id": "956f7290-7d17-4c41-a6d5-e7de9289b6e8",
+          "credits_consumed": 10,
+          "file": "hero-boy/Attack3.glb",
+          "geometry": false
+        },
+        "Blast": {
+          "preset": "preset:biped:cast_a_spell",
+          "task_id": "1c167764-6aae-40af-b935-0612cff05827",
+          "credits_consumed": 10,
+          "file": "hero-boy/Blast.glb",
+          "geometry": false
+        }
       }
     },
     "hero-girl": {
       "role": "the hero's girl body (ADR 0012): the bake fits it to the boy's armature, so it plays the same clips",
       "prompts": [
-        "Original anime martial-arts hero, teenage girl, stylized arcade fighter proportions with a slightly large head, big hands and big boots, athletic build, plain pure white martial-arts gi top and loose trousers, bright cyan belt, bright cyan wristbands and bright cyan boots, light peach skin, completely bald smooth head, smooth simple face with no painted eyes, eyebrows or mouth, full body, standing A-pose with arms slightly away from the body, highly detailed stylized game character, flat even colors"
+        "Original anime martial-arts hero, teenage girl, stylized arcade fighter proportions with a slightly large head, big hands and big boots, athletic build, plain pure white martial-arts gi top and loose trousers, bright cyan belt, bright cyan wristbands and bright cyan boots, light peach skin, completely bald smooth head, smooth simple face with no painted eyes, eyebrows or mouth, full body, standing A-pose with arms slightly away from the body, highly detailed stylized game character, flat even colors",
+        "Original anime martial-arts heroine, young adult woman, heroic athletic proportions, clearly feminine strong figure, slim waist, strong legs, long-sleeved fitted bodysuit in pure white with bright cyan panels on the shoulders, the sides and the chest, bright cyan gloves, bright cyan knee-high reinforced boots and a wide bright cyan belt, light peach skin, completely bald smooth head, smooth blank face with no painted eyes, eyebrows or mouth, confident posture, full body, standing A-pose with arms slightly away from the body, highly detailed stylized game character, flat even colors"
       ],
-      "negative_prompt": "hair, eyebrows, eyes, mouth, beard, text, letters, logo, weapon, cape, armor, jewelry, patterns, extra limbs, extra fingers, blurry, low detail, photorealistic real person, dark colors",
+      "negative_prompt": "hair, eyebrows, eyes, mouth, beard, chibi, big head, toy, gi, robe, jacket, cape, armor, claws, weapon, jewelry, text, logo, patterns, extra limbs, extra fingers, blurry, low detail, photorealistic, dark colors",
       "seeds": [
         11,
         42
@@ -170,14 +275,74 @@
           "face_limit": 800000
         }
       },
-      "candidates": {},
+      "candidates": {
+        "p0s0": {
+          "task_id": "2c76c672-6fcb-4064-a5e0-80d5396a21f1",
+          "status": "success",
+          "credits_consumed": 50,
+          "prompt": 0,
+          "seed": 11,
+          "file": "hero-girl/candidates/p0s0.glb"
+        },
+        "p0s1": {
+          "task_id": "5402c5a1-f0e0-4741-b77c-e2fcacbbcde4",
+          "status": "success",
+          "credits_consumed": 50,
+          "prompt": 0,
+          "seed": 42,
+          "file": "hero-girl/candidates/p0s1.glb"
+        },
+        "p1s0": {
+          "task_id": "8b05d85b-4d38-4459-996a-c8a20c33f73a",
+          "status": "success",
+          "credits_consumed": 50,
+          "prompt": 1,
+          "seed": 11,
+          "file": "hero-girl/candidates/p1s0.glb"
+        },
+        "p1s1": {
+          "task_id": "742339f8-2378-467d-86f6-edcfa1a809cb",
+          "status": "success",
+          "credits_consumed": 50,
+          "prompt": 1,
+          "seed": 42,
+          "file": "hero-girl/candidates/p1s1.glb"
+        }
+      },
       "rig": {
         "model": "v1.0-20240301",
         "spec": "tripo",
-        "faces": 30000
+        "faces": 30000,
+        "import_task_id": "d5ddc0af-39af-4836-9762-ac52836a9b88",
+        "task_id": "b3908347-8bc1-4607-bbf5-5500078609a9",
+        "credits_consumed": 25
       },
       "animations": {
         "Idle": "preset:biped:idle"
+      },
+      "note": "Prompt 0 (a plain gi, arcade proportions) made p0s0 and p0s1 on 2026-09-25. Prompt 1 is an athletic comic-book heroine in the style of the Rival (the fighter) and at his height, in a two-tone suit. The negative prompt changed with prompt 1; each task's payload (tripo task get <id>) holds the one it ran with.",
+      "chosen": {
+        "candidate": "p1s1",
+        "task_id": "742339f8-2378-467d-86f6-edcfa1a809cb"
+      },
+      "retexture": {
+        "why": "The family picked p1s1 but asked for facial features: the prompt had asked for a blank face. The same shape is painted again with an anime face; the bake cuts the face out of the texture onto the face layer (ADR 0012).",
+        "text": "Original anime martial-arts heroine, young adult woman, light peach skin, completely bald smooth head, a detailed anime face with large expressive dark eyes, dark eyebrows, long dark eyelashes, a small nose and soft lips, long-sleeved fitted bodysuit in pure white with bright cyan panels on the shoulders, the sides and the chest, bright cyan gloves, bright cyan knee-high boots and a wide bright cyan belt, highly detailed stylized game character, flat even colors",
+        "quality": "detailed",
+        "seed": 42,
+        "candidate": "p1s1",
+        "task_id": "91c4ccf1-3145-4d41-9370-cf09b6489d3e",
+        "credits_consumed": 20,
+        "file": "hero-girl/candidates/p1s1-texture.glb"
+      },
+      "clips": {
+        "Idle": {
+          "preset": "preset:biped:idle",
+          "task_id": "c0154ec2-e8b3-4dcf-9610-3ee82a66df0d",
+          "credits_consumed": 10,
+          "file": "hero-girl/Idle.glb",
+          "geometry": true
+        }
       }
     }
   }

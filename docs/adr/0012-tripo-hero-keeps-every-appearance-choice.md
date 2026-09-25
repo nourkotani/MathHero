@@ -24,11 +24,12 @@ The name "Training Dummy" no longer fits: the opponent is a fighter who takes hi
 ## Decision
 
 - **Rival** is the new glossary term for the Training Dummy. The code follows (`rival.ts`, `RivalDirector`, `RIVAL_X`, `Rival.tsx`). The model keeps its asset name, `fighter`. Earlier ADRs keep the old term as history.
-- **Parts, not combinations.** Tripo makes 2 bodies (girl, boy, each in a plain gi), 2 garment pieces (cape, armor), 8 hair pieces, and 4 manes. All parts go under one armature, and the director shows one of each, as today.
+- **Parts, not combinations.** Tripo makes 2 bodies, 3 garment pieces (gi top, cape, armor), 8 hair pieces, and 4 manes. All parts go under one armature, and the director shows one of each, as today.
+- **The bodies.** The hero matches the Rival: the same anime style (the body prompts use the fighter prompt's words) and the same height (the bake scales both bodies to `FIGHTER_HEIGHT`). The family asked for the general traits of two comic-book heroes: a stocky, powerful brawler (the boy) and an athletic, strong heroine (the girl). Each body wears a fitted two-tone suit, with gloves, knee-high boots, and a wide belt. The prompts describe these traits and never name a character (CLAUDE.md). The first tries in arcade proportions stay in the record.
 - **One skeleton for both bodies.** Tripo rigs each body with its native skeleton (`v1.0-20240301`, spec `tripo`). The bake keeps the boy's armature, fits the girl to it, and fails if their joints differ by more than 2 % of the height. The bake renames the 11 joints that the renderer uses, by side (the hero faces +Z, so the character's left is `armR`), and adds the `hair` bone.
 - **The pivots are baked output.** The bake writes the rest positions and the fist and boot offsets to `src/renderer/models/hero-rig.json`. The renderer reads it in place of hardcoded values.
-- **Tint regions by hue.** The body prompt fixes a flat palette: peach skin, white gi, cyan trim, no hair, a smooth face. The bake sorts each face into Skin, Outfit, or Trim by hue, keeps the texture's light and shade, and removes its color. The runtime tint works as today. Hair and garments come without texture; the bake paints them as it paints the scripted parts.
-- **A Face shell per body** carries the three face decals, as the sphere segment does today.
+- **Tint regions by hue.** The body prompt fixes a flat palette: peach skin, a white suit, cyan panels and trim, no hair, a smooth face. The bake sorts each face into Skin, Outfit, or Trim by hue, keeps the texture's light and shade, and removes its color. The runtime tint works as today. Hair and garments come without texture; the bake paints them as it paints the scripted parts.
+- **A face layer per body** shows the face that Tripo painted, in the Rival's style. The game's drawn decals fit the chunky scripted head, not these bodies. The bake copies the head's front faces into a thin layer, bakes the painted face onto it, and keeps only the features (eyes, brows, lashes) opaque, so the tinted skin shows through. A body painted without a face gets a second paint (`npm run tripo -- retexture`): Tripo keeps the UV layout, so the bake takes the face from the new texture and the rest from the first. The eye color of each Form moves from the iris decal to this layer's iris.
 - **The clip owns its length; the code reads it.** The director receives each clip's duration from the model. Style values keep only fractions of a clip.
 - **Clip sources.** Tripo presets: Idle, the four strikes, Blast, and the Rival's clips. HY-Motion (ADR 0010): Charge, Transform, Stagger, Victory, and the Rival's Launch and Recover. The bake adds the strike dash (3.5–4.0 m), the jump arc, and the spin to the root of each strike clip, so the hitboxes and the contact window stay as they are.
 
@@ -48,6 +49,6 @@ The name "Training Dummy" no longer fits: the opponent is a fighter who takes hi
 | Hero triangles drawn per frame (with the ink hull) | 84,000 |
 | `hero.glb` | about 3.3 MB (1.18 MB now) |
 | Built file | about 15 MB (13.1 MB now) |
-| Credits planned (with reserves) | 690 (1,040) |
+| Credits planned (with the reserve for diagnosis) | 950 (1,100): the first plan's 690, the second body prompt (200), and the gi top (60) |
 
 - If the iPad drops under 60 fps, decimate the Rival to 50,000 faces first, then the bodies to 20,000.

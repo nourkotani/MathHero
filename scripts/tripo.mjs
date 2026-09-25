@@ -6,6 +6,8 @@
 //   npm run tripo -- generate <name>    make every candidate of a brief (one per prompt and seed)
 //   npm run tripo -- preview <name>     render every candidate from four sides
 //   npm run tripo -- pick <name> <id>   choose a candidate
+//   npm run tripo -- retexture <name>   paint the chosen candidate again from the
+//                                       brief's "retexture" text (same shape)
 //   npm run tripo -- rig <name>         rig the chosen candidate (rig check first, free)
 //   npm run tripo -- animate <name>     apply the brief's preset animations to the rig;
 //                                       the result is the model's source in sources/tripo/
@@ -65,11 +67,28 @@ const EXIT = {
   9: 'rate limit',
 };
 
+/**
+ * The CLI's own entry script (tripo-cli dist/cli.js). Node runs it with the
+ * arguments as they are: on Windows, `tripo` is a .cmd shim, and the shell
+ * splits the quotes inside a JSON parameter. TRIPO_CLI overrides the search.
+ */
+function cliEntry() {
+  if (process.env.TRIPO_CLI) return process.env.TRIPO_CLI;
+  const roots = [
+    join(process.env.LOCALAPPDATA ?? '', 'Volta', 'tools', 'image', 'packages', 'tripo-cli', 'node_modules'),
+  ];
+  const npmRoot = spawnSync('npm', ['root', '-g'], { encoding: 'utf8', shell: process.platform === 'win32' });
+  if (npmRoot.stdout) roots.push(npmRoot.stdout.trim());
+  return roots.map((root) => join(root, 'tripo-cli', 'dist', 'cli.js')).find(existsSync) ?? null;
+}
+const CLI = cliEntry();
+
 /** Run the Tripo CLI; return its one-line JSON result from stdout. */
 function tripo(args) {
-  const run = spawnSync('tripo', [...args, '--json', '--yes', '--no-open'], {
+  const flags = [...args, '--json', '--yes', '--no-open'];
+  const run = spawnSync(CLI ? process.execPath : 'tripo', CLI ? [CLI, ...flags] : flags, {
     encoding: 'utf8',
-    shell: process.platform === 'win32', // tripo is a .cmd shim on Windows
+    shell: !CLI && process.platform === 'win32', // without the entry: the .cmd shim
     env: { ...process.env, TRIPO_API_KEY: apiKey() },
     stdio: ['ignore', 'pipe', 'inherit'],
   });
@@ -82,9 +101,9 @@ function tripo(args) {
     // no JSON: the exit code explains it
   }
   if (run.status !== 0) {
-    throw new Error(
-      `tripo ${args[0]}: exit ${run.status} (${EXIT[run.status] ?? 'error'}) ${last.slice(0, 300)}`,
-    );
+    // A failed --dry-run lists its reasons in `errors`: show them whole.
+    const detail = result.errors ? JSON.stringify(result.errors) : last.slice(0, 300);
+    throw new Error(`tripo ${args[0]}: exit ${run.status} (${EXIT[run.status] ?? 'error'}) ${detail}`);
   }
   return result;
 }
@@ -100,9 +119,9 @@ function estimate(params) {
   return credits;
 }
 
-/** Windows shells split on spaces: quote each argument for the .cmd shim. */
+/** Only the .cmd shim needs quotes: the shell splits on spaces. */
 const arg = (value) =>
-  process.platform === 'win32' ? `"${String(value).replace(/"/g, '\\"')}"` : String(value);
+  !CLI && process.platform === 'win32' ? `"${String(value).replace(/"/g, '\\"')}"` : String(value);
 
 const manifest = JSON.parse(readFileSync(BRIEFS, 'utf8'));
 const save = () => writeFileSync(BRIEFS, `${JSON.stringify(manifest, null, 2)}\n`);
@@ -115,9 +134,9 @@ if (command === 'balance') {
 }
 
 const brief = name ? manifest.models[name] : undefined;
-if (!brief || !['generate', 'preview', 'pick', 'rig', 'animate'].includes(command)) {
+if (!brief || !['generate', 'preview', 'pick', 'retexture', 'rig', 'animate'].includes(command)) {
   console.error(
-    `usage: npm run tripo -- balance | generate <name> | preview <name> | pick <name> <id> | rig <name> | animate <name>; models: ${Object.keys(manifest.models).join(', ')}`,
+    `usage: npm run tripo -- balance | generate <name> | preview <name> | pick <name> <id> | retexture <name> | rig <name> | animate <name>; models: ${Object.keys(manifest.models).join(', ')}`,
   );
   process.exit(1);
 }
@@ -148,7 +167,13 @@ const modelFile = (cid) => {
 };
 
 if (command === 'generate') {
-  const todo = candidateIds.filter((cid) => brief.candidates[cid]?.status !== 'success');
+  // A candidate with a live task is paid for: never make it again, even
+  // when it is still queued (fetch it with `tripo task watch <id> --download`).
+  const failed = ['failed', 'cancelled', 'banned', 'expired'];
+  const todo = candidateIds.filter((cid) => {
+    const made = brief.candidates[cid];
+    return !made?.task_id || failed.includes(made.status);
+  });
   const makeArgs = (cid) => {
     const [p, s] = [Number(cid[1]), Number(cid[3])];
     const seed = brief.seeds[s];
@@ -259,6 +284,52 @@ if (command === 'pick') {
   brief.chosen = { candidate: id, task_id: brief.candidates[id].task_id };
   save();
   console.log(`chose ${id} for ${name}; next: npm run tripo -- rig ${name}`);
+}
+
+// A texture painted again keeps the model's UV layout (checked on hero-girl:
+// the UVs match exactly), so it never replaces the chosen model: the rig
+// and the regions use the chosen one, and the bake takes only what it needs
+// from the new texture (ADR 0012: the face).
+if (command === 'retexture') {
+  if (!brief.chosen) throw new Error(`pick a candidate first: npm run tripo -- pick ${name} <id>`);
+  const paint = brief.retexture;
+  if (!paint?.text) throw new Error(`the brief has no "retexture": {"text": ...}`);
+  if (paint.task_id) throw new Error(`already painted again: task ${paint.task_id}`);
+  const cid = brief.chosen.candidate;
+  const cost = paint.quality === 'detailed' ? 20 : 10;
+  const { balance } = tripo(['balance']);
+  console.log(`painting ${cid} again: about ${cost} credits; balance ${balance}`);
+  if (cost > balance) throw new Error('Not enough API credits: buy some with `tripo topup`.');
+  const out = join(work, `${cid}-texture`);
+  const result = tripo([
+    'model',
+    'texture',
+    brief.candidates[cid].task_id,
+    '--texture-quality',
+    paint.quality ?? 'standard',
+    '--texture-alignment',
+    'geometry',
+    '-p',
+    `texture_prompt=${JSON.stringify({ text: paint.text })}`,
+    '-p',
+    `texture_seed=${paint.seed ?? brief.candidates[cid].seed}`,
+    '--out',
+    arg(out),
+    '--name',
+    `${name}-${cid}-texture`,
+  ]);
+  const model = findModel(out);
+  if (!model) throw new Error('the texture task finished without a model file');
+  const file = `${name}/candidates/${cid}-texture.glb`;
+  copyFileSync(model, join(SOURCES, file));
+  Object.assign(paint, {
+    candidate: cid,
+    task_id: result.task_id,
+    credits_consumed: result.credits_consumed,
+    file,
+  });
+  save();
+  console.log(`painted: task ${result.task_id}, ${result.credits_consumed} credits (the bake reads ${file})`);
 }
 
 if (command === 'rig') {
