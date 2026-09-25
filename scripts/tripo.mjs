@@ -118,11 +118,22 @@ if (!brief || !['generate', 'preview', 'pick'].includes(command)) {
 }
 const work = join(ROOT, 'build', 'tripo', name);
 const candidateIds = brief.prompts.flatMap((_, p) => brief.seeds.map((_, s) => `p${p}s${s}`));
+/** The candidate's model file; the CLI nests it a folder or two down. */
 function modelFile(cid) {
-  const dir = join(work, cid);
-  if (!existsSync(dir)) return null;
-  const model = readdirSync(dir).find((f) => /\.(glb|gltf|fbx)$/i.test(f));
-  return model ? join(dir, model) : null;
+  const find = (dir) => {
+    if (!existsSync(dir)) return null;
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const path = join(dir, entry.name);
+      if (entry.isDirectory()) {
+        const found = find(path);
+        if (found) return found;
+      } else if (/\.(glb|gltf|fbx)$/i.test(entry.name)) {
+        return path;
+      }
+    }
+    return null;
+  };
+  return find(join(work, cid));
 }
 
 if (command === 'generate') {

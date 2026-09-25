@@ -22,7 +22,40 @@
           "face_limit": 800000
         }
       },
-      "candidates": {},
+      "candidates": {
+        "p0s0": {
+          "task_id": "3b00916d-40dd-4d52-a984-490117062d84",
+          "status": "success",
+          "credits_consumed": 50,
+          "prompt": 0,
+          "seed": 11,
+          "files": "build/tripo/fighter/p0s0/tripo-out/fighter-p0s0-3b00916d"
+        },
+        "p0s1": {
+          "task_id": "1e16037c-f99a-4bb2-8df0-f0bf4bc69614",
+          "status": "success",
+          "credits_consumed": 50,
+          "prompt": 0,
+          "seed": 42,
+          "files": "build/tripo/fighter/p0s1/tripo-out/fighter-p0s1-1e16037c"
+        },
+        "p1s0": {
+          "task_id": "b5b4d850-059a-4f7c-b4b2-b9a7b55a4a92",
+          "status": "success",
+          "credits_consumed": 50,
+          "prompt": 1,
+          "seed": 11,
+          "files": "build/tripo/fighter/p1s0/tripo-out/fighter-p1s0-b5b4d850"
+        },
+        "p1s1": {
+          "task_id": "11eb3bde-6ab8-46bd-bb3a-a901bebdaf02",
+          "status": "success",
+          "credits_consumed": 50,
+          "prompt": 1,
+          "seed": 42,
+          "files": "build/tripo/fighter/p1s1/tripo-out/fighter-p1s1-11eb3bde"
+        }
+      },
       "chosen": null,
       "rig": {
         "model": "v1.0-20240301",
