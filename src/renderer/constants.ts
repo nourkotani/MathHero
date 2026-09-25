@@ -5,6 +5,10 @@
 export const HERO_X = -2.4;
 export const DUMMY_X = 2.4;
 
+/** The Training Dummy's fighter body, in game units (ADR 0011). The bake
+ *  (scripts/blender/fighter.py FIGHTER_HEIGHT) sizes its ink hull for it. */
+export const FIGHTER_HEIGHT = 2.6;
+
 /** The painted sky dome's radius around the arena. */
 export const SKY_RADIUS = 80;
 

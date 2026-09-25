@@ -3,7 +3,8 @@
 // the stage and the effects into R3F's scene, dresses the hero, and draws
 // each frame through its own pipeline (bloom tiers, ADR 0004). A useFrame
 // with priority 1 tells R3F that this component renders. The hero, the
-// Training Dummy and the hitboxes are React components (ADR 0009).
+// Training Dummy (the Tripo fighter, ADR 0011) and the hitboxes are React
+// components (ADR 0009).
 
 import { useFrame, useThree } from '@react-three/fiber';
 import { Physics } from '@react-three/rapier';
@@ -14,7 +15,7 @@ import { createRenderer } from '../renderer';
 import { createDummyDirector } from '../renderer/dummy';
 import { Hero } from './Hero';
 import { HeroHitboxes } from './HeroHitboxes';
-import { TrainingDummy } from './TrainingDummy';
+import { Fighter } from './Fighter';
 
 export function Arena({ store }: { store: Store }) {
   const gl = useThree((s) => s.gl);
@@ -44,7 +45,7 @@ export function Arena({ store }: { store: Store }) {
       <Suspense fallback={null}>
         {/* Normal gravity; nothing falls yet. The world holds the sensors. */}
         <Physics gravity={[0, -9.81, 0]}>
-          <TrainingDummy
+          <Fighter
             director={director}
             timeScale={renderer.timeScale}
             onStruck={renderer.strikeContact}

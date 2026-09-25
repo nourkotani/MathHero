@@ -383,7 +383,7 @@ ATTACK_ANTICIPATION = 0.12
 ATTACK_STRIKE = 0.55
 # The dash-in: how far forward the root travels at the strike's peak. The
 # hero stands 4.8 m from the Training Dummy (renderer/constants.ts), and a
-# fist or boot must enter the Dummy's hurtbox (src/scene/TrainingDummy.tsx)
+# fist or boot must enter the Dummy's hurtbox (src/scene/Fighter.tsx)
 # for the strike to land on contact (ADR 0009).
 DASH = (3.5, 3.75, 4.0, 3.95)
 

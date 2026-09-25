@@ -11,3 +11,6 @@ build/
 
 bash.exe.stackdump
 __pycache__/
+
+# Tripo CLI state (the last task id); the records live in models.json.
+.tripo/

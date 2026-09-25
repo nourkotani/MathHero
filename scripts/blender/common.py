@@ -565,8 +565,8 @@ def bake_painted(obj, size=1024, regions=None):
     return image
 
 
-def add_ink_hull(obj, thickness):
-    """The inverted-hull outline: a flipped shell just outside the body."""
+def ink_material():
+    """The material of every ink hull; the runtime gives it the ink color."""
     ink = bpy.data.materials.get(INK)
     if ink is None:
         ink = bpy.data.materials.new(INK)
@@ -576,7 +576,12 @@ def add_ink_hull(obj, thickness):
         bsdf = ink.node_tree.nodes["Principled BSDF"]
         bsdf.inputs["Base Color"].default_value = (0.006, 0.005, 0.012, 1.0)
         bsdf.inputs["Roughness"].default_value = 1.0
-    obj.data.materials.append(ink)
+    return ink
+
+
+def add_ink_hull(obj, thickness):
+    """The inverted-hull outline: a flipped shell just outside the body."""
+    obj.data.materials.append(ink_material())
     mod = obj.modifiers.new("Ink", "SOLIDIFY")
     mod.thickness = thickness
     mod.offset = 1.0

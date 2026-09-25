@@ -20,9 +20,9 @@ import common  # noqa: E402
 
 # Model name -> the module whose build() makes it.
 MODELS = {
-    "training-dummy": "training_dummy",
     "arena": "arena",
     "hero": "hero",
+    "fighter": "fighter",
 }
 
 

@@ -5,7 +5,10 @@
 //   npm run tripo -- balance            show the credit balance
 //   npm run tripo -- generate <name>    make every candidate of a brief (one per prompt and seed)
 //   npm run tripo -- preview <name>     render every candidate from four sides
-//   npm run tripo -- pick <name> <id>   choose a candidate as the model's source
+//   npm run tripo -- pick <name> <id>   choose a candidate
+//   npm run tripo -- rig <name>         rig the chosen candidate (rig check first, free)
+//   npm run tripo -- animate <name>     apply the brief's preset animations to the rig;
+//                                       the result is the model's source in sources/tripo/
 //
 // The brief is in scripts/blender/sources/tripo/models.json. Candidates
 // download into build/tripo/<name>/<id>/ (git ignores build/): the model,
@@ -110,16 +113,16 @@ if (command === 'balance') {
 }
 
 const brief = name ? manifest.models[name] : undefined;
-if (!brief || !['generate', 'preview', 'pick'].includes(command)) {
+if (!brief || !['generate', 'preview', 'pick', 'rig', 'animate'].includes(command)) {
   console.error(
-    `usage: npm run tripo -- balance | generate <name> | preview <name> | pick <name> <id>; models: ${Object.keys(manifest.models).join(', ')}`,
+    `usage: npm run tripo -- balance | generate <name> | preview <name> | pick <name> <id> | rig <name> | animate <name>; models: ${Object.keys(manifest.models).join(', ')}`,
   );
   process.exit(1);
 }
 const work = join(ROOT, 'build', 'tripo', name);
 const candidateIds = brief.prompts.flatMap((_, p) => brief.seeds.map((_, s) => `p${p}s${s}`));
-/** The candidate's model file; the CLI nests it a folder or two down. */
-function modelFile(cid) {
+/** The model file under dir; the CLI nests it a folder or two down. */
+function findModel(root) {
   const find = (dir) => {
     if (!existsSync(dir)) return null;
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -133,8 +136,9 @@ function modelFile(cid) {
     }
     return null;
   };
-  return find(join(work, cid));
+  return find(root);
 }
+const modelFile = (cid) => findModel(join(work, cid));
 
 if (command === 'generate') {
   const todo = candidateIds.filter((cid) => brief.candidates[cid]?.status !== 'success');
@@ -195,17 +199,10 @@ if (command === 'generate') {
   console.log(`done; next: npm run tripo -- preview ${name}`);
 }
 
-if (command === 'preview') {
-  const ready = candidateIds.filter((cid) => modelFile(cid));
-  if (ready.length === 0) {
-    console.error(`no downloaded candidates in ${work}; run generate first`);
-    process.exit(1);
-  }
-  const blender =
-    process.env.BLENDER ??
-    (existsSync('C:\\Program Files\\Blender Foundation\\Blender 5.2\\blender.exe')
-      ? 'C:\\Program Files\\Blender Foundation\\Blender 5.2\\blender.exe'
-      : 'blender');
+/** Run a script from scripts/blender/ headless; return its stdout. */
+function runBlender(script, args) {
+  const windows = 'C:\\Program Files\\Blender Foundation\\Blender 5.2\\blender.exe';
+  const blender = process.env.BLENDER ?? (existsSync(windows) ? windows : 'blender');
   const result = spawnSync(
     blender,
     [
@@ -214,32 +211,115 @@ if (command === 'preview') {
       '--python-exit-code',
       '1',
       '--python',
-      join(ROOT, 'scripts', 'blender', 'tripo_preview.py'),
+      join(ROOT, 'scripts', 'blender', script),
       '--',
-      join(work, 'sheet.png'),
-      ...ready.map((cid) => `${cid}=${modelFile(cid)}`),
+      ...args,
     ],
     { stdio: ['ignore', 'pipe', 'inherit'], encoding: 'utf8' },
   );
-  for (const line of (result.stdout ?? '').split('\n')) {
+  if (result.status !== 0) throw new Error(`blender ${script} failed (exit ${result.status})`);
+  return result.stdout ?? '';
+}
+
+if (command === 'preview') {
+  const ready = candidateIds.filter((cid) => modelFile(cid));
+  if (ready.length === 0) {
+    console.error(`no downloaded candidates in ${work}; run generate first`);
+    process.exit(1);
+  }
+  const out = runBlender('tripo_preview.py', [
+    join(work, 'sheet.png'),
+    ...ready.map((cid) => `${cid}=${modelFile(cid)}`),
+  ]);
+  for (const line of out.split('\n')) {
     if (line.startsWith('CANDIDATE')) console.log(line.slice(10));
   }
-  if (result.status !== 0) process.exit(result.status ?? 1);
   console.log(
     `sheet (one row per candidate: front, right, back, left): ${join(work, 'sheet.png')}`,
   );
 }
 
 if (command === 'pick') {
-  const source = id ? modelFile(id) : null;
-  if (!source) {
-    console.error(`no downloaded candidate ${id}; candidates: ${candidateIds.join(', ')}`);
+  if (!id || !brief.candidates[id]?.task_id) {
+    console.error(`no finished candidate ${id}; candidates: ${candidateIds.join(', ')}`);
     process.exit(1);
   }
-  mkdirSync(SOURCES, { recursive: true });
-  const file = `${name}.glb`;
-  copyFileSync(source, join(SOURCES, file));
-  brief.chosen = { candidate: id, task_id: brief.candidates[id].task_id, file };
+  brief.chosen = { candidate: id, task_id: brief.candidates[id].task_id };
   save();
-  console.log(`chose ${id} for ${name}: scripts/blender/sources/tripo/${file}`);
+  console.log(`chose ${id} for ${name}; next: npm run tripo -- rig ${name}`);
+}
+
+if (command === 'rig') {
+  if (!brief.chosen) throw new Error(`pick a candidate first: npm run tripo -- pick ${name} <id>`);
+  const { model, spec, faces } = brief.rig;
+  // Tripo's retarget fails on the full ~780k-face model, and the game needs
+  // far fewer faces: decimate first (the script is the record), then upload
+  // and rig that. Through `make --then` the CLI sends the rig model; the
+  // presets need rig v1.0 and Tripo's native skeleton (spec "tripo"): a
+  // Mixamo-named rig matches no preset skeleton profile.
+  const prepared = join(work, 'prepared.glb');
+  runBlender('tripo_prepare.py', [modelFile(brief.chosen.candidate), prepared, String(faces)]);
+  const result = tripo([
+    'make',
+    arg(prepared),
+    '--then',
+    `rig-check,rig:spec=${spec},model=${model}`,
+    '--out',
+    arg(join(work, 'rig')),
+    '--name',
+    `${name}-rig`,
+  ]);
+  const byType = (type) => (result.credits_breakdown ?? []).find((t) => t.type === type);
+  brief.rig.import_task_id = byType('import_model')?.task_id;
+  brief.rig.task_id = byType('animate_rig')?.task_id ?? result.task_id;
+  brief.rig.credits_consumed = result.credits_consumed;
+  save();
+  console.log(
+    `rigged: task ${brief.rig.task_id}, ${brief.rig.credits_consumed} credits; next: npm run tripo -- animate ${name}`,
+  );
+}
+
+if (command === 'animate') {
+  if (!brief.rig?.task_id) throw new Error(`rig the model first: npm run tripo -- rig ${name}`);
+  // One preset per task: a multi-preset task was billed for every preset
+  // but returned only the last one (task 6bb52ba3, 2026-09-25). The first
+  // clip carries the geometry and is the base; the others are animation
+  // only, which keeps each file small. The bake merges them.
+  const dir = join(SOURCES, name);
+  mkdirSync(dir, { recursive: true });
+  brief.clips ??= {};
+  Object.entries(brief.animations).forEach(([clip, preset], i) => {
+    const file = `${clip}.glb`;
+    if (brief.clips[clip]?.task_id && existsSync(join(dir, file))) return; // already made
+    const out = join(work, 'clips', clip);
+    const result = tripo([
+      'anim',
+      'retarget',
+      brief.rig.task_id,
+      '--animation',
+      preset,
+      '--out-format',
+      'glb',
+      '--animate-in-place',
+      '-p',
+      `export_with_geometry=${i === 0}`,
+      '--out',
+      arg(out),
+      '--name',
+      `${name}-${clip}`,
+    ]);
+    const model = findModel(out);
+    if (!model) throw new Error(`the ${clip} task finished without a model file`);
+    copyFileSync(model, join(dir, file));
+    brief.clips[clip] = {
+      preset,
+      task_id: result.task_id,
+      credits_consumed: result.credits_consumed,
+      file: `${name}/${file}`,
+      geometry: i === 0,
+    };
+    save();
+    console.log(`${clip}: ${preset}, task ${result.task_id}, ${result.credits_consumed} credits`);
+  });
+  console.log(`animated: sources in scripts/blender/sources/tripo/${name}/`);
 }
