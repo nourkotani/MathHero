@@ -1,15 +1,19 @@
-"""The sparring opponent (ADR 0011): the Tripo fighter, fitted to the game.
+"""The Rival's body (ADR 0011, ADR 0012): the Tripo fighter, fitted to the game.
 
 The sources are in sources/tripo/fighter/, made by `npm run tripo`: Idle.glb
 carries the model (the chosen candidate decimated to 100k faces, rigged by
 Tripo with its native biped skeleton) and the idle clip; each other file
 carries one preset clip on the same skeleton, no geometry. The clip names
-are the Rival director's (models.json "animations"), so the
-opponent reacts to the same cues.
+are the Rival director's (models.json "animations"), so the opponent
+reacts to the same cues. Launch and Recover come from HY-Motion
+(sources/hy-motion/clips.json; ADR 0010), retargeted onto the same
+skeleton by mocap.py.
 
 This script makes the game's version, and nothing is edited by hand:
 
 - every clip moves onto the one armature, named for the director;
+- the long presets play a window (WINDOWS): Idle loops 4 s of its 15 s,
+  Taunt keeps 1.5 s of the swagger and settles into Idle's first pose;
 - only the base-color texture stays, at game size, in a material named
   "Painted" (the game uses base color only; ADR 0011);
 - a baked ink hull, like the scripted models, as wide on screen as the
@@ -23,14 +27,31 @@ import json
 import os
 
 import bpy
+from mathutils import Matrix
 
 import common as c
+import mocap
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SOURCES = os.path.join(HERE, "sources", "tripo")
 TEXTURE_SIZE = 2048
 FIGHTER_HEIGHT = 2.6  # game units: src/renderer/constants.ts FIGHTER_HEIGHT
 HERO_INK = 0.012  # hero.py INK_WIDTH, in game units
+
+# The window of a preset clip the game plays, in seconds of the source.
+#   loop:   the last seconds blend back to the first frame, so it loops.
+#   settle: the last seconds blend to the stance (Idle's first frame), so
+#           the cross-fade to Idle never pops.
+#   pin:    the hips stay on Idle's spot; the swagger walks 2.5 m although
+#           the retarget asked for it in place (tripo.mjs --animate-in-place).
+WINDOWS = {
+    "Idle": {"window": (0.0, 4.0), "loop": 0.5},
+    "Taunt": {"window": (0.0, 1.5), "settle": 0.3, "pin": True},
+}
+
+# The Rival's HY-Motion clips: the director's name and the brief's.
+HY_CLIPS = {"Launch": "launch", "Recover": "recover"}
+PELVIS = mocap.TRIPO["bones"]["pelvis"]
 
 
 def _objects():
@@ -94,6 +115,87 @@ def _ink_hull(mesh, rig, width):
     skin.object = rig
 
 
+def _play(rig, action):
+    rig.animation_data.action = action
+    if action.slots:
+        rig.animation_data.action_slot = action.slots[0]
+
+
+def _sample(rig, action, first, count):
+    """The pose of every bone at count frames from the source frame first:
+    [{bone: (location, quaternion, scale, pose matrix)}] as the action
+    plays them, plus the pelvis bone's world position per frame."""
+    scene = bpy.context.scene
+    _play(rig, action)
+    frames = []
+    for i in range(count):
+        f = first + i
+        scene.frame_set(int(f), subframe=f - int(f))
+        pose = {}
+        for pb in rig.pose.bones:
+            pose[pb.name] = (pb.location.copy(), pb.rotation_quaternion.copy(), pb.scale.copy(), pb.matrix.copy())
+        frames.append(pose)
+    rig.animation_data.action = None
+    return frames
+
+
+def _blend(pose, target, weight):
+    """Between two sampled poses: the rotation slerped, the rest lerped."""
+    out = {}
+    for bone, (loc, quat, scale, matrix) in pose.items():
+        t_loc, t_quat, t_scale, _ = target[bone]
+        if quat.dot(t_quat) < 0:
+            t_quat = -t_quat
+        out[bone] = (loc.lerp(t_loc, weight), quat.slerp(t_quat, weight), scale.lerp(t_scale, weight), matrix)
+    return out
+
+
+def _window(rig, action, spec, stance=None):
+    """Replace a preset clip with the window of it the game plays."""
+    start, end = spec["window"]
+    count = int(round((end - start) * c.FPS)) + 1
+    frames = _sample(rig, action, action.frame_range[0] + start * c.FPS, count)
+    if spec.get("pin"):
+        # Hold the pelvis where Idle keeps it: take its horizontal travel
+        # out of its location, in the bone's own frame (its pose matrix
+        # without its own basis).
+        home = (stance or frames[0])[PELVIS][3].to_translation()
+        for pose in frames:
+            loc, quat, scale, matrix = pose[PELVIS]
+            gone = matrix.to_translation() - home
+            gone.z = 0.0
+            chain = matrix @ Matrix.LocRotScale(loc, quat, scale).inverted()
+            pose[PELVIS] = (loc - chain.to_3x3().inverted() @ gone, quat, scale, matrix)
+    tail = spec.get("loop") or spec.get("settle") or 0.0
+    target = frames[0] if "loop" in spec else stance
+    if tail:
+        span = tail * c.FPS
+        for i in range(count):
+            over = i - (count - 1 - span)
+            if over > 0:
+                frames[i] = _blend(frames[i], target, mocap._smooth(over / span))
+    name = action.name
+    keys = {bone: [] for bone in frames[0]}
+    for i, pose in enumerate(frames):
+        for bone, (loc, quat, scale, _) in pose.items():
+            keys[bone].append((i, {"loc": tuple(loc), "quat": tuple(quat), "scale": tuple(scale)}))
+    bpy.data.actions.remove(action)
+    c.add_clip(rig, name, count - 1, keys)
+
+
+def _idle_start(rig):
+    """Idle's first frame, sampled: the pose the Rival rests in."""
+    rig.animation_data_create()
+    idle = bpy.data.actions["Idle"]
+    return _sample(rig, idle, idle.frame_range[0], 1)[0]
+
+
+def stance(rig):
+    """The pose every HY-Motion clip blends in from and out to: Idle's first
+    frame, as {bone: {"quat", "loc"}} in each bone's own rest frame."""
+    return {bone: {"quat": quat, "loc": loc} for bone, (loc, quat, _, _) in _idle_start(rig).items()}
+
+
 def _clips(rig, brief):
     """Every clip onto the one armature, named for the director, each on its
     own muted NLA track (how the scripted clips export; common.add_clip)."""
@@ -102,6 +204,7 @@ def _clips(rig, brief):
     # track would export every Idle channel twice.
     for track in list(rig.animation_data.nla_tracks):
         rig.animation_data.nla_tracks.remove(track)
+    settle = None  # Idle's first frame, once Idle is in
     for clip, info in brief["clips"].items():
         path = os.path.join(SOURCES, info["file"])
         if info.get("geometry"):
@@ -114,14 +217,20 @@ def _clips(rig, brief):
                 bpy.data.objects.remove(obj, do_unlink=True)
         action.name = clip
         action.use_fake_user = True
-        rig.animation_data.action = action
-        if action.slots:
-            rig.animation_data.action_slot = action.slots[0]
+        if clip in WINDOWS:
+            _window(rig, action, WINDOWS[clip], settle)
+            if clip == "Idle":
+                settle = _idle_start(rig)
+            continue
+        _play(rig, action)
         track = rig.animation_data.nla_tracks.new()
         track.name = clip
         track.strips.new(clip, int(action.frame_range[0]), action)
         track.mute = True
     rig.animation_data.action = None
+    rest = stance(rig)
+    for clip, name in HY_CLIPS.items():
+        mocap.hy_clip(rig, clip, name, rest, mocap.TRIPO)
 
 
 def build():

@@ -3,22 +3,24 @@
 //   npm run motion -- <clip>              make every candidate, score, render the best
 //   npm run motion -- <clip> --rescore    score the last candidates again (after a weight change)
 //   npm run motion -- <clip> --pick <id>  install a candidate as the clip's source
+//   ... --for <target>                    score on another rig than the brief's
 //
 // The clip's brief is in scripts/blender/sources/hy-motion/clips.json:
-// prompts, frames, samples per prompt, master seed, window, length, and
-// the score weights. Every run of the same brief makes the same
-// candidates, bit for bit.
+// the target rig ("hero" or "fighter"; hero when absent), prompts, frames,
+// samples per prompt, master seed, window, length, and the score weights.
+// Every run of the same brief makes the same candidates, bit for bit.
 //
 // 1. HY-Motion makes <samples> candidates per prompt into build/motion/
 //    (git ignores build/). It runs outside the repo: set HY_MOTION_DIR if
 //    it is not in C:\Users\nourk\ai\HY-Motion-1.0, and HY_MOTION_GPU to
 //    pick the GPU (default 1: GPU 0 drives the display).
-// 2. Blender retargets every candidate onto the hero exactly as the bake
-//    does, measures it on the hero's bones, and renders the best ones
-//    (scripts/blender/motion_score.py). Needs build/models/hero.blend:
-//    run `npm run bake:models hero` first.
+// 2. Blender retargets every candidate onto the target rig exactly as the
+//    bake does, measures it on the rig's bones, and renders the best ones
+//    (scripts/blender/motion_score.py). Needs build/models/<target>.blend:
+//    run `npm run bake:models <target>` first.
 // 3. --pick copies a candidate into sources/ and records it as chosen.
-//    Then bake again: `npm run bake:models hero && npm run gen:hero`.
+//    Then bake again: `npm run bake:models <target>` (and `npm run gen:hero`
+//    for the hero).
 //
 // HY-Motion's license limits its outputs to its Territory; the family
 // publishes on GitHub Pages and accepts that risk (ADR 0010).
@@ -40,6 +42,7 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const SOURCES = join(ROOT, 'scripts', 'blender', 'sources', 'hy-motion');
 const CLIPS = join(SOURCES, 'clips.json');
 const HY = process.env.HY_MOTION_DIR ?? 'C:\\Users\\nourk\\ai\\HY-Motion-1.0';
+const TARGETS = ['hero', 'fighter'];
 
 function findBlender() {
   if (process.env.BLENDER) return process.env.BLENDER;
@@ -53,17 +56,35 @@ function run(command, args, options) {
   return result.status ?? 1;
 }
 
-const [clip, flag, pickId] = process.argv.slice(2);
+/** The command line: the clip, then flags in any order. A flag without
+ *  its value reads as null; a second clip reads as no options at all. */
+function parse(argv) {
+  const options = { clip: undefined, rescore: false, pick: undefined, target: undefined };
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i];
+    if (arg === '--rescore') options.rescore = true;
+    else if (arg === '--pick') options.pick = argv[++i] ?? null;
+    else if (arg === '--for') options.target = argv[++i] ?? null;
+    else if (options.clip === undefined) options.clip = arg;
+    else return null;
+  }
+  return options;
+}
+
 const manifest = JSON.parse(readFileSync(CLIPS, 'utf8'));
-const brief = clip ? manifest.clips[clip] : undefined;
-if (!brief) {
+const options = parse(process.argv.slice(2));
+const brief = options?.clip ? manifest.clips[options.clip] : undefined;
+const target = options?.target === undefined ? (brief?.target ?? 'hero') : options.target;
+if (!brief || options.pick === null || !TARGETS.includes(target)) {
   console.error(
-    `usage: npm run motion -- <clip> [--pick <id>]; clips: ${Object.keys(manifest.clips).join(', ')}`,
+    `usage: npm run motion -- <clip> [--rescore] [--pick <id>] [--for ${TARGETS.join('|')}]; clips: ${Object.keys(manifest.clips).join(', ')}`,
   );
   process.exit(1);
 }
+const { clip } = options;
 const work = join(ROOT, 'build', 'motion', clip);
 const out = join(work, 'out');
+const bakeAgain = `npm run bake:models ${target}${target === 'hero' ? ' && npm run gen:hero' : ''}`;
 
 /** Candidates on disk: HY-Motion names them <prompt number>_<sample>.npz. */
 function candidates() {
@@ -75,23 +96,23 @@ function candidates() {
     .sort((a, b) => a.id.localeCompare(b.id));
 }
 
-if (flag === '--pick') {
-  const chosen = candidates().find((c) => c.id === pickId);
+if (options.pick !== undefined) {
+  const chosen = candidates().find((c) => c.id === options.pick);
   if (!chosen) {
-    console.error(`no candidate ${pickId} in ${out}; run \`npm run motion -- ${clip}\` first`);
+    console.error(`no candidate ${options.pick} in ${out}; run \`npm run motion -- ${clip}\` first`);
     process.exit(1);
   }
   const scores = JSON.parse(readFileSync(join(work, 'scores.json'), 'utf8'));
-  const score = scores.find((s) => s.id === pickId)?.score;
+  const score = scores.find((s) => s.id === options.pick)?.score;
   const file = `${clip}.npz`;
   copyFileSync(chosen.file, join(SOURCES, file));
   brief.chosen = {
     file,
-    candidate: pickId,
+    candidate: options.pick,
     by: `npm run motion (score ${score?.toFixed(3)}), ${new Date().toISOString().slice(0, 10)}`,
   };
   writeFileSync(CLIPS, `${JSON.stringify(manifest, null, 2)}\n`);
-  console.log(`chose ${pickId} for ${clip}; now run: npm run bake:models hero && npm run gen:hero`);
+  console.log(`chose ${options.pick} for ${clip}; now run: ${bakeAgain}`);
   process.exit(0);
 }
 
@@ -143,7 +164,7 @@ function generate() {
 // 1. Make the candidates, unless --rescore scores the last ones again.
 // HY-Motion's reference-character export can fail after the motion is
 // saved; only missing motion files are an error.
-const status = flag === '--rescore' ? 0 : generate();
+const status = options.rescore ? 0 : generate();
 const made = candidates();
 const expected = brief.prompts.length * brief.samples;
 if (made.length !== expected) {
@@ -153,20 +174,21 @@ if (made.length !== expected) {
   process.exit(1);
 }
 
-// 2. Score them on the hero and render the best.
-const heroBlend = join(ROOT, 'build', 'models', 'hero.blend');
-if (!existsSync(heroBlend)) {
-  console.error('build/models/hero.blend is missing: run `npm run bake:models hero` first');
+// 2. Score them on the target rig and render the best.
+const blend = join(ROOT, 'build', 'models', `${target}.blend`);
+if (!existsSync(blend)) {
+  console.error(`build/models/${target}.blend is missing: run \`npm run bake:models ${target}\` first`);
   process.exit(1);
 }
 const scored = run(findBlender(), [
   '--background',
-  heroBlend,
+  blend,
   '--python-exit-code',
   '1',
   '--python',
   join(ROOT, 'scripts', 'blender', 'motion_score.py'),
   '--',
+  target,
   clip,
   work,
   ...made.map((c) => `${c.id}=${c.file}`),
@@ -175,7 +197,7 @@ if (scored !== 0) process.exit(scored);
 
 const scores = JSON.parse(readFileSync(join(work, 'scores.json'), 'utf8'));
 console.log(
-  `\n${clip}: ${scores.length} candidates, best first (weights ${JSON.stringify(brief.score)})`,
+  `\n${clip} on the ${target}: ${scores.length} candidates, best first (weights ${JSON.stringify(brief.score)})`,
 );
 for (const s of scores) {
   const m = Object.entries(s.metrics)

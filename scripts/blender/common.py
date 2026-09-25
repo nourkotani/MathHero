@@ -17,7 +17,7 @@ import math
 
 import bmesh
 import bpy
-from mathutils import Matrix, Vector
+from mathutils import Matrix, Quaternion, Vector
 
 INK = "Ink"
 PAINTED = "Painted"
@@ -644,6 +644,9 @@ def add_clip(rig, name, length, keys):
 
     length: the last frame (the clip runs 0..length at FPS).
     keys: {bone: [(frame, {"loc": ..., "rot": ..., "scale": ...}), ...]}.
+    "rot" is a three.js Euler for an upright bone (see add_rig); a bone of
+    a rig that keeps its own rest pose (fighter.py) takes "quat", its pose
+    quaternion in the bone's own rest frame, instead.
     Every bone gets keys at frame 0 and at length (rest unless given), so a
     clip never leaves a bone posed by an earlier clip.
     """
@@ -665,7 +668,7 @@ def add_clip(rig, name, length, keys):
             pose = {**rest, **frames[frame]}
             pose_bone.location = pose["loc"]
             if quat:
-                q = three_rotation(*pose["rot"])
+                q = Quaternion(pose["quat"]) if "quat" in pose else three_rotation(*pose["rot"])
                 previous = last_quat.get(pose_bone.name)
                 if previous is not None and previous.dot(q) < 0:
                     q.negate()

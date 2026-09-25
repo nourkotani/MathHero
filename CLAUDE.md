@@ -36,7 +36,7 @@ Blender is the bakery: every model and clip in the game is the output of a commi
 | Tripo briefs, task ids, costs, candidates, the chosen one, rig, clip presets | `scripts/blender/sources/tripo/models.json` |
 | Tripo sources: every candidate at full detail, the rigged model, one file per clip | `scripts/blender/sources/tripo/<name>/**/*.glb` (git LFS) |
 | HY-Motion briefs, scores, and chosen candidates | `scripts/blender/sources/hy-motion/clips.json`, `*.npz` |
-| Bake scripts | `scripts/blender/` (`bake.py` lists the models; `common.py`, `mocap.py`, `tripo_prepare.py`, `tripo_preview.py`, `motion_score.py`) |
+| Bake scripts | `scripts/blender/` (`bake.py` lists the models; `common.py`, `regions.py`, `mocap.py`, `tripo_prepare.py`, `tripo_preview.py`, `motion_score.py`, `contact_sheet.py`) |
 | Baked output: committed, never LFS, never edited by hand | `src/renderer/models/*.glb`, `src/scene/models/*.tsx` |
 
 **Commands**
@@ -50,7 +50,7 @@ Blender is the bakery: every model and clip in the game is the output of a commi
 | Paint the chosen candidate again from the brief's `retexture` text (the UV layout stays; the bake takes only what it needs, such as the face) | `npm run tripo -- retexture <name>` |
 | Decimate, then rig with the native skeleton | `npm run tripo -- rig <name>` |
 | Make one clip per preset | `npm run tripo -- animate <name>` |
-| Make, score, and render HY-Motion candidates for a clip | `npm run motion -- <clip>` |
+| Make, score, and render HY-Motion candidates for a clip (the brief's `"target"` picks the rig, hero or fighter; `--for` overrides it) | `npm run motion -- <clip> [--for hero\|fighter]` |
 | Install a HY-Motion candidate | `npm run motion -- <clip> --pick <id>` |
 | Bake models | `npm run bake:models [hero\|fighter\|arena]` |
 | Make the hero component again (after every hero bake) | `npm run gen:hero` |
@@ -69,7 +69,7 @@ Blender is the bakery: every model and clip in the game is the output of a commi
 - Put the Tripo sources in git LFS. Never put `src/renderer/models/` in LFS: the build would inline the pointer text, and the game would break with no error.
 - Never edit a `.blend`, a `.glb`, or a generated component by hand. Change the script and bake again.
 - The clip owns its length; the code reads it (ADR 0012). Do not copy a clip's duration into a constant.
-- HY-Motion runs outside the repo on GPU 1 (memory note `hy-motion-local-setup`). It needs `build/models/hero.blend`: run `npm run bake:models hero` first. Its outputs are limited to the license Territory (ADR 0010).
+- HY-Motion runs outside the repo on GPU 1 (memory note `hy-motion-local-setup`). It needs the target's `build/models/<target>.blend`: run `npm run bake:models hero` or `fighter` first. `mocap.py` retargets onto the scripted hero's joints, or onto a Tripo rig through a naming scheme (`mocap.TRIPO`). Its outputs are limited to the license Territory (ADR 0010).
 - Tests assert behavior only. Judge the look by eye on the sheet and in the game.
 
 **Tripo CLI exit codes**

@@ -1,12 +1,16 @@
-"""Render key frames of hero clips into one contact sheet (ADR 0010).
+"""Render key frames of clips into one contact sheet (ADR 0010).
 
-One row per clip, seven frames across it, an orthographic side view that
-covers the dash toward the Rival (-Y in Blender). The camera sees
-the hero's right side, as the game's camera does, so the hero faces right
-toward the Rival, as in the game. Workbench
-engine, flat colors per painted region, and the baked ink hulls removed:
-the sheet is for judging poses, not the look. It changes only the open
-session; nothing is saved.
+One row per clip, seven frames across it, an orthographic side view. A
+view says what to show and where the camera stands:
+
+- HERO: the boy in the gi with short spiky hair, seen from his right as the
+  game's camera sees him, facing right toward the Rival (-Y in Blender), a
+  frame wide enough for the dash. Flat colors per painted region.
+- FIGHTER: the Tripo fighter (fighter.py), facing right (+X), its own
+  texture.
+
+Workbench engine, the baked ink hulls removed: the sheet is for judging
+poses, not the look. It changes only the open session; nothing is saved.
 """
 
 import os
@@ -15,7 +19,6 @@ import bmesh
 import bpy
 import numpy as np
 
-SHOWN = ("BodyBoy", "GarmentGi", "Hair_spiky_short")
 SAMPLES = (0.0, 0.2, 0.4, 0.55, 0.7, 0.85, 1.0)
 TILE_W, TILE_H = 300, 360
 REGION_COLORS = {
@@ -23,6 +26,19 @@ REGION_COLORS = {
     "Skin": (0.95, 0.75, 0.6, 1.0),
     "Trim": (1.0, 0.62, 0.11, 1.0),
     "Hair": (0.15, 0.15, 0.18, 1.0),
+}
+
+# shown: the meshes to render (by name prefix); camera: location, rotation,
+# and orthographic width; color: Workbench's color source.
+HERO = {
+    "shown": ("BodyBoy", "GarmentGi", "Hair_spiky_short"),
+    "camera": ((-10.0, -1.3, 1.5), (1.5708, 0.0, -1.5708), 7.4),  # look along +X
+    "color": "MATERIAL",
+}
+FIGHTER = {
+    "shown": ("Fighter",),
+    "camera": ((-0.15, -6.0, 0.55), (1.5708, 0.0, 0.0), 2.6),  # look along +Y
+    "color": "TEXTURE",
 }
 
 
@@ -37,11 +53,11 @@ def _drop_ink(obj):
     bm.free()
 
 
-def _prepare(scene):
+def _prepare(scene, view):
     for obj in scene.objects:
         if obj.type != "MESH":
             continue
-        shown = obj.name.startswith(SHOWN)
+        shown = obj.name.startswith(view["shown"])
         obj.hide_render = not shown
         if shown:
             _drop_ink(obj)
@@ -49,17 +65,18 @@ def _prepare(scene):
         for key, color in REGION_COLORS.items():
             if key in mat.name:
                 mat.diffuse_color = color
+    location, rotation, width = view["camera"]
     cam = bpy.data.objects.new("SheetCam", bpy.data.cameras.new("SheetCam"))
     cam.data.type = "ORTHO"
-    cam.data.ortho_scale = 7.4
-    cam.location = (-10.0, -1.3, 1.5)
-    cam.rotation_euler = (1.5708, 0.0, -1.5708)  # look along +X, at the hero's right
+    cam.data.ortho_scale = width
+    cam.location = location
+    cam.rotation_euler = rotation
     scene.collection.objects.link(cam)
     scene.camera = cam
     scene.render.engine = "BLENDER_WORKBENCH"
     shading = scene.display.shading
     shading.light = "STUDIO"
-    shading.color_type = "MATERIAL"
+    shading.color_type = view["color"]
     shading.show_cavity = True
     shading.show_object_outline = True
     shading.show_backface_culling = True
@@ -80,10 +97,10 @@ def play(rig, action):
         rig.animation_data.action_slot = action.slots[0]
 
 
-def render(rig, actions, out):
+def render(rig, actions, out, view=HERO):
     """One row per action, top to bottom, into the PNG at out."""
     scene = bpy.context.scene
-    _prepare(scene)
+    _prepare(scene, view)
     tiles = os.path.join(os.path.dirname(out), "_tiles")
     os.makedirs(tiles, exist_ok=True)
     rows = len(actions)
