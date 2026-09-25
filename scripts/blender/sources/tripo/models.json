@@ -1,0 +1,24 @@
+{
+  "about": "Tripo-generated models (ADR 0011). Each model has a brief (prompts, negative prompt, seeds, options), which `npm run tripo -- generate <name>` turns into candidates, one per prompt and seed. Use a paid key only: free-tier outputs are public and CC BY. Prompts describe features, never franchise, character, or trademark names (CLAUDE.md).",
+  "models": {
+    "fighter": {
+      "role": "proposed: a sparring opponent beside or in place of the Training Dummy",
+      "prompts": [
+        "Original anime martial-arts hero, adult male, heroic muscular proportions, tall spiky upswept black hair with one teal streak, sleeveless white training gi top over a fitted charcoal bodysuit, crimson waist sash, cloth forearm wraps, fingerless armored gauntlets, knee-high reinforced boots, confident determined expression, full body, standing A-pose with arms slightly away from the body, highly detailed stylized game character",
+        "Original comic-book superhero martial artist, adult male, athletic muscular build, short spiky silver-white hair, sleek navy and crimson armored bodysuit with sculpted chest plates and segmented shoulder guards, wide belt with a round star emblem, glowing teal seams on the gauntlets, heavy boots, brow visor plate, full body, standing A-pose with arms slightly away from the body, highly detailed stylized game character"
+      ],
+      "negative_prompt": "text, letters, logo, weapon, claws, cape, extra limbs, extra fingers, blurry, low detail, photorealistic real person",
+      "seeds": [11, 42],
+      "options": {
+        "model": "v3.1-20260211",
+        "geometry_quality": "detailed",
+        "texture_quality": "detailed",
+        "texture": true,
+        "pbr": true,
+        "face_limit": 800000
+      },
+      "candidates": {},
+      "chosen": null
+    }
+  }
+}

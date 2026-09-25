@@ -10,6 +10,7 @@
     "bake:models": "node scripts/bake-models.mjs",
     "gen:hero": "node scripts/gltfjsx-hero.mjs",
     "motion": "node scripts/motion.mjs",
+    "tripo": "node scripts/tripo.mjs",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tests",
     "lint": "eslint .",
     "test:core": "vitest run",

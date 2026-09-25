@@ -9,10 +9,17 @@ export default tseslint.config(
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
-    // Offline tooling (the texture baker) runs under Node, not the browser.
+    // Tooling (the bakers, the model and motion tools) runs under Node, not the browser.
     files: ['scripts/**'],
     languageOptions: {
-      globals: { Buffer: 'readonly', console: 'readonly', process: 'readonly' },
+      globals: {
+        Buffer: 'readonly',
+        console: 'readonly',
+        process: 'readonly',
+        fetch: 'readonly',
+        URL: 'readonly',
+        setTimeout: 'readonly',
+      },
     },
   },
   {
