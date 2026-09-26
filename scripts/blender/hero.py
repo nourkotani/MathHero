@@ -26,9 +26,11 @@ This script makes the game's version, and nothing is edited by hand:
   texture (regions.py) and made gray, in one atlas for both bodies, so
   the runtime tints them as it tinted the scripted hero;
 - a face layer per body: the head's front faces, a little off the skin,
-  wearing the painted face with only its features opaque, and an iris
-  layer above it that the Form recolors (_iris finds the painted iris of
-  both bodies, the boy's small eyes too);
+  wearing the painted face with only its features opaque, the thin gaps
+  inside a feature closed (_close_features), so the white of an eye and
+  its iris meet with no line; and an iris layer above it that the Form
+  recolors (_iris finds the painted iris of both bodies, the boy's small
+  eyes too; _spread takes it over the closed gap);
 - the HY-Motion idle (ADR 0010), a loop whose first frame, the guard, is
   the stance: every other clip blends in from it and out to it;
 - the preset clips, each a window of its source, blended from and to the
@@ -40,15 +42,20 @@ This script makes the game's version, and nothing is edited by hand:
   off the eyes, and rigid on the body's hair bone; under each one, the
   scalp cap: the head's own faces above the hairline, a little off the
   skin, on the head bone, so no bald patch shows between the locks. The
-  cap alone is the short buzz cut; a thicker one with tufts is the long;
-- the garments from Tripo (sources/tripo/hero-garments), fitted to each
-  body band by band (GARMENT_FIT), moved out of the skin, and skinned to
-  that body's own bones by weight transfer from its mesh, the weights
-  evened out over the cloth so an arm's swing does not fold it, and
-  pushed out of the skin once more across the idle; the cape is fitted
-  on the body with the arms down, cut open at the front, and brought
-  back to rest, so it hangs behind the arms; the inner wall of each
-  garment gets no ink hull;
+  cap alone is the short buzz cut; a thicker one with tufts is the long.
+  The legend mane has a window cut for the face that widens toward the
+  front (_cut_face_window);
+- the garments from Tripo (sources/tripo/hero-garments), painted from
+  the colors Tripo gave them on their outer side only, a fold's small
+  patch of accent dropped (_paint_garment); fitted to each body band by
+  band (GARMENT_FIT), moved out of the skin (the inner wall to its offset,
+  the outer wall SHELL farther, so the two walls never cross, _wrap_out),
+  and skinned to that body's own bones by weight transfer from its mesh,
+  the weights evened out over the cloth so an arm's swing does not fold
+  it, and pushed out of the skin once more across the idle; the cape is
+  fitted on the body with the arms down, cut open at the front, and
+  brought back to rest, so it hangs behind the arms; the inner wall of
+  each garment gets no ink hull;
 - one painted atlas for everything: the bodies in the top row, the baked
   paint of the hair, garments, and caps in the bottom row;
 - a baked ink hull, as on the scripted models;
@@ -155,11 +162,14 @@ FACE_WINDOW = ("Hair_mane_legend",)
 # front of a cape is cut open (_open_front); weights: the weights are
 # evened out over the cloth (_smooth_weights), a share per pass and the
 # passes; settle: once skinned, the garment is pushed out of the body in
-# the idle as well (SETTLE_AT).
+# the idle as well (SETTLE_AT); pushed: an accent face that the push out
+# of the skin moves farther than this wears the main region
+# (_repaint_pushed): the armor's recesses between its plates, pushed onto
+# the visible surface, are no longer recesses.
 GARMENT_FIT = {
     "GarmentGi": {"top": ("neck", 0.1), "anchor": (0.6, "hip", 0.08), "margin": 0.03, "start": 0.15, "hug": 0.85, "smooth": 0.25, "weights": (0.5, 10), "settle": True},
     "GarmentCape": {"top": ("neck", 0.14), "anchor": (1.0, "knee", 0.1), "margin": 0.04, "hug": 0.3, "smooth": 0.15, "offset": 0.03, "flare": ("hip", 0.15, 0.35), "arms_down": True, "open": (0.0, 0.2, 100.0, 105.0), "weights": (0.5, 10), "settle": True},
-    "GarmentArmor": {"top": ("shoulder_z", 0.14), "anchor": (1.0, "chest", -0.15), "margin": 0.03, "smooth": 0.3, "front": True, "weights": (0.5, 10), "settle": True},
+    "GarmentArmor": {"top": ("shoulder_z", 0.14), "anchor": (1.0, "chest", -0.15), "margin": 0.03, "smooth": 0.3, "front": True, "weights": (0.5, 10), "settle": True, "pushed": 0.02},
 }
 
 # The paint of each garment, from the colors Tripo gave it: the accent
@@ -168,17 +178,26 @@ GARMENT_FIT = {
 # and grayer than the second saturation (a shaded fold of the main color
 # stays saturated); the main elsewhere. Main and accent go to the tint
 # regions named. The cape and the armor wear the trim color, so they stand
-# out from the suit.
+# out from the suit. Tripo paints shade into the colors, so a deep fold or
+# a shaded plate passes these limits too: on the garment's outer side
+# (_paint_garment), an accent patch smaller than the last share given of
+# that side is main. Real accents are bands and parts, larger than a
+# fold's patch.
 GARMENT_PAINT = {
-    "GarmentGi": ("Outfit", "Trim", 0.3, 0.4, 0.55),
-    "GarmentCape": ("Trim", "Outfit", 0.3, 0.4, 0.55),
-    "GarmentArmor": ("Trim", "Outfit", 0.0, 0.2, 1.1),
+    "GarmentGi": ("Outfit", "Trim", 0.3, 0.4, 0.55, 0.005),
+    "GarmentCape": ("Trim", "Outfit", 0.3, 0.4, 0.55, 0.005),
+    "GarmentArmor": ("Trim", "Outfit", 0.0, 0.2, 1.1, 0.005),
 }
 # How far out of the skin a garment lies at least: past the body's own
-# ink hull (INK_WIDTH), so the hull never shows through the cloth.
+# ink hull (INK_WIDTH), so the hull never shows through the cloth. The
+# outer wall of a garment lies SHELL farther than its inner wall
+# (_wrap_out).
 CLOTH_OFFSET = 0.02
-# The face attribute that marks a garment's inner wall (_mark_inner).
+SHELL = 0.012
+# The face attribute that marks a garment's inner wall (_mark_inner), and
+# the one that marks it on the Tripo piece before the fit (_inner_wall).
 INNER = "inner_wall"
+WALL = "source_inner_wall"
 # A cape hangs from the trunk and the shoulders only: no leg, forearm, or
 # head bone moves it, so a kick or a raised fist does not drag it along.
 # The upper arms move only the cloth over the shoulders (SHOULDER_BONES
@@ -615,6 +634,68 @@ def _components(mask):
     return parts
 
 
+def _close_features(rgb, alpha):
+    """Close the thin gaps inside a painted feature. Where the white of an
+    eye meets the iris or the lid, the texels mix both colours and fit none
+    of _features' kinds, so the tinted skin showed through as a thin line;
+    a small highlight inside an iris showed as a hole. A closing of the
+    opaque features fills each gap narrower than twice FEATURE_CLOSE, and
+    a hole that the features enclose, up to FEATURE_HOLE of the layer, is
+    filled too. Each filled texel is opaque and takes the mean colour of
+    the opaque texels next to it, so the white and the iris meet with no
+    line. Returns the new colours and alpha."""
+    size = rgb.shape[0]
+    opaque = alpha > 0.5
+    radius = max(1, round(FEATURE_CLOSE * size / 512))
+    closed = _shrink(_grow(opaque, radius), radius)
+    for part in _components(~closed):
+        rows, cols = part[:, 0], part[:, 1]
+        if len(part) > FEATURE_HOLE * size * size:
+            continue
+        if rows.min() == 0 or cols.min() == 0 or rows.max() == size - 1 or cols.max() == alpha.shape[1] - 1:
+            continue
+        closed[rows, cols] = True
+    filled = closed & ~opaque
+    rgb = rgb.copy()
+    known = opaque.copy()
+    while (filled & ~known).any():
+        total = np.zeros_like(rgb)
+        count = np.zeros(known.shape, dtype=np.float32)
+        weighted = rgb * known[..., None]
+        for src, dst in ((np.s_[1:], np.s_[:-1]), (np.s_[:-1], np.s_[1:])):
+            total[dst] += weighted[src]
+            count[dst] += known[src]
+            total[:, dst] += weighted[:, src]
+            count[:, dst] += known[:, src]
+        new = filled & ~known & (count > 0)
+        if not new.any():
+            break
+        rgb[new] = total[new] / count[new][:, None]
+        known |= new
+    return rgb, np.where(filled, 1.0, alpha).astype(np.float32)
+
+
+def _spread(iris, filled):
+    """The iris over the gap that _close_features filled next to it, so
+    a Form's eye colour meets the white with no line: each filled texel
+    takes the strongest iris of its neighbours, as many times as the widest
+    gap is wide. The iris is found on the paint as it was (_iris)."""
+    iris = iris.copy()
+    for _ in range(2 * max(1, round(FEATURE_CLOSE * iris.shape[0] / 512))):
+        near = iris.copy()
+        near[1:] = np.maximum(near[1:], iris[:-1])
+        near[:-1] = np.maximum(near[:-1], iris[1:])
+        near[:, 1:] = np.maximum(near[:, 1:], iris[:, :-1])
+        near[:, :-1] = np.maximum(near[:, :-1], iris[:, 1:])
+        iris = np.where(filled, near, iris)
+    return iris
+
+
+# The gaps inside a feature that _close_features fills: the widest gap
+# closed is twice FEATURE_CLOSE texels (at 512 px), and the largest hole a
+# share of the layer.
+FEATURE_CLOSE = 2
+FEATURE_HOLE = 0.0005
 # The iris disc (_iris): its radius from the patch's thickness, and the
 # share of it that is the pupil.
 IRIS_REACH = 1.2
@@ -787,9 +868,11 @@ def _dress_body(body, prefix, half, face_source, atlas, face_atlas, iris_atlas):
     baked_image.pixels.foreach_set(fill.ravel())
     face, baked = _face_layer(body, polys, face_source, baked_image, half)
     bpy.data.images.remove(baked_image)
-    rgb = baked[:, :, :3]
-    alpha = _features(rgb, skin)
-    iris = _iris(rgb, alpha)
+    painted = baked[:, :, :3]
+    alpha = _features(painted, skin)
+    rgb, closed = _close_features(painted, alpha)
+    iris = _spread(_iris(painted, alpha), (closed > 0.5) & (alpha <= 0.5))
+    alpha = closed
     print(f"FACE {body.name}: features {float((alpha > 0.5).mean()):.3f} of the layer, iris {float((iris > 0.5).mean()):.4f}")
     x0 = half * FACE_TEXTURE
     face_atlas[:, x0 : x0 + FACE_TEXTURE, :3] = rgb
@@ -926,11 +1009,18 @@ def _tripo_piece(path, name, faces):
     return obj
 
 
-def _paint_garment(obj, paint, materials):
+def _paint_garment(obj, part, materials):
     """Each face of a garment wears the paint of its tint region, read from
-    the colors Tripo gave it (GARMENT_PAINT), with the stray faces voted
-    into their neighbours' region."""
-    main, accent, gray_below, dark_below, dark_gray_below = paint
+    the colors Tripo gave it (GARMENT_PAINT). A Tripo garment is a thin
+    solid: its outer side shows, its inner wall only through an opening
+    (_inner_wall tells them apart; the mask stays on the piece as the face
+    attribute WALL). On the outer side the stray faces are voted into
+    their neighbours' region, and an accent patch too small to be a band
+    or a part (a shaded fold) goes to the main region (_drop_patches). The
+    inner wall is painted dark, so it read as accent and joined the
+    patches on the outer side through the rims; now it wears the region
+    of the outer side nearest to it, so the inside of a collar is collar."""
+    main, accent, gray_below, dark_below, dark_gray_below, patch = GARMENT_PAINT[part]
     image = regions.base_color_image(obj)
     px = regions._pixels(image)
     height, width = px.shape[:2]
@@ -940,13 +1030,97 @@ def _paint_garment(obj, paint, materials):
     x = np.clip((points[..., 0] % 1.0) * (width - 1), 0, width - 1).astype(np.int32)
     y = np.clip((points[..., 1] % 1.0) * (height - 1), 0, height - 1).astype(np.int32)
     _, sat, val = regions._hsv(px[y, x].mean(axis=1))
-    labels = ((sat < gray_below) | ((val < dark_below) & (sat < dark_gray_below))).astype(np.int8)
-    labels = regions._smooth(obj, labels)
+    raw = ((sat < gray_below) | ((val < dark_below) & (sat < dark_gray_below))).astype(np.int8)
+    inner = _inner_wall(obj)
+    # The inner wall does not vote: regions._smooth leaves it unknown.
+    labels = regions._smooth(obj, np.where(inner, regions.UNKNOWN, raw).astype(np.int8))
+    labels, dropped = _drop_patches(obj, labels, ~inner, patch)
+    labels = np.where(inner, labels[_nearest_outer(obj, inner)], labels).astype(np.int8)
     _clean_mesh(obj)
     obj.data.materials.append(materials[main])
     obj.data.materials.append(materials[accent])
     obj.data.polygons.foreach_set("material_index", labels.astype(np.int32))
-    print(f"PAINT {obj.name}: {main} {1.0 - labels.mean():.2f}, {accent} {labels.mean():.2f}")
+    obj.data.attributes.new(WALL, "INT", "FACE").data.foreach_set("value", inner.astype(np.int32))
+    print(f"PAINT {obj.name}: {main} {1.0 - labels.mean():.2f}, {accent} {labels.mean():.2f}; raw accent {raw.mean():.2f}; {dropped} small accent patches to {main}; inner wall {inner.mean():.2f}")
+
+
+def _inner_wall(obj):
+    """Which faces of a Tripo garment are its inner wall: the face's normal
+    points to the middle of the garment's bounding box, where the body
+    would be (behind the chest plate for the armor, under the shoulders
+    for a cape), with each face voted into its neighbours' side
+    (regions._smooth), so a stray face on a fold goes with its wall."""
+    mesh = obj.data
+    co = np.empty(len(mesh.vertices) * 3)
+    mesh.vertices.foreach_get("co", co)
+    co = co.reshape(-1, 3)
+    middle = 0.5 * (co.min(axis=0) + co.max(axis=0))
+    normals = np.empty(len(mesh.polygons) * 3)
+    mesh.polygons.foreach_get("normal", normals)
+    centres = np.empty(len(mesh.polygons) * 3)
+    mesh.polygons.foreach_get("center", centres)
+    inward = (normals.reshape(-1, 3) * (centres.reshape(-1, 3) - middle)).sum(axis=1) < 0.0
+    return regions._smooth(obj, inward.astype(np.int8)) == 1
+
+
+def _nearest_outer(obj, inner):
+    """For each face, the nearest face of the outer side (itself when it is
+    on the outer side)."""
+    mesh = obj.data
+    outer = np.nonzero(~inner)[0]
+    tree = BVHTree.FromPolygons([v.co.copy() for v in mesh.vertices], [tuple(mesh.polygons[i].vertices) for i in outer])
+    nearest = np.arange(len(inner))
+    for i in np.nonzero(inner)[0]:
+        found = tree.find_nearest(mesh.polygons[i].center)[2]
+        if found is not None:
+            nearest[i] = outer[found]
+    return nearest
+
+
+def _face_patches(mesh, mask):
+    """The patches of a face mask: faces joined by an edge, each patch a
+    list of face indices, in the order of their first face."""
+    edge_faces = {}
+    for poly in mesh.polygons:
+        if mask[poly.index]:
+            for key in poly.edge_keys:
+                edge_faces.setdefault(key, []).append(poly.index)
+    neighbours = [[] for _ in range(len(mesh.polygons))]
+    for faces in edge_faces.values():
+        for a in faces:
+            neighbours[a].extend(f for f in faces if f != a)
+    seen = np.zeros(len(mesh.polygons), dtype=bool)
+    patches = []
+    for start in np.nonzero(mask)[0]:
+        if seen[start]:
+            continue
+        seen[start] = True
+        stack, patch = [int(start)], []
+        while stack:
+            face = stack.pop()
+            patch.append(face)
+            for other in neighbours[face]:
+                if not seen[other]:
+                    seen[other] = True
+                    stack.append(other)
+        patches.append(patch)
+    return patches
+
+
+def _drop_patches(obj, labels, outer, share):
+    """On the outer side, an accent patch (1) smaller than share of that
+    side's area goes to the main region (0). Returns the labels and how
+    many patches went."""
+    labels = labels.copy()
+    area = np.empty(len(obj.data.polygons))
+    obj.data.polygons.foreach_get("area", area)
+    limit = share * area[outer].sum()
+    dropped = 0
+    for patch in _face_patches(obj.data, outer & (labels == 1)):
+        if area[patch].sum() < limit:
+            labels[patch] = 0
+            dropped += 1
+    return labels, dropped
 
 
 def _copy(obj, name):
@@ -1128,26 +1302,52 @@ def _lift_fringe(piece, skull, keep=0.15, reach=0.16):
 
 # The window cut in a mane for the face (_cut_face_window), seen from the
 # front: an ellipse, in units of the crown's half width, its top this far
-# above the brow, and its half width and half height.
+# above the brow, its half width and half height, and how far in front of
+# the crown's middle the cut starts. The ellipse widens toward the front
+# by WINDOW_TURN degrees, so no lock in front of a cheek covers the face
+# seen from the side (the guard turns the head from the camera).
 WINDOW_TOP = 0.2
 WINDOW_AXES = (0.95, 1.2)
+WINDOW_DEPTH = 0.6
+WINDOW_TURN = 40.0
+# The lining of the window (_cut_face_window): the locks it copies lie
+# between the window's foot and this far above the brow, and no farther
+# back than this behind the crown's middle (in the crown's half width);
+# the copy lies this far under the sheet.
+LINING_ABOVE = 0.6
+LINING_BACK = 0.8
+LINING_DEPTH = 0.002
 
 
 def _cut_face_window(piece, skull):
     """Cut away the hair that hangs in front of the face: forward of the
-    forehead, inside an ellipse around the face, so the locks part in an
-    arch over the brow and curve along the cheeks to the chin. A face whose
-    centre is inside goes; the corners of the faces that stay and reach
-    inside go out onto the ellipse, so the cut edge is a smooth curve and
-    not a row of steps."""
+    forehead, inside an ellipse around the face that widens toward the
+    front (WINDOW_TURN), so the locks part in an arch over the brow and
+    curve along the cheeks to the chin, and none lies in front of a cheek.
+    A face whose centre is inside goes; the corners of the faces that stay
+    and reach inside go out onto the edge, so the cut edge is a smooth
+    curve and not a row of steps. Through the window the side of the
+    locks that turns to the head shows, and it read as a dark hollow
+    beside the cheeks: its ink hull lies between it and the eye and faces
+    away, so it drew as a flat sheet of ink, and its paint was baked dark
+    (the far side of the whole mane shades it). Those faces, above the
+    window's foot, get no ink hull (INNER, _drop_inner_ink) and wear the
+    paint of the nearest face turned out."""
     brow, cx, cy, half = skull["brow"], skull["crown_x"], skull["crown_y"], skull["half_width"]
-    front = cy - 0.6 * half
+    front = cy - WINDOW_DEPTH * half
     a, b = WINDOW_AXES[0] * half, WINDOW_AXES[1] * half
     cz = brow + WINDOW_TOP * half - b
+    slope = math.tan(math.radians(WINDOW_TURN))
+
+    def side(p):
+        """How far out of the widened middle p lies, across (0 inside it),
+        and how much wider the ellipse is at p's depth."""
+        wider = max(0.0, front - p.y) * slope
+        return max(0.0, abs(p.x - cx) - wider), wider
 
     def reach(p):
-        """Below 1 inside the ellipse."""
-        return math.hypot((p.x - cx) / a, (p.z - cz) / b)
+        """Below 1 inside the widened ellipse."""
+        return math.hypot(side(p)[0] / a, (p.z - cz) / b)
 
     bm = bmesh.new()
     bm.from_mesh(piece.data)
@@ -1158,12 +1358,66 @@ def _cut_face_window(piece, skull):
     for v in bm.verts:
         r = reach(v.co)
         if v.co.y < front and 1e-6 < r < 1.0:
-            v.co.x = cx + (v.co.x - cx) / r
+            across, wider = side(v.co)
+            v.co.x = cx + math.copysign(across / r + wider, v.co.x - cx)
             v.co.z = cz + (v.co.z - cz) / r
             moved += 1
+    # The faces turned to the head, above the window's foot (the chin),
+    # wear the paint of the nearest face turned out, and get no ink hull.
+    bm.normal_update()
+    bm.verts.index_update()
+    bm.faces.index_update()
+    uv = bm.loops.layers.uv.active
+    middle = Vector((cx, cy, skull["hairline"][1]))
+    turned_out = [f for f in bm.faces if f.normal.dot(f.calc_center_median() - middle) >= 0.0]
+    tree = BVHTree.FromPolygons([v.co.copy() for v in bm.verts], [[v.index for v in f.verts] for f in turned_out])
+    inside = np.zeros(len(bm.faces), dtype=bool)
+    for f in bm.faces:
+        centre = f.calc_center_median()
+        if centre.z < cz - b or f.normal.dot(centre - middle) >= 0.0:
+            continue
+        inside[f.index] = True
+        found = tree.find_nearest(centre)[2]
+        if found is None:
+            continue
+        loops = turned_out[found].loops
+        paint = sum((loop[uv].uv for loop in loops), Vector((0.0, 0.0))) / len(loops)
+        for loop in f.loops:
+            loop[uv].uv = paint
+    repainted = int(inside.sum())
+    # The locks are single sheets: through the window their far side turns
+    # its back to the eye, the game culls it, and its ink hull, which faces
+    # the eye, shows as a flat sheet of ink. A copy of those faces, turned
+    # to the window and a little under the sheet, wears their paint and
+    # hides the ink; from outside it turns its back and does not show. The
+    # faces nearest the head come first, within the budget of a hair piece.
+    room = HAIR_FACES + CAP_FACES - len(bm.faces) - CAP_FACES
+    candidates = []
+    for f in bm.faces:
+        centre = f.calc_center_median()
+        if inside[f.index] or centre.z < cz - b or centre.z > brow + LINING_ABOVE * half or centre.y > cy + LINING_BACK * half:
+            continue
+        candidates.append((math.hypot(centre.x - cx, centre.y - cy), f.index))
+    candidates.sort()
+    bm.faces.ensure_lookup_table()
+    lined = [bm.faces[i] for _, i in candidates[: max(0, room)]]
+    copies = []
+    for f in lined:
+        verts = [bm.verts.new(v.co - f.normal * LINING_DEPTH) for v in f.verts]
+        copy = bm.faces.new(list(reversed(verts)))
+        copy.material_index = f.material_index
+        copy.smooth = f.smooth
+        for loop, source in zip(copy.loops, reversed(list(f.loops))):
+            loop[uv].uv = source[uv].uv
+        copies.append(copy)
+    inside = np.concatenate([inside, np.ones(len(copies), dtype=bool)])
     bm.to_mesh(piece.data)
     bm.free()
-    print(f"FACE WINDOW {piece.name}: {len(cut)} faces cut, {moved} corners onto the edge")
+    # The ink hull of such a face lies between it and the eye and faces
+    # away: through the window it drew as a flat dark sheet beside the
+    # cheeks (_drop_inner_ink removes it, as on a garment's inner wall).
+    piece.data.attributes.new(INNER, "BOOLEAN", "FACE").data.foreach_set("value", inside)
+    print(f"FACE WINDOW {piece.name}: {len(cut)} faces cut, {moved} corners onto the edge, {repainted} faces turned to the head repainted, {len(copies)} of {len(candidates)} faces lined")
 
 
 def _hair_pieces(body, body_name, prefix, rig, skull, canon, caps):
@@ -1341,6 +1595,30 @@ def _open_front(piece, marks, spec):
     print(f"OPEN {piece.name}: {len(cut)} faces cut, {moved} corners onto the edge")
 
 
+def _repaint_pushed(piece, part, before, limit):
+    """An accent face that the push out of the skin moved farther than
+    limit (the mean of its corners; before: the corners' places) wears the
+    main region. A recess between two plates, pushed out of the body, lies
+    on the visible surface, and its accent read as a blotch on the plate."""
+    main, accent = GARMENT_PAINT[part][:2]
+    names = [m.name for m in piece.data.materials]
+    if c.PAINTED + main not in names or c.PAINTED + accent not in names:
+        return
+    to_main, from_accent = names.index(c.PAINTED + main), names.index(c.PAINTED + accent)
+    after = np.empty_like(before)
+    piece.data.vertices.foreach_get("co", after)
+    moved = np.linalg.norm((after - before).reshape(-1, 3), axis=1)
+    index = np.empty(len(piece.data.polygons), dtype=np.int32)
+    piece.data.polygons.foreach_get("material_index", index)
+    count = 0
+    for poly in piece.data.polygons:
+        if index[poly.index] == from_accent and moved[list(poly.vertices)].mean() > limit:
+            index[poly.index] = to_main
+            count += 1
+    piece.data.polygons.foreach_set("material_index", index)
+    print(f"REPAINT {piece.name}: {count} pushed accent faces to {main}")
+
+
 def _flare(piece, marks, flare):
     """Swing a hanging piece's hem out from the legs, like a bell: below the
     landmark, the cloth moves out from the body's axis by rate per unit of
@@ -1364,13 +1642,7 @@ def _shrink_out(piece, bare, offset):
     the folds the push made."""
     before = np.empty(len(piece.data.vertices) * 3)
     piece.data.vertices.foreach_get("co", before)
-    wrap = piece.modifiers.new("Out", "SHRINKWRAP")
-    wrap.target = bare
-    wrap.wrap_method = "NEAREST_SURFACEPOINT"
-    wrap.wrap_mode = "OUTSIDE"
-    wrap.offset = offset
-    bpy.context.view_layer.objects.active = piece
-    bpy.ops.object.modifier_apply(modifier=wrap.name)
+    _wrap_out(piece, bare, offset)
     after = np.empty_like(before)
     piece.data.vertices.foreach_get("co", after)
     moved = np.linalg.norm((after - before).reshape(-1, 3), axis=1) > 1e-5
@@ -1392,14 +1664,56 @@ def _shrink_out(piece, bare, offset):
     bpy.ops.object.modifier_apply(modifier=smooth.name)
     piece.vertex_groups.remove(piece.vertex_groups["Heal"])
     # The smooth pulls a curve in a little: out once more, with no smooth.
-    again = piece.modifiers.new("Out", "SHRINKWRAP")
-    again.target = bare
-    again.wrap_method = "NEAREST_SURFACEPOINT"
-    again.wrap_mode = "OUTSIDE"
-    again.offset = offset
-    bpy.ops.object.modifier_apply(modifier=again.name)
-    late = _clear_skin(piece, bare, offset)
+    late = _push_out(piece, bare, offset)
     print(f"SHRINK {piece.name}: {int(moved.sum())} of {len(moved)} vertices moved out, {late} more past the skin")
+
+
+def _push_out(piece, bare, offset):
+    """Every vertex inside the body, or nearer than offset, goes out to it,
+    with no smooth (_wrap_out); then past the skin seen along its normal
+    (_clear_skin). Returns how many the second step moved."""
+    _wrap_out(piece, bare, offset)
+    return _clear_skin(piece, bare, offset)
+
+
+def _inner_verts(piece):
+    """Which vertices of a garment lie on its inner wall only: every face
+    around them is marked WALL (_inner_wall). None without the mark."""
+    mesh = piece.data
+    if WALL not in mesh.attributes:
+        return None
+    wall = np.zeros(len(mesh.polygons), dtype=bool)
+    mesh.attributes[WALL].data.foreach_get("value", wall)
+    inner = np.ones(len(mesh.vertices), dtype=bool)
+    for poly in mesh.polygons:
+        if not wall[poly.index]:
+            inner[list(poly.vertices)] = False
+    return inner
+
+
+def _wrap_out(piece, bare, offset):
+    """The push out of the skin: every vertex inside the body, or nearer
+    than its offset, goes out to it. The two walls of a Tripo garment go
+    to different offsets: the inner wall to offset, the rest SHELL farther,
+    so the outer wall stays outside the inner wall. Pushed to one offset,
+    the walls met, and any move crossed them: the game culls a face turned
+    inward, and the skin behind showed as a speck."""
+    inner = _inner_verts(piece)
+    parts = [(None, offset)] if inner is None else [(inner, offset), (~inner, offset + SHELL)]
+    bpy.context.view_layer.objects.active = piece
+    for mask, distance in parts:
+        wrap = piece.modifiers.new("Out", "SHRINKWRAP")
+        wrap.target = bare
+        wrap.wrap_method = "NEAREST_SURFACEPOINT"
+        wrap.wrap_mode = "OUTSIDE"
+        wrap.offset = distance
+        if mask is not None:
+            group = piece.vertex_groups.new(name="Wall")
+            group.add(np.nonzero(mask)[0].tolist(), 1.0, "REPLACE")
+            wrap.vertex_group = group.name
+        bpy.ops.object.modifier_apply(modifier=wrap.name)
+        if mask is not None:
+            piece.vertex_groups.remove(piece.vertex_groups["Wall"])
 
 
 def _clear_skin(piece, bare, offset, reach=0.04, deep=0.12):
@@ -1409,15 +1723,18 @@ def _clear_skin(piece, bare, offset, reach=0.04, deep=0.12):
     the shoulder): the nearest face may lie buried inside the body. Seen
     along the cloth's normal from just outside, the outermost skin that
     faces the cloth is the one that shows, so the vertex goes offset past
-    that. Returns how many moved."""
+    that (the outer wall SHELL farther, as in _wrap_out). Returns how many
+    moved."""
     tree = BVHTree.FromObject(bare, bpy.context.evaluated_depsgraph_get())
     piece.data.update()
+    inner = _inner_verts(piece)
     moved = 0
     for v in piece.data.vertices:
         n = v.normal.normalized()
         _, facing, _, _ = tree.find_nearest(v.co)
         if facing is None or facing.dot(n) <= 0.0:
             continue  # the inner side, turned toward the body
+        past = offset if inner is None or inner[v.index] else offset + SHELL
         origin = v.co + n * reach
         far = reach + deep
         while far > 0.0:
@@ -1425,8 +1742,8 @@ def _clear_skin(piece, bare, offset, reach=0.04, deep=0.12):
             if hit is None:
                 break
             if normal.dot(n) > 0.0:
-                if (hit - v.co).dot(n) > -offset:
-                    v.co = hit + n * offset
+                if (hit - v.co).dot(n) > -past:
+                    v.co = hit + n * past
                     moved += 1
                 break
             origin = hit - n * 1e-5
@@ -1640,7 +1957,11 @@ def _garment_pieces(body, body_name, prefix, marks, canon, rigs):
         _fit_garment(piece, at, spec)
         if "open" in spec:
             _open_front(piece, at, spec["open"])
+        before = np.empty(len(piece.data.vertices) * 3)
+        piece.data.vertices.foreach_get("co", before)
         _shrink_out(piece, on, offset)
+        if "pushed" in spec:
+            _repaint_pushed(piece, part, before, spec["pushed"])
         if "flare" in spec:
             _flare(piece, at, spec["flare"])
         armpit = at["shoulder_z"] - ARMPIT_DROP if part in HANGING else None
@@ -1759,7 +2080,7 @@ def _pieces(rigs, bodies, briefs, atlas, materials):
         hair_units.append(piece)
     for part, path in _tripo_parts(briefs["hero-garments"]).items():
         piece = _tripo_piece(path, part, GARMENT_FACES)
-        _paint_garment(piece, GARMENT_PAINT[part], garment_paint)
+        _paint_garment(piece, part, garment_paint)
         garment_units.append(piece)
     skulls = {}
     for body_name, prefix in BODIES.items():
@@ -1803,6 +2124,8 @@ def _finish_pieces(pieces, rigs):
         for i, mat in enumerate(piece.data.materials):
             if mat is None or not mat.name.startswith(c.PAINTED):
                 raise ValueError(f"{piece.name}: slot {i} wears {mat and mat.name}, not an atlas paint")
+        if WALL in piece.data.attributes:
+            piece.data.attributes.remove(piece.data.attributes[WALL])
         c.ink_hull_skinned(piece, rigs[body_name], INK_WIDTH)
         if INNER in piece.data.attributes:
             _drop_inner_ink(piece)
