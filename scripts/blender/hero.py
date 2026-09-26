@@ -27,11 +27,14 @@ This script makes the game's version, and nothing is edited by hand:
   the runtime tints them as it tinted the scripted hero;
 - a face layer per body: the head's front faces, a little off the skin,
   wearing the painted face with only its features opaque, and an iris
-  layer above it that the Form recolors;
+  layer above it that the Form recolors (_iris finds the painted iris of
+  both bodies, the boy's small eyes too);
+- the HY-Motion idle (ADR 0010), a loop whose first frame, the guard, is
+  the stance: every other clip blends in from it and out to it;
 - the preset clips, each a window of its source, blended from and to the
-  stance (the preset idle's first frame), the strike dash added to the
-  root so the fists and boots reach the Rival (PRESETS table);
-- the HY-Motion clips (ADR 0010) through mocap's scheme for each rig;
+  stance, the strike dash added to the root so the fists and boots reach
+  the Rival (PRESETS table);
+- the other HY-Motion clips through mocap's scheme for each rig;
 - the hair pieces and manes from Tripo (sources/tripo/hero-hair, ticket
   D), each decimated, placed on each skull by HAIR_FIT, its fringe lifted
   off the eyes, and rigid on the body's hair bone; under each one, the
@@ -40,9 +43,12 @@ This script makes the game's version, and nothing is edited by hand:
   cap alone is the short buzz cut; a thicker one with tufts is the long;
 - the garments from Tripo (sources/tripo/hero-garments), fitted to each
   body band by band (GARMENT_FIT), moved out of the skin, and skinned to
-  that body's own bones by weight transfer from its mesh; the cape is
-  fitted on the body in the stance (the arms down) and brought back to
-  rest, so it hangs around the arms;
+  that body's own bones by weight transfer from its mesh, the weights
+  evened out over the cloth so an arm's swing does not fold it, and
+  pushed out of the skin once more across the idle; the cape is fitted
+  on the body with the arms down, cut open at the front, and brought
+  back to rest, so it hangs behind the arms; the inner wall of each
+  garment gets no ink hull;
 - one painted atlas for everything: the bodies in the top row, the baked
   paint of the hair, garments, and caps in the bottom row;
 - a baked ink hull, as on the scripted models;
@@ -62,6 +68,7 @@ import bmesh
 import bpy
 import numpy as np
 from mathutils import Matrix, Vector
+from mathutils.bvhtree import BVHTree
 
 import common as c
 import mocap
@@ -143,11 +150,18 @@ FACE_WINDOW = ("Hair_mane_legend",)
 # has no back, so its front lies on the body's front; offset: how far out
 # of the skin the shrinkwrap puts the cloth; flare: below a landmark, the
 # cloth behind the body swings back by this much per unit of drop (_flare).
+# The rest of each spec is about the pose (_garment_pieces). arms_down: the
+# garment is fitted on the body with the arms down, not at rest; open: the
+# front of a cape is cut open (_open_front); weights: the weights are
+# evened out over the cloth (_smooth_weights), a share per pass and the
+# passes; settle: once skinned, the garment is pushed out of the body in
+# the idle as well (SETTLE_AT).
 GARMENT_FIT = {
-    "GarmentGi": {"top": ("neck", 0.1), "anchor": (0.6, "hip", 0.08), "margin": 0.03, "start": 0.15, "hug": 0.85, "smooth": 0.25},
-    "GarmentCape": {"top": ("neck", 0.14), "anchor": (1.0, "knee", 0.1), "margin": 0.04, "hug": 0.3, "smooth": 0.15, "offset": 0.03, "flare": ("hip", 0.15, 0.35)},
-    "GarmentArmor": {"top": ("shoulder_z", 0.14), "anchor": (1.0, "chest", -0.15), "margin": 0.03, "smooth": 0.3, "front": True},
+    "GarmentGi": {"top": ("neck", 0.1), "anchor": (0.6, "hip", 0.08), "margin": 0.03, "start": 0.15, "hug": 0.85, "smooth": 0.25, "weights": (0.5, 10), "settle": True},
+    "GarmentCape": {"top": ("neck", 0.14), "anchor": (1.0, "knee", 0.1), "margin": 0.04, "hug": 0.3, "smooth": 0.15, "offset": 0.03, "flare": ("hip", 0.15, 0.35), "arms_down": True, "open": (0.0, 0.2, 100.0, 105.0), "weights": (0.5, 10), "settle": True},
+    "GarmentArmor": {"top": ("shoulder_z", 0.14), "anchor": (1.0, "chest", -0.15), "margin": 0.03, "smooth": 0.3, "front": True, "weights": (0.5, 10), "settle": True},
 }
+
 # The paint of each garment, from the colors Tripo gave it: the accent
 # (belt, lapels, bands, clasps; the plates' recesses) where the color is
 # grayer than the first saturation given, or darker than the value given
@@ -163,14 +177,21 @@ GARMENT_PAINT = {
 # How far out of the skin a garment lies at least: past the body's own
 # ink hull (INK_WIDTH), so the hull never shows through the cloth.
 CLOTH_OFFSET = 0.02
+# The face attribute that marks a garment's inner wall (_mark_inner).
+INNER = "inner_wall"
 # A cape hangs from the trunk and the shoulders only: no leg, forearm, or
 # head bone moves it, so a kick or a raised fist does not drag it along.
 # The upper arms move only the cloth over the shoulders (SHOULDER_BONES
-# above the armpit, _transfer_weights): a flap that hangs beside an arm
-# does not rise with the arm and crumple.
-HANGING = {"GarmentCape": ("Hip", "Pelvis", "Waist", "torso", "Spine02", "NeckTwist01", "NeckTwist02", "L_Clavicle", "R_Clavicle", "L_UpperarmTwist01", "R_UpperarmTwist01")}
-SHOULDER_BONES = ("L_UpperarmTwist01", "R_UpperarmTwist01")
+# above the armpit, _transfer_weights), all of it, so the deltoid does not
+# come up through the cloth; a flap that hangs beside an arm does not rise
+# with the arm and crumple.
+HANGING = {"GarmentCape": ("Hip", "Pelvis", "Waist", "torso", "Spine02", "NeckTwist01", "NeckTwist02", "L_Clavicle", "R_Clavicle", "armR", "armL", "L_UpperarmTwist01", "R_UpperarmTwist01")}
+SHOULDER_BONES = ("armR", "armL", "L_UpperarmTwist01", "R_UpperarmTwist01")
 ARMPIT_DROP = 0.08
+# The shares of the idle at which a settled garment is pushed out of the
+# body once more (_garment_pieces): the guard, and three more across the
+# loop, where the raised arms swell the shoulders.
+SETTLE_AT = (0.0, 0.25, 0.5, 0.75)
 
 # Hero space in Blender: the hero faces three's +Z, which is Blender -Y.
 FORWARD = Vector((0.0, -1.0, 0.0))
@@ -197,7 +218,9 @@ JOINTS = {
 # joint that carries each, and the bone whose middle is the fist or boot.
 STRIKES = (("elbowL", "R_Hand"), ("elbowR", "L_Hand"), ("kneeL", "R_Foot"), ("kneeR", "L_Foot"))
 
-HY_CLIPS = ("Idle", "Stagger", "Transform", "Charge", "Victory")
+# The HY-Motion clips besides Idle (ADR 0010); Idle is HY-Motion too, and
+# made first (_clips).
+HY_CLIPS = ("Stagger", "Transform", "Charge", "Victory")
 
 # A strike clip: the share of it before the strike phase, and the share of
 # the strike phase from which a fist or boot on the Rival's hurtbox lands
@@ -366,8 +389,8 @@ def _prefixed_copy(action, prefix, suffix):
 
 
 def _stance(rig, idle):
-    """The pose every clip blends in from and out to: the preset idle's
-    first frame, sampled."""
+    """The pose every clip blends in from and out to: Idle's first frame
+    (the guard), sampled."""
     return c.sample_poses(rig, idle, idle.frame_range[0], 1)[0]
 
 
@@ -433,9 +456,9 @@ def _fit_clip(rig, action, name, spec, stance, prefix):
 
 def stance(rig):
     """The pose the HY-Motion clips blend in from and out to, as mocap
-    wants it: Idle's first frame, {bone: {"quat", "loc"}} in each bone's
-    own rest frame. On a baked hero.blend (motion_score.py) Idle is the
-    HY-Motion idle, which starts in this same stance."""
+    wants it: Idle's first frame (the guard), {bone: {"quat", "loc"}} in
+    each bone's own rest frame. motion_score.py reads it on a baked
+    hero.blend."""
     rig.animation_data_create()
     idle = bpy.data.actions["Idle"]
     first = c.sample_poses(rig, idle, idle.frame_range[0], 1)[0]
@@ -445,8 +468,11 @@ def stance(rig):
 def _clips(rigs, brief, scale):
     """Idle and the reactions from HY-Motion, the strikes and the Blast
     from the presets, on every rig, each on its own muted NLA track
-    (common.add_clip). The girl's clips carry her suffix; the bake merges
-    them into the boy's."""
+    (common.add_clip). Idle comes first: it loops (clips.json "loop"), and
+    its first frame, the guard, is the stance every other clip blends in
+    from and out to, so no clip passes through the preset idle's pose
+    (the arms down, the palms open). The girl's clips carry her suffix;
+    the bake merges them into the boy's."""
     boy = rigs["BodyBoy"]
     presets = _load_clips(boy, brief, scale)
     per_rig = {"BodyBoy": presets}
@@ -456,7 +482,9 @@ def _clips(rigs, brief, scale):
     for body, actions in per_rig.items():
         rig, prefix = rigs[body], BODIES[body]
         suffix = "" if not prefix else "-" + body
-        rest = _stance(rig, actions.pop("Idle"))
+        bpy.data.actions.remove(actions.pop("Idle"))
+        mocap.hy_clip(rig, "Idle" + suffix, "idle", None, scheme(prefix))
+        rest = _stance(rig, bpy.data.actions["Idle" + suffix])
         for name, spec in PRESETS.items():
             _fit_clip(rig, actions.pop(name), name + suffix, spec, rest, prefix)
         for action in actions.values():
@@ -565,18 +593,79 @@ def _shrink(mask, radius):
     return ~_grow(~mask, radius)
 
 
+def _components(mask):
+    """The 4-connected parts of a mask, each an (n, 2) array of (row,
+    column), in the order numpy finds their first pixels."""
+    seen = np.zeros(mask.shape, dtype=bool)
+    height, width = mask.shape
+    parts = []
+    for r0, c0 in zip(*np.nonzero(mask)):
+        if seen[r0, c0]:
+            continue
+        seen[r0, c0] = True
+        stack, part = [(r0, c0)], []
+        while stack:
+            r, col = stack.pop()
+            part.append((r, col))
+            for rr, cc in ((r + 1, col), (r - 1, col), (r, col + 1), (r, col - 1)):
+                if 0 <= rr < height and 0 <= cc < width and mask[rr, cc] and not seen[rr, cc]:
+                    seen[rr, cc] = True
+                    stack.append((rr, cc))
+        parts.append(np.array(part))
+    return parts
+
+
+# The iris disc (_iris): its radius from the patch's thickness, and the
+# share of it that is the pupil.
+IRIS_REACH = 1.2
+PUPIL = 0.35
+
+
 def _iris(rgb, alpha):
-    """The iris: the painted eye's coloured or dark middle, ringed by the
-    white of the eye. The whites are the bright, unsaturated features;
-    closing them fills the hole the iris leaves; the pupil stays dark."""
+    """The iris: a round coloured or dark patch of the painted eye, next to
+    the white of the eye. Two kinds count: the patch the whites ring
+    (closing them fills the hole the iris leaves), and a painted patch too
+    thick to be a line (an opening keeps it) that touches the whites: a
+    small eye whose iris meets the lid, as the boy's. Each is cut to a disc
+    around its thickest point, so a lash line that joins it stays out. The
+    disc's rim takes the Form's eye color; its middle, the pupil, keeps the
+    paint's own dark where the paint is dark."""
+    size = rgb.shape[0]
     luma = rgb @ regions.LUMA
     sat = 1.0 - rgb.min(axis=-1) / np.maximum(rgb.max(axis=-1), 1e-3)
     white = (alpha > 0.5) & (luma > 0.55) & (sat < 0.25)
-    radius = max(2, rgb.shape[0] // 40)
-    eye = _shrink(_grow(white, radius), radius)
-    inside = eye & ~white & (alpha > 0.3)
+    radius = max(2, size // 40)
+    enclosed = _shrink(_grow(white, radius), radius) & ~white & (alpha > 0.3)
+    paint = (alpha > 0.5) & ~white
+    thick = max(2, size // 128)
+    blob = _grow(_shrink(paint, thick), thick) & paint
+    near_white = _grow(white, 2)
+    patches = np.zeros(paint.shape, dtype=bool)
+    for part in _components(blob | enclosed):
+        rows, cols = part[:, 0], part[:, 1]
+        if len(part) >= 12 * (size / 512) ** 2 and near_white[rows, cols].sum() >= 0.2 * np.sqrt(len(part)):
+            patches[rows, cols] = True
+    # How deep each pixel lies in its patch: the shrinks it survives.
+    depth = np.zeros(paint.shape, dtype=np.float32)
+    left = patches.copy()
+    while left.any():
+        depth += left
+        left = _shrink(left, 1)
     keep = _smoothstep((luma - 0.08) / 0.2)
-    return np.where(inside, alpha * keep, 0.0).astype(np.float32)
+    rows_all, cols_all = np.mgrid[0 : paint.shape[0], 0 : paint.shape[1]]
+    painted = paint | enclosed
+    iris = np.zeros(paint.shape, dtype=np.float32)
+    for part in _components(patches):
+        rows, cols = part[:, 0], part[:, 1]
+        d = depth[rows, cols]
+        deepest = d == d.max()
+        reach = IRIS_REACH * float(d.max()) + 1.0
+        dist = np.hypot(rows_all - rows[deepest].mean(), cols_all - cols[deepest].mean()) / reach
+        rim = _smoothstep((dist - PUPIL) / 0.25)
+        edge = _smoothstep((1.0 - dist) * reach / 1.5)
+        disc = painted & (dist < 1.0)
+        iris = np.where(disc, np.maximum(iris, np.maximum(keep, rim) * edge), iris)
+    return iris.astype(np.float32)
 
 
 def _face_layer(body, polys, source, into, half):
@@ -603,7 +692,10 @@ def _face_layer(body, polys, source, into, half):
     face.data.uv_layers["FaceUV"].active = True
     bpy.ops.object.mode_set(mode="EDIT")
     bpy.ops.mesh.select_all(action="SELECT")
-    bpy.ops.uv.smart_project(angle_limit=math.radians(60), island_margin=0.02, rotate_method="AXIS_ALIGNED_Y")
+    # Unwrapped, not projected: each eye stays whole on one island, so the
+    # iris is found inside it (_iris). A projection by angle cut the small
+    # painted eyes of the boy into pieces.
+    bpy.ops.uv.unwrap(method="ANGLE_BASED", margin=0.01)
     bpy.ops.uv.pack_islands(margin=0.01, rotate=False)
     bpy.ops.object.mode_set(mode="OBJECT")
     face.data.uv_layers["FaceUV"].active_render = True
@@ -1034,20 +1126,44 @@ def _lift_fringe(piece, skull, keep=0.15, reach=0.16):
             v.co.z += (brow - (brow - p.z) * keep - p.z) * w
 
 
+# The window cut in a mane for the face (_cut_face_window), seen from the
+# front: an ellipse, in units of the crown's half width, its top this far
+# above the brow, and its half width and half height.
+WINDOW_TOP = 0.2
+WINDOW_AXES = (0.95, 1.2)
+
+
 def _cut_face_window(piece, skull):
     """Cut away the hair that hangs in front of the face: forward of the
-    forehead, below the brow, within the face's width."""
+    forehead, inside an ellipse around the face, so the locks part in an
+    arch over the brow and curve along the cheeks to the chin. A face whose
+    centre is inside goes; the corners of the faces that stay and reach
+    inside go out onto the ellipse, so the cut edge is a smooth curve and
+    not a row of steps."""
     brow, cx, cy, half = skull["brow"], skull["crown_x"], skull["crown_y"], skull["half_width"]
     front = cy - 0.6 * half
+    a, b = WINDOW_AXES[0] * half, WINDOW_AXES[1] * half
+    cz = brow + WINDOW_TOP * half - b
+
+    def reach(p):
+        """Below 1 inside the ellipse."""
+        return math.hypot((p.x - cx) / a, (p.z - cz) / b)
+
     bm = bmesh.new()
     bm.from_mesh(piece.data)
-    inside = {v.index for v in bm.verts if v.co.y < front and v.co.z < brow and abs(v.co.x - cx) < 0.85 * half}
-    cut = [f for f in bm.faces if all(v.index in inside for v in f.verts)]
+    cut = [f for f in bm.faces if f.calc_center_median().y < front and reach(f.calc_center_median()) < 1.0]
     bmesh.ops.delete(bm, geom=cut, context="FACES")
     bmesh.ops.delete(bm, geom=[v for v in bm.verts if not v.link_faces], context="VERTS")
+    moved = 0
+    for v in bm.verts:
+        r = reach(v.co)
+        if v.co.y < front and 1e-6 < r < 1.0:
+            v.co.x = cx + (v.co.x - cx) / r
+            v.co.z = cz + (v.co.z - cz) / r
+            moved += 1
     bm.to_mesh(piece.data)
     bm.free()
-    print(f"FACE WINDOW {piece.name}: {len(cut)} faces cut")
+    print(f"FACE WINDOW {piece.name}: {len(cut)} faces cut, {moved} corners onto the edge")
 
 
 def _hair_pieces(body, body_name, prefix, rig, skull, canon, caps):
@@ -1085,8 +1201,8 @@ def _hair_pieces(body, body_name, prefix, rig, skull, canon, caps):
 def _landmarks(body, prefix, rig, posed=False):
     """Where a garment goes on a body: heights of its joints, the shoulders'
     half span, and the torso's cross-section by height (the arms left out):
-    half width, front, and back. posed: the joints as the rig is posed now
-    (body is then the posed copy), not at rest."""
+    half width, front, back, and the middle across. posed: the joints as
+    the rig is posed now (body is then the posed copy), not at rest."""
     if posed:
         bone = lambda name: rig.matrix_world @ rig.pose.bones[prefix + name].head  # noqa: E731
     else:
@@ -1105,13 +1221,17 @@ def _landmarks(body, prefix, rig, posed=False):
     step = 0.02
     heights = np.arange(0.3, FIGHTER_HEIGHT - 0.3, step)
     profile = []
+    centre_x = []
     for z in heights:
         band = co[(np.abs(co[:, 2] - z) < step) & (np.abs(co[:, 0]) < shoulder_x + 0.12)]
         if len(band) < 8:
             profile.append((np.nan, np.nan, np.nan))
+            centre_x.append(np.nan)
         else:
             profile.append((np.percentile(np.abs(band[:, 0]), 99), np.percentile(band[:, 1], 1), np.percentile(band[:, 1], 99)))
+            centre_x.append(0.5 * (band[:, 0].min() + band[:, 0].max()))
     marks["heights"], marks["profile"] = heights, np.array(profile)
+    marks["centre_x"] = np.array(centre_x)
     return marks
 
 
@@ -1174,6 +1294,53 @@ def _fit_garment(piece, marks, spec, bands=40):
     print(f"GARMENT {piece.name}: height x{stretch:.2f}, width x{sx.min():.2f}..{sx.max():.2f}, depth x{sy.min():.2f}..{sy.max():.2f}")
 
 
+def _open_front(piece, marks, spec):
+    """Open a cape at the front: below the shoulders, the cloth that goes
+    round the body more than a set angle from the back goes, so the cape
+    hangs behind the arms and clear of the legs and does not wrap the body
+    like a coat. The limit eases from the front (the collar and the cloth
+    over the shoulders stay) down to the angle behind the arms, and from
+    the chest down to the hips to the angle beside the legs; the corners
+    of the faces that stay and reach past it go onto it, so the edge is a
+    smooth curve. spec: how far below the shoulders the opening starts,
+    over what drop it closes in to the arms' angle, the arms' angle, and
+    the legs' angle (degrees from the back)."""
+    start, span, arms, legs = spec
+    top = marks["shoulder_z"] - start
+    heights, profile, centre_x = marks["heights"], marks["profile"], marks["centre_x"]
+    known = ~np.isnan(profile[:, 1])
+    middle_y = 0.5 * (profile[known, 1] + profile[known, 2])
+
+    def around(p):
+        """Degrees from the back, and the limit, at p."""
+        cx = np.interp(p.z, heights[known], centre_x[known])
+        cy = np.interp(p.z, heights[known], middle_y)
+        limit = 180.0 + (arms - 180.0) * mocap._smooth((top - p.z) / span)
+        limit += (legs - arms) * mocap._smooth((marks["chest"] - p.z) / (marks["chest"] - marks["hip"]))
+        return math.degrees(math.atan2(p.x - cx, p.y - cy)), limit, cx, cy
+
+    bm = bmesh.new()
+    bm.from_mesh(piece.data)
+    cut = []
+    for f in bm.faces:
+        turn, limit, _, _ = around(f.calc_center_median())
+        if abs(turn) > limit:
+            cut.append(f)
+    bmesh.ops.delete(bm, geom=cut, context="FACES")
+    bmesh.ops.delete(bm, geom=[v for v in bm.verts if not v.link_faces], context="VERTS")
+    moved = 0
+    for v in bm.verts:
+        turn, limit, cx, cy = around(v.co)
+        if abs(turn) > limit:
+            r = math.hypot(v.co.x - cx, v.co.y - cy)
+            a = math.radians(math.copysign(limit, turn))
+            v.co.x, v.co.y = cx + r * math.sin(a), cy + r * math.cos(a)
+            moved += 1
+    bm.to_mesh(piece.data)
+    bm.free()
+    print(f"OPEN {piece.name}: {len(cut)} faces cut, {moved} corners onto the edge")
+
+
 def _flare(piece, marks, flare):
     """Swing a hanging piece's hem out from the legs, like a bell: below the
     landmark, the cloth moves out from the body's axis by rate per unit of
@@ -1231,7 +1398,40 @@ def _shrink_out(piece, bare, offset):
     again.wrap_mode = "OUTSIDE"
     again.offset = offset
     bpy.ops.object.modifier_apply(modifier=again.name)
-    print(f"SHRINK {piece.name}: {int(moved.sum())} of {len(moved)} vertices moved out")
+    late = _clear_skin(piece, bare, offset)
+    print(f"SHRINK {piece.name}: {int(moved.sum())} of {len(moved)} vertices moved out, {late} more past the skin")
+
+
+def _clear_skin(piece, bare, offset, reach=0.04, deep=0.12):
+    """Move each vertex of the cloth's outer side out past the skin seen
+    along its normal. The modifier goes by the nearest point, which
+    misleads where a posed body folds into itself (the raised deltoid over
+    the shoulder): the nearest face may lie buried inside the body. Seen
+    along the cloth's normal from just outside, the outermost skin that
+    faces the cloth is the one that shows, so the vertex goes offset past
+    that. Returns how many moved."""
+    tree = BVHTree.FromObject(bare, bpy.context.evaluated_depsgraph_get())
+    piece.data.update()
+    moved = 0
+    for v in piece.data.vertices:
+        n = v.normal.normalized()
+        _, facing, _, _ = tree.find_nearest(v.co)
+        if facing is None or facing.dot(n) <= 0.0:
+            continue  # the inner side, turned toward the body
+        origin = v.co + n * reach
+        far = reach + deep
+        while far > 0.0:
+            hit, normal, _, dist = tree.ray_cast(origin, -n, far)
+            if hit is None:
+                break
+            if normal.dot(n) > 0.0:
+                if (hit - v.co).dot(n) > -offset:
+                    v.co = hit + n * offset
+                    moved += 1
+                break
+            origin = hit - n * 1e-5
+            far -= dist + 1e-5
+    return moved
 
 
 def _transfer_weights(piece, bare, prefix, only=None, armpit=None):
@@ -1267,10 +1467,41 @@ def _transfer_weights(piece, bare, prefix, only=None, armpit=None):
         bpy.ops.object.vertex_group_normalize_all(lock_active=False)
 
 
-def _pose_stance(rigs, body_name):
-    """Pose one body's rig in the stance: the first frame of the boy's
-    preset idle, which every clip starts from (the girl's rig plays a
-    copy with her prefix). Returns a function that puts the rig back."""
+def _smooth_weights(piece, factor, repeat):
+    """Even out a garment's weights over its own surface: each vertex moves
+    by factor toward the mean of its neighbours, repeat times. The weights
+    it took from the nearest skin jump where the cloth bridges a hollow
+    (the armpit), and a jump folds the cloth when an arm swings: the fold
+    turns the cloth inside out, and its ink hull shows as a dark patch.
+    Spread out, the cloth bends over a wider band instead."""
+    mesh = piece.data
+    groups = list(piece.vertex_groups)
+    weights = np.zeros((len(mesh.vertices), len(groups)))
+    for v in mesh.vertices:
+        for g in v.groups:
+            weights[v.index, g.group] = g.weight
+    edges = np.empty(len(mesh.edges) * 2, dtype=np.int64)
+    mesh.edges.foreach_get("vertices", edges)
+    edges = edges.reshape(-1, 2)
+    count = np.bincount(edges.ravel(), minlength=len(mesh.vertices)).astype(float)
+    for _ in range(repeat):
+        total = np.zeros_like(weights)
+        np.add.at(total, edges[:, 0], weights[edges[:, 1]])
+        np.add.at(total, edges[:, 1], weights[edges[:, 0]])
+        mean = total / np.maximum(count, 1.0)[:, None]
+        weights = np.where(count[:, None] > 0, (1.0 - factor) * weights + factor * mean, weights)
+    weights /= np.maximum(weights.sum(axis=1, keepdims=True), 1e-9)
+    for group in groups:
+        column = weights[:, group.index]
+        group.remove(range(len(mesh.vertices)))
+        for i in np.nonzero(column > 1e-4)[0]:
+            group.add([int(i)], float(column[i]), "REPLACE")
+
+
+def _pose_arms_down(rigs, body_name):
+    """Pose one body's rig with the arms down: the first frame of the
+    boy's preset idle (the girl's rig plays a copy with her prefix).
+    Returns a function that puts the rig back."""
     boy = rigs["BodyBoy"]
     idle = boy.animation_data.action
     # Its paths name the renderer's joints, as _load_clips makes them.
@@ -1281,7 +1512,7 @@ def _pose_stance(rigs, body_name):
     prefix = BODIES[body_name]
     scene = bpy.context.scene
     frame = scene.frame_current
-    copy = _prefixed_copy(idle, prefix, "-Stance") if prefix else None
+    copy = _prefixed_copy(idle, prefix, "-ArmsDown") if prefix else None
     rig.animation_data_create()
     before = rig.animation_data.action
     c.play_action(rig, copy or idle)
@@ -1296,6 +1527,40 @@ def _pose_stance(rigs, body_name):
                 pose_bone.location = (0.0, 0.0, 0.0)
                 pose_bone.rotation_quaternion = (1.0, 0.0, 0.0, 0.0)
                 pose_bone.scale = (1.0, 1.0, 1.0)
+        scene.frame_set(frame)
+        bpy.context.view_layer.update()
+
+    return back
+
+
+def _pose_idle(rig, prefix, share):
+    """Pose one body's rig at a share of the HY-Motion idle (clips.json
+    "idle"), made on this rig as a passing clip; share 0 is the guard, the
+    stance every clip starts from and ends in (_clips). Returns a function
+    that puts the rig back."""
+    scene = bpy.context.scene
+    frame = scene.frame_current
+    rig.animation_data_create()
+    before = rig.animation_data.action
+    name = f"Guard{prefix}"
+    mocap.hy_clip(rig, name, "idle", None, scheme(prefix))
+    guard = bpy.data.actions[name]
+    c.play_action(rig, guard)
+    start, end = guard.frame_range
+    scene.frame_set(int(round(start + (end - start) * share)))
+    bpy.context.view_layer.update()
+
+    def back():
+        rig.animation_data.nla_tracks.remove(rig.animation_data.nla_tracks[name])
+        bpy.data.actions.remove(guard)
+        if before is not None:
+            c.play_action(rig, before)
+        else:
+            rig.animation_data.action = None
+        for pose_bone in rig.pose.bones:
+            pose_bone.location = (0.0, 0.0, 0.0)
+            pose_bone.rotation_quaternion = (1.0, 0.0, 0.0, 0.0)
+            pose_bone.scale = (1.0, 1.0, 1.0)
         scene.frame_set(frame)
         bpy.context.view_layer.update()
 
@@ -1324,10 +1589,11 @@ def _skinning(rig):
     return {pb.name: world @ pb.matrix @ pb.bone.matrix_local.inverted() @ world.inverted() for pb in rig.pose.bones}
 
 
-def _unpose(piece, skinning):
+def _unpose(piece, skinning, forward=False):
     """Bring a piece fitted on the posed body back to rest: each vertex
     through the inverse of its weighted skinning matrix, so the Armature
-    modifier puts it back where it was fitted in that pose."""
+    modifier puts it back where it was fitted in that pose. forward: pose
+    the piece instead, as the Armature modifier would."""
     names = {group.index: group.name for group in piece.vertex_groups}
     for v in piece.data.vertices:
         blend = Matrix(((0.0,) * 4,) * 4)
@@ -1338,16 +1604,30 @@ def _unpose(piece, skinning):
                 blend += skinning[bone] * g.weight
                 total += g.weight
         if total > 1e-6:
-            v.co = (blend * (1.0 / total)).inverted() @ v.co
+            blend = blend * (1.0 / total)
+            v.co = (blend if forward else blend.inverted()) @ v.co
 
 
 def _garment_pieces(body, body_name, prefix, marks, canon, rigs):
     """The garments of one body: each fitted, moved out of the skin, and
     skinned to the body's bones. Weights come only from this body (ADR
     0012): a bare copy of it, with no modifier, so the rig's pose plays no
-    part. A hanging piece (the cape) is fitted and skinned on the body in
-    the stance, where the arms hang at the sides, and then brought back to
-    rest: so it hangs around the arms, not through them."""
+    part. The cape (GARMENT_FIT "arms_down") is fitted and skinned on the
+    body with the arms at the sides, cut open at the front there, and
+    brought back to rest: so it hangs behind the arms, not around them. A
+    settled garment, once skinned, is pushed out of the body in the idle,
+    at each share of it in SETTLE_AT, and brought back to rest each time:
+    so the skin stays under it in the poses the player sees most."""
+    rig = rigs[body_name]
+    back = _pose_arms_down(rigs, body_name)
+    arms_down = _posed_copy(body, f"ArmsDown{body_name}")
+    arms_down_pose = (arms_down, _skinning(rig), _landmarks(arms_down, prefix, rig, posed=True))
+    back()
+    idle = []
+    for share in SETTLE_AT:
+        back = _pose_idle(rig, prefix, share)
+        idle.append((_posed_copy(body, f"Idle{body_name}{share}"), _skinning(rig)))
+        back()
     bare = _copy(body, f"Bare{body_name}")
     bare.modifiers.clear()
     bare.parent = None
@@ -1355,28 +1635,71 @@ def _garment_pieces(body, body_name, prefix, marks, canon, rigs):
     pieces = []
     for part, spec in GARMENT_FIT.items():
         piece = _copy(canon[part], piece_name(part, body_name))
-        if part in HANGING:
-            back = _pose_stance(rigs, body_name)
-            posed = _posed_copy(body, f"Posed{body_name}")
-            skinning = _skinning(rigs[body_name])
-            posed_marks = _landmarks(posed, prefix, rigs[body_name], posed=True)
-            back()
-            _fit_garment(piece, posed_marks, spec)
-            _shrink_out(piece, posed, spec.get("offset", CLOTH_OFFSET))
-            if "flare" in spec:
-                _flare(piece, posed_marks, spec["flare"])
-            _transfer_weights(piece, posed, prefix, HANGING[part], posed_marks["shoulder_z"] - ARMPIT_DROP)
+        on, skinning, at = arms_down_pose if spec.get("arms_down") else (bare, None, marks)
+        offset = spec.get("offset", CLOTH_OFFSET)
+        _fit_garment(piece, at, spec)
+        if "open" in spec:
+            _open_front(piece, at, spec["open"])
+        _shrink_out(piece, on, offset)
+        if "flare" in spec:
+            _flare(piece, at, spec["flare"])
+        armpit = at["shoulder_z"] - ARMPIT_DROP if part in HANGING else None
+        _transfer_weights(piece, on, prefix, HANGING.get(part), armpit)
+        if "weights" in spec:
+            _smooth_weights(piece, *spec["weights"])
+        if skinning is not None:
             _unpose(piece, skinning)
-            c.remove(posed)
-        else:
-            _fit_garment(piece, marks, spec)
-            _shrink_out(piece, bare, spec.get("offset", CLOTH_OFFSET))
-            if "flare" in spec:
-                _flare(piece, marks, spec["flare"])
-            _transfer_weights(piece, bare, prefix, HANGING.get(part))
+        if spec.get("settle"):
+            for idle_body, idle_skinning in idle:
+                _unpose(piece, idle_skinning, forward=True)
+                _shrink_out(piece, idle_body, offset)
+                _unpose(piece, idle_skinning)
+        _mark_inner(piece, bare)
         pieces.append(piece)
-    c.remove(bare)
+    for copy in [arms_down, bare] + [posed for posed, _ in idle]:
+        c.remove(copy)
     return pieces
+
+
+def _mark_inner(piece, bare):
+    """Mark the garment's inner wall: a Tripo garment is a thin solid, and
+    the faces of its inside turn toward the body. The fit squeezes the two
+    walls together, so the inside crosses the outside here and there; an
+    ink hull on the inside would show through there as dark specks, so
+    the inside gets none (_finish_pieces)."""
+    tree = BVHTree.FromObject(bare, bpy.context.evaluated_depsgraph_get())
+    inner = np.zeros(len(piece.data.polygons), dtype=bool)
+    for poly in piece.data.polygons:
+        near, normal, _, _ = tree.find_nearest(poly.center)
+        if near is None:
+            continue
+        away = poly.center - near
+        if away.length < 1e-6:
+            away = normal
+        inner[poly.index] = poly.normal.dot(away) < 0.0
+    attribute = piece.data.attributes.new(INNER, "BOOLEAN", "FACE")
+    attribute.data.foreach_set("value", inner)
+    print(f"INNER {piece.name}: {int(inner.sum())} of {len(inner)} faces")
+
+
+def _drop_inner_ink(piece):
+    """Remove the ink hull of a garment's inner wall (_mark_inner): the
+    solidify copies each face's mark onto its hull face."""
+    mesh = piece.data
+    ink = mesh.materials.find(c.INK)
+    inner = np.zeros(len(mesh.polygons), dtype=bool)
+    mesh.attributes[INNER].data.foreach_get("value", inner)
+    index = np.empty(len(mesh.polygons), dtype=np.int32)
+    mesh.polygons.foreach_get("material_index", index)
+    bm = bmesh.new()
+    bm.from_mesh(mesh)
+    bm.faces.ensure_lookup_table()
+    drop = [bm.faces[i] for i in np.nonzero(inner & (index == ink))[0]]
+    bmesh.ops.delete(bm, geom=drop, context="FACES")
+    bm.to_mesh(mesh)
+    bm.free()
+    mesh.attributes.remove(mesh.attributes[INNER])
+    print(f"INK {piece.name}: the inner wall's {len(drop)} hull faces removed")
 
 
 def _cosmetic_anchors(body, prefix, skull, marks):
@@ -1481,6 +1804,8 @@ def _finish_pieces(pieces, rigs):
             if mat is None or not mat.name.startswith(c.PAINTED):
                 raise ValueError(f"{piece.name}: slot {i} wears {mat and mat.name}, not an atlas paint")
         c.ink_hull_skinned(piece, rigs[body_name], INK_WIDTH)
+        if INNER in piece.data.attributes:
+            _drop_inner_ink(piece)
         piece.parent = rigs[body_name]
         faces = sum(1 for p in piece.data.polygons if piece.data.materials[p.material_index].name != c.INK)
         print(f"FACES {piece.name}: {faces}")

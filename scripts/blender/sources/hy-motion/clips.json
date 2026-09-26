@@ -142,18 +142,23 @@
     "idle": {
       "used_by": "hero.py: the Idle clip (between cues; it loops)",
       "prompts": [
-        "A fighter stands in a relaxed guard with fists up, breathes slowly, and shifts weight gently from foot to foot.",
-        "A martial artist waits in a ready stance, fists raised, bouncing lightly on the balls of the feet and breathing calmly.",
-        "A cartoon fighter holds a loose fighting stance with both fists up, the shoulders rising and falling with each breath."
+        "A boxer stands in a tight guard with both fists up by the chin the whole time, elbows in, bouncing lightly on the balls of the feet and breathing steadily.",
+        "A fighter holds a high guard, both fists raised close to the chin and never lowered, shifts weight gently from foot to foot and bobs the head slightly.",
+        "A martial artist waits in a fighting stance with both fists held up in front of the chin throughout, knees slightly bent, the shoulders rising and falling with each breath."
       ],
       "frames": 120,
       "samples": 4,
-      "master_seed": 20260929,
+      "master_seed": 20260933,
       "window": [
         0,
         4
       ],
       "length": 4,
+      "loop": true,
+      "blend": [
+        0,
+        0.25
+      ],
       "score": {
         "air": {
           "target": 0,
@@ -169,12 +174,23 @@
         },
         "profile": -3,
         "lean_fwd": -1,
-        "drift": -3
+        "drift": -3,
+        "guard": {
+          "target": -0.04,
+          "weight": 3
+        },
+        "fist_high": {
+          "target": 0,
+          "weight": 2
+        },
+        "head_left": -2,
+        "head_down": -2
       },
+      "note": "Loops: it blends out to its own first frame, the guard, which is the stance every other hero clip blends from and to (hero.py _clips). Scored on the Tripo rig. The game's camera sees the hero's right side and a little of the front, so fists at the chin cover the face: guard (the lower fist's height above the head pivot) aims just below the chin, fist_high keeps the higher fist there too, and head_left and head_down keep the face toward the camera. p0s3 is first by score and by eye: fists up by the chin, the face in view, a light bounce.",
       "chosen": {
         "file": "idle.npz",
-        "candidate": "p2s3",
-        "by": "npm run motion (score -0.822), 2026-09-25"
+        "candidate": "p0s3",
+        "by": "npm run motion (score -0.260), 2026-09-26"
       }
     },
     "launch": {

@@ -71,6 +71,7 @@ Blender is the bakery: every model and clip in the game is the output of a commi
 - `bake-models.mjs` strips the normals and UVs from every ink hull (they draw one flat color).
 - Each hero body keeps its own Tripo rig and weights; never transfer weights between the bodies (ADR 0012). Garment and hair pieces are fitted per body and named `<part>-<body>`.
 - The clip owns its length; the code reads it (ADR 0012). Do not copy a clip's duration into a constant.
+- A `"loop"` HY-Motion brief blends to its own first frame. The hero's Idle first frame is the stance of every hero clip: after `npm run motion -- idle --pick`, bake the hero and check the strikes and the start and end of every clip.
 - HY-Motion runs outside the repo on GPU 1 (memory note `hy-motion-local-setup`). It needs the target's `build/models/<target>.blend`: run `npm run bake:models hero` or `fighter` first. `mocap.py` retargets onto the scripted hero's joints, or onto a Tripo rig through a naming scheme (`mocap.TRIPO`). Its outputs are limited to the license Territory (ADR 0010).
 - Tests assert behavior only. Judge the look by eye on the sheet and in the game.
 

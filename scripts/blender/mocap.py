@@ -307,9 +307,13 @@ def smplh_clip(rig, name, path, brief, stance, scheme=None):
       travel: "ease" (the root eases back to where it started, so Idle
         takes over in place) or "pin" (the root never leaves its spot;
         only its height moves).
+      loop: the clip blends in from and out to its own first frame, not
+        the stance, so it plays around and around with no seam (the
+        hero's Idle; its first frame is the stance of the other clips).
     stance: the pose the clip blends in from and out to. For the hero,
       {bone: three.js Euler}; for a scheme rig, {bone: {"quat", "loc"}}
-      in each bone's own rest frame (fighter.stance).
+      in each bone's own rest frame (fighter.stance). A loop does not
+      read it (it may be None).
     scheme: None for the hero; TRIPO for a rig with its own rest pose.
     The drift is how far (meters) the root had to be eased or pinned home.
     """
@@ -324,7 +328,6 @@ def smplh_clip(rig, name, path, brief, stance, scheme=None):
     poses, trans = poses[first : last + 1], trans[first : last + 1]
     if scheme is None:
         frames = _retarget(poses, trans, travel)
-        stance_q = {bone: c.three_rotation(*rot) for bone, rot in stance.items()}
         home = None  # the hero's root rests at the origin
         moving = "root"
         travelled = frames[-1][1].length
@@ -332,8 +335,17 @@ def smplh_clip(rig, name, path, brief, stance, scheme=None):
         native = _retarget_native(poses, trans, rig, scheme, travel)
         frames = [(rotations, location) for rotations, location, _ in native]
         travelled = native[-1][2].length
-        stance_q = {bone: pose["quat"] for bone, pose in stance.items()}
         moving = scheme["bones"]["pelvis"]
+    if brief.get("loop"):
+        # The first frame is the blend's target: the bones the retarget
+        # leaves alone (twists) stay at rest, as add_clip keys them.
+        first_rotations, first_location = frames[0]
+        stance_q = {bone: m.to_quaternion() for bone, m in first_rotations.items()}
+        home = first_location.copy()
+    elif scheme is None:
+        stance_q = {bone: c.three_rotation(*rot) for bone, rot in stance.items()}
+    else:
+        stance_q = {bone: pose["quat"] for bone, pose in stance.items()}
         home = stance[moving]["loc"]
         # The bones the scheme leaves alone (twists) follow their parents
         # mid-clip and blend to the stance at both ends like the others.

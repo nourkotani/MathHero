@@ -31,17 +31,17 @@ The name "Training Dummy" no longer fits: the opponent is a fighter who takes hi
 - **Tint regions by hue.** The body prompt fixes a flat palette: peach skin, a white suit, cyan panels and trim, no hair, a smooth face. The bake sorts each face into Skin, Outfit, or Trim by hue, keeps the texture's light and shade, and removes its color. The runtime tint works as today. Hair and garments come without texture; the bake paints them as it paints the scripted parts.
 - **A face layer per body** shows the face that Tripo painted, in the Rival's style. The game's drawn decals fit the chunky scripted head, not these bodies. The bake copies the head's front faces into a thin layer, bakes the painted face onto it, and keeps only the features (eyes, brows, lashes) opaque, so the tinted skin shows through. A body painted without a face gets a second paint (`npm run tripo -- retexture`): Tripo keeps the UV layout, so the bake takes the face from the new texture and the rest from the first. The eye color of each Form moves from the iris decal to this layer's iris.
 - **The clip owns its length; the code reads it.** The director receives each clip's duration from the model. Style values keep only fractions of a clip.
-- **Clip sources.** Tripo presets: Idle, the four strikes, Blast, and the Rival's clips. HY-Motion (ADR 0010): Charge, Transform, Stagger, Victory, and the Rival's Launch and Recover. The bake adds the strike dash (3.5–4.0 m), the jump arc, and the spin to the root of each strike clip, so the hitboxes and the contact window stay as they are. The front_kick_01 preset is a side kick that turns the body: the bake faces it, aims it 90 degrees at the dash's peak, and pins the hips' sideways travel, so the boot reaches the Rival.
+- **Clip sources.** Tripo presets: Idle, the four strikes, Blast, and the Rival's clips. HY-Motion (ADR 0010): Charge, Transform, Stagger, Victory, and the Rival's Launch and Recover. The bake adds the strike dash (3.5–4.0 m), the jump arc, and the spin to the root of each strike clip, so the hitboxes and the contact window stay as they are. The front_kick_01 preset is a side kick that turns the body: the bake faces it, aims it 90 degrees at the dash's peak, and pins the hips' sideways travel, so the boot reaches the Rival. The HY-Motion idle loops (`"loop": true`): it blends out to its own first frame, a guard with the fists at the chin, and that frame is the stance every hero clip blends from and to. The Tripo preset idle is no longer played.
 
 ## Consequences
 
 - The scripted body goes to git history. The hero's sources go through git LFS, as in ADR 0011.
 - `mocap.py` gets a map from SMPL joints to Tripo bone names. The same map lets HY-Motion drive the Rival. `npm run motion` takes a target (hero or fighter).
 - `gen:hero` learns the Face and Iris layers and the per-body pieces. The drawn face decals and their six PNGs go.
-- The boy's painted eyes are small, so his iris layer holds almost nothing: a Form's eye color shows on the girl and hardly on the boy.
+- The face layer is unwrapped, so each painted eye stays whole. The iris rule also takes a thick dark patch that touches the whites, so a Form's eye color shows on both bodies (the boy's painted eyes are small).
 - One 2048 px atlas holds the bodies (top half) and the hair and garment pieces (bottom half).
 - A scalp cap lies under every hair piece, so no bald skin shows between the locks; the cap alone is the short buzz cut, and a thicker cap with short tufts is the long one. The buzz cuts ride the head bone, so a Form's hair growth does not change them.
-- The cape is fitted in the idle stance: it follows the trunk, the clavicles, and the upper arms above the armpit, and its hem flares out from the legs, so the kick does not cut through it.
+- The cape is fitted with the arms down and cut open at the front (100 degrees from the back at the arms, 105 at the legs), so it hangs behind the arms; its hem flares out from the legs, so the kick does not cut through it. Every garment's weights are smoothed over the cloth, its inner wall has no ink hull, and it is pushed out of the body at four frames of the idle.
 - `hero-rig.json` also holds each body's cosmetic anchors (crown, halo, wings, trail); `STYLE.cosmetics` keeps only offsets from them.
 - Budgets:
 
@@ -52,8 +52,8 @@ The name "Training Dummy" no longer fits: the opponent is a fighter who takes hi
 | Faces per hair piece or mane | 4,000 |
 | Body texture | 1024 px |
 | Hero triangles drawn per frame (with the ink hull) | 84,000 |
-| `hero.glb` | about 3.3 MB planned; 6.04 MB with every part (1.18 MB before) |
-| Built file | about 15 MB planned; 18.78 MB with every part (13.1 MB before) |
+| `hero.glb` | about 3.3 MB planned; 5.89 MB with every part (1.18 MB before) |
+| Built file | about 15 MB planned; 18.58 MB with every part (13.1 MB before) |
 | Credits planned (with the reserve for diagnosis) | 950 (1,100): the first plan's 690, the second body prompt (200), and the gi top (60) |
 
 - If the iPad drops under 60 fps, decimate the Rival to 50,000 faces first, then the bodies to 20,000.

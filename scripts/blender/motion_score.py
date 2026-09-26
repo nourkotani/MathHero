@@ -18,6 +18,15 @@ The measures, in the rig's space (the hero faces the Rival along Blender
   lean_back  most the chest leans back (rad)
   lean_fwd   most the chest bends forward (rad)
   fist_high  most a fist rises above the head pivot (m)
+  guard    mean height of the lower fist from the head pivot (m): near 0
+           when both fists stay up by the chin, far below 0 when an arm
+           hangs
+  guard_low  the lowest the lower fist gets from the head pivot (m)
+  head_left  mean turn of the head to the rig's left (rad; negative to the
+           right): the game's camera sees the hero's right side, so a
+           turn to the left takes the hero's face away from it
+  head_down  mean tilt of the face below level (rad): a bowed head hides
+           the face from the game's camera
   air      highest the pelvis rises above its rest (m)
   crouch   lowest the pelvis sinks below its rest (m)
   drift    how far the root had to be eased or pinned home (m)
@@ -89,9 +98,13 @@ def measure(rig, action, drift, target):
     chest_rest = world.to_3x3() @ data[target["chest"]].matrix_local.to_3x3()
     up_local = chest_rest.inverted() @ UP
     forward_local = chest_rest.inverted() @ forward
+    head_rest = world.to_3x3() @ data[target["head"]].matrix_local.to_3x3()
+    face_local = head_rest.inverted() @ forward
+    head_turn = head_down = 0.0
     start, end = (int(v) for v in action.frame_range)
-    reach = back = air = crouch = hunch = turn = travel = lean_back = lean_fwd = 0.0
+    reach = back = air = crouch = hunch = turn = travel = lean_back = lean_fwd = guard = 0.0
     fist_high = -math.inf
+    guard_low = math.inf
     last = None
     for f in range(start, end + 1):
         scene.frame_set(f)
@@ -110,7 +123,14 @@ def measure(rig, action, drift, target):
         lean_back = max(lean_back, -lean)
         points = [world @ (bones[b].matrix @ Vector(off)) for b, off in target["strike"].items()]
         head = world @ bones[target["head"]].head
+        face = world.to_3x3() @ bones[target["head"]].matrix.to_3x3() @ face_local
+        level = face.dot(forward) * forward + face.dot(side) * side
+        head_turn += math.atan2(face.dot(side), face.dot(forward))
+        head_down += max(0.0, math.atan2(-face.z, max(level.length, 1e-6)))
         fist_high = max(fist_high, max(p.z for p in points[:2]) - head.z)  # the fists
+        lower = min(p.z for p in points[:2]) - head.z
+        guard += lower
+        guard_low = min(guard_low, lower)
         reach = max(reach, max(p.dot(forward) for p in points))
         if last is not None:
             travel += sum((p - q).length for p, q in zip(points, last)) / len(points)
@@ -124,6 +144,10 @@ def measure(rig, action, drift, target):
         "lean_back": lean_back,
         "lean_fwd": lean_fwd,
         "fist_high": fist_high,
+        "guard": guard / frames,
+        "guard_low": guard_low,
+        "head_left": head_turn / frames,
+        "head_down": head_down / frames,
         "air": air,
         "crouch": crouch,
         "drift": drift,
