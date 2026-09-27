@@ -112,9 +112,10 @@ TRIM = (0.86, 0.86, 0.86)
 HAIR_LENGTHS = ("short", "long")
 
 # Face budgets (ADR 0012): a hair piece or mane at most 4,000, its scalp
-# cap included; a garment piece at most 8,000. The garments take 7,000 so
-# that the largest look (a body, a garment, and a hair, each inked) draws
-# under the 84,000 triangles a frame allows.
+# cap included (a mane with a face window: WINDOW_FACES); a garment piece
+# at most 8,000. The garments take 7,000 so that the largest look (a body,
+# a garment, and a hair, each inked) draws under the 84,000 triangles a
+# frame allows.
 HAIR_FACES = 3300
 CAP_FACES = 700
 GARMENT_FACES = 7000
@@ -162,13 +163,16 @@ FACE_WINDOW = ("Hair_mane_legend",)
 # front of a cape is cut open (_open_front); weights: the weights are
 # evened out over the cloth (_smooth_weights), a share per pass and the
 # passes; settle: once skinned, the garment is pushed out of the body in
-# the idle as well (SETTLE_AT); pushed: an accent face that the push out
-# of the skin moves farther than this wears the main region
-# (_repaint_pushed): the armor's recesses between its plates, pushed onto
-# the visible surface, are no longer recesses.
+# the idle as well (SETTLE_AT, or the shares given, in that order: each
+# push undoes a little of the one before, so the last pose fits best; the
+# cape ends with the guard, where the shoulder away from the camera came
+# through it); pushed: an accent face that the push out of the skin moves
+# farther than this wears the main region (_repaint_pushed): the armor's
+# recesses between its plates, pushed onto the visible surface, are no
+# longer recesses.
 GARMENT_FIT = {
     "GarmentGi": {"top": ("neck", 0.1), "anchor": (0.6, "hip", 0.08), "margin": 0.03, "start": 0.15, "hug": 0.85, "smooth": 0.25, "weights": (0.5, 10), "settle": True},
-    "GarmentCape": {"top": ("neck", 0.14), "anchor": (1.0, "knee", 0.1), "margin": 0.04, "hug": 0.3, "smooth": 0.15, "offset": 0.03, "flare": ("hip", 0.15, 0.35), "arms_down": True, "open": (0.0, 0.2, 100.0, 105.0), "weights": (0.5, 10), "settle": True},
+    "GarmentCape": {"top": ("neck", 0.14), "anchor": (1.0, "knee", 0.1), "margin": 0.04, "hug": 0.3, "smooth": 0.15, "offset": 0.03, "flare": ("hip", 0.15, 0.35), "arms_down": True, "open": (0.0, 0.2, 100.0, 105.0), "weights": (0.5, 10), "settle": (0.25, 0.5, 0.75, 0.0)},
     "GarmentArmor": {"top": ("shoulder_z", 0.14), "anchor": (1.0, "chest", -0.15), "margin": 0.03, "smooth": 0.3, "front": True, "weights": (0.5, 10), "settle": True, "pushed": 0.02},
 }
 
@@ -180,13 +184,16 @@ GARMENT_FIT = {
 # regions named. The cape and the armor wear the trim color, so they stand
 # out from the suit. Tripo paints shade into the colors, so a deep fold or
 # a shaded plate passes these limits too: on the garment's outer side
-# (_paint_garment), an accent patch smaller than the last share given of
+# (_paint_garment), an accent patch smaller than the share given next of
 # that side is main. Real accents are bands and parts, larger than a
-# fold's patch.
+# fold's patch. The last value: an accent patch whose mean saturation is
+# above it is main too, a pale highlight of the main color and not a
+# white band (the cape's highlight on the left shoulder read as a patch
+# of the outfit color, which looked like the suit coming through).
 GARMENT_PAINT = {
-    "GarmentGi": ("Outfit", "Trim", 0.3, 0.4, 0.55, 0.005),
-    "GarmentCape": ("Trim", "Outfit", 0.3, 0.4, 0.55, 0.005),
-    "GarmentArmor": ("Trim", "Outfit", 0.0, 0.2, 1.1, 0.005),
+    "GarmentGi": ("Outfit", "Trim", 0.3, 0.4, 0.55, 0.005, 1.0),
+    "GarmentCape": ("Trim", "Outfit", 0.3, 0.4, 0.55, 0.005, 0.22),
+    "GarmentArmor": ("Trim", "Outfit", 0.0, 0.2, 1.1, 0.005, 1.0),
 }
 # How far out of the skin a garment lies at least: past the body's own
 # ink hull (INK_WIDTH), so the hull never shows through the cloth. The
@@ -1020,7 +1027,7 @@ def _paint_garment(obj, part, materials):
     inner wall is painted dark, so it read as accent and joined the
     patches on the outer side through the rims; now it wears the region
     of the outer side nearest to it, so the inside of a collar is collar."""
-    main, accent, gray_below, dark_below, dark_gray_below, patch = GARMENT_PAINT[part]
+    main, accent, gray_below, dark_below, dark_gray_below, patch, pale = GARMENT_PAINT[part]
     image = regions.base_color_image(obj)
     px = regions._pixels(image)
     height, width = px.shape[:2]
@@ -1034,7 +1041,7 @@ def _paint_garment(obj, part, materials):
     inner = _inner_wall(obj)
     # The inner wall does not vote: regions._smooth leaves it unknown.
     labels = regions._smooth(obj, np.where(inner, regions.UNKNOWN, raw).astype(np.int8))
-    labels, dropped = _drop_patches(obj, labels, ~inner, patch)
+    labels, dropped = _drop_patches(obj, labels, ~inner, patch, sat, pale)
     labels = np.where(inner, labels[_nearest_outer(obj, inner)], labels).astype(np.int8)
     _clean_mesh(obj)
     obj.data.materials.append(materials[main])
@@ -1107,17 +1114,18 @@ def _face_patches(mesh, mask):
     return patches
 
 
-def _drop_patches(obj, labels, outer, share):
+def _drop_patches(obj, labels, outer, share, sat, pale):
     """On the outer side, an accent patch (1) smaller than share of that
-    side's area goes to the main region (0). Returns the labels and how
-    many patches went."""
+    side's area, or with a mean saturation (sat, per face) above pale,
+    goes to the main region (0). Returns the labels and how many patches
+    went."""
     labels = labels.copy()
     area = np.empty(len(obj.data.polygons))
     obj.data.polygons.foreach_get("area", area)
     limit = share * area[outer].sum()
     dropped = 0
     for patch in _face_patches(obj.data, outer & (labels == 1)):
-        if area[patch].sum() < limit:
+        if area[patch].sum() < limit or sat[patch].mean() > pale:
             labels[patch] = 0
             dropped += 1
     return labels, dropped
@@ -1311,15 +1319,62 @@ WINDOW_AXES = (0.95, 1.2)
 WINDOW_DEPTH = 0.6
 WINDOW_TURN = 40.0
 # The lining of the window (_cut_face_window): the locks it copies lie
-# between the window's foot and this far above the brow, and no farther
-# back than this behind the crown's middle (in the crown's half width);
-# the copy lies this far under the sheet.
+# between this far below the window's foot and this far above the brow,
+# and no farther back than this behind the crown's middle (in the crown's
+# half width); the copy lies this far under the sheet.
+LINING_BELOW = 0.5
 LINING_ABOVE = 0.6
-LINING_BACK = 0.8
+LINING_BACK = 1.6
 LINING_DEPTH = 0.002
+# The face budget of a mane with a window, its scalp cap included (the
+# family allowed 4,500 faces for the legend mane on 2026-09-26): the
+# lining takes what the cut mane leaves of it.
+WINDOW_FACES = 4500
+# The eyes the lining is chosen for (_seen_from_behind): degrees round the
+# head from the front to each side, degrees above the eyes' height, and
+# the distance from the middle of the window. They take in the game
+# camera (the hero's right side, 22 degrees toward the front) and hero
+# creation, as the guard turns the head.
+SEEN_AZIMUTHS = tuple(float(a) for a in range(-110, 111, 10))
+SEEN_ELEVATIONS = (-25.0, -10.0, 5.0, 20.0, 35.0)
+SEEN_DISTANCE = 2.0
 
 
-def _cut_face_window(piece, skull):
+def _seen_from_behind(bm, body, centre, inside):
+    """Which faces of a mane an eye in front of the face sees from behind:
+    the eyes lie round the head (SEEN_AZIMUTHS, SEEN_ELEVATIONS); a face
+    counts when the line from an eye meets it first, no skin of the body
+    at rest lies before it, and it turns its back to that eye. The game
+    culls such a face, and its ink hull shows in its place."""
+    bm.faces.ensure_lookup_table()
+    mane = BVHTree.FromBMesh(bm)
+    skin = BVHTree.FromPolygons([v.co.copy() for v in body.data.vertices], [tuple(p.vertices) for p in body.data.polygons])
+    eyes = []
+    for az in SEEN_AZIMUTHS:
+        for el in SEEN_ELEVATIONS:
+            a, e = math.radians(az), math.radians(el)
+            eyes.append(centre + SEEN_DISTANCE * Vector((-math.sin(a) * math.cos(e), -math.cos(a) * math.cos(e), math.sin(e))))
+    seen = np.zeros(len(bm.faces), dtype=bool)
+    for f in bm.faces:
+        if inside[f.index]:
+            continue
+        c = f.calc_center_median()
+        for eye in eyes:
+            ray = c - eye
+            dist = ray.length
+            ray /= dist
+            if f.normal.dot(ray) <= 0.0:
+                continue
+            if mane.ray_cast(eye, ray, dist + 1e-3)[2] != f.index:
+                continue
+            if skin.ray_cast(eye, ray, dist)[0] is not None:
+                continue
+            seen[f.index] = True
+            break
+    return seen
+
+
+def _cut_face_window(piece, skull, body):
     """Cut away the hair that hangs in front of the face: forward of the
     forehead, inside an ellipse around the face that widens toward the
     front (WINDOW_TURN), so the locks part in an arch over the brow and
@@ -1389,18 +1444,21 @@ def _cut_face_window(piece, skull):
     # its back to the eye, the game culls it, and its ink hull, which faces
     # the eye, shows as a flat sheet of ink. A copy of those faces, turned
     # to the window and a little under the sheet, wears their paint and
-    # hides the ink; from outside it turns its back and does not show. The
-    # faces nearest the head come first, within the budget of a hair piece.
-    room = HAIR_FACES + CAP_FACES - len(bm.faces) - CAP_FACES
+    # hides the ink; from outside it turns its back and does not show.
+    # Within the budget of a mane with a window (WINDOW_FACES), the faces
+    # an eye in front sees from behind come first (_seen_from_behind), and
+    # then the faces nearest the head.
+    room = WINDOW_FACES - CAP_FACES - len(bm.faces)
+    seen = _seen_from_behind(bm, body, Vector((cx, cy, cz)), inside)
     candidates = []
     for f in bm.faces:
         centre = f.calc_center_median()
-        if inside[f.index] or centre.z < cz - b or centre.z > brow + LINING_ABOVE * half or centre.y > cy + LINING_BACK * half:
+        if inside[f.index] or centre.z < cz - b - LINING_BELOW * half or centre.z > brow + LINING_ABOVE * half or centre.y > cy + LINING_BACK * half:
             continue
-        candidates.append((math.hypot(centre.x - cx, centre.y - cy), f.index))
+        candidates.append((not seen[f.index], math.hypot(centre.x - cx, centre.y - cy), f.index))
     candidates.sort()
     bm.faces.ensure_lookup_table()
-    lined = [bm.faces[i] for _, i in candidates[: max(0, room)]]
+    lined = [bm.faces[i] for _, _, i in candidates[: max(0, room)]]
     copies = []
     for f in lined:
         verts = [bm.verts.new(v.co - f.normal * LINING_DEPTH) for v in f.verts]
@@ -1417,7 +1475,7 @@ def _cut_face_window(piece, skull):
     # away: through the window it drew as a flat dark sheet beside the
     # cheeks (_drop_inner_ink removes it, as on a garment's inner wall).
     piece.data.attributes.new(INNER, "BOOLEAN", "FACE").data.foreach_set("value", inside)
-    print(f"FACE WINDOW {piece.name}: {len(cut)} faces cut, {moved} corners onto the edge, {repainted} faces turned to the head repainted, {len(copies)} of {len(candidates)} faces lined")
+    print(f"FACE WINDOW {piece.name}: {len(cut)} faces cut, {moved} corners onto the edge, {repainted} faces turned to the head repainted, {len(copies)} of {len(candidates)} faces lined, {int(seen.sum())} seen from behind")
 
 
 def _hair_pieces(body, body_name, prefix, rig, skull, canon, caps):
@@ -1437,7 +1495,7 @@ def _hair_pieces(body, body_name, prefix, rig, skull, canon, caps):
         piece.data.transform(place)
         _lift_fringe(piece, skull)
         if part in FACE_WINDOW:
-            _cut_face_window(piece, skull)
+            _cut_face_window(piece, skull, body)
         piece["bone"] = prefix + "hair"
         under = _copy(caps["short"], piece_name(part, body_name) + "Cap")
         under["bone"] = prefix + "head"
@@ -1940,10 +1998,10 @@ def _garment_pieces(body, body_name, prefix, marks, canon, rigs):
     arms_down = _posed_copy(body, f"ArmsDown{body_name}")
     arms_down_pose = (arms_down, _skinning(rig), _landmarks(arms_down, prefix, rig, posed=True))
     back()
-    idle = []
+    idle = {}
     for share in SETTLE_AT:
         back = _pose_idle(rig, prefix, share)
-        idle.append((_posed_copy(body, f"Idle{body_name}{share}"), _skinning(rig)))
+        idle[share] = (_posed_copy(body, f"Idle{body_name}{share}"), _skinning(rig))
         back()
     bare = _copy(body, f"Bare{body_name}")
     bare.modifiers.clear()
@@ -1971,13 +2029,14 @@ def _garment_pieces(body, body_name, prefix, marks, canon, rigs):
         if skinning is not None:
             _unpose(piece, skinning)
         if spec.get("settle"):
-            for idle_body, idle_skinning in idle:
+            order = spec["settle"] if isinstance(spec["settle"], tuple) else SETTLE_AT
+            for idle_body, idle_skinning in (idle[share] for share in order):
                 _unpose(piece, idle_skinning, forward=True)
                 _shrink_out(piece, idle_body, offset)
                 _unpose(piece, idle_skinning)
         _mark_inner(piece, bare)
         pieces.append(piece)
-    for copy in [arms_down, bare] + [posed for posed, _ in idle]:
+    for copy in [arms_down, bare] + [posed for posed, _ in idle.values()]:
         c.remove(copy)
     return pieces
 

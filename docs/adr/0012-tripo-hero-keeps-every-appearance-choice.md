@@ -39,7 +39,9 @@ The name "Training Dummy" no longer fits: the opponent is a fighter who takes hi
 - `mocap.py` gets a map from SMPL joints to Tripo bone names. The same map lets HY-Motion drive the Rival. `npm run motion` takes a target (hero or fighter).
 - `gen:hero` learns the Face and Iris layers and the per-body pieces. The drawn face decals and their six PNGs go.
 - The face layer is unwrapped, so each painted eye stays whole. The iris rule also takes a thick dark patch that touches the whites, so a Form's eye color shows on both bodies (the boy's painted eyes are small). The thin gaps where the white meets the iris or the lid are closed and filled from their neighbors, and the iris spreads over them.
-- The legend mane's face window widens 40 degrees toward the front. The exposed far side of its locks is lined with a flipped copy that has no ink hull, within the 4,000-face budget (3,917 faces on the boy, 3,999 on the girl).
+- The legend mane's face window widens 40 degrees toward the front. The exposed far side of its locks is lined with a flipped copy that has no ink hull, within its own face budget of 4,500 (`WINDOW_FACES`; 4,417 faces on the boy, 4,499 on the girl). The lining takes first the locks that an eye in front of the face sees from behind, then the nearest locks.
+- Each garment has its own settle order: the cape settles with the guard last, because each push out of the skin undoes a little of the one before, and the guard is the pose the player sees most. An accent patch whose mean saturation is above a limit per garment is a highlight of the main color, not a band (the cape: 0.22).
+- The deltoid still pokes through the gi and the armor in the strikes and in Victory. The body's own skin folds into itself at the shoulder in these clips: a copy of the skin 3.2 cm out, with the same weights, is poked through too. Weights and offsets cannot fix this; it needs corrective shapes, another skinning method, or clips that raise the arm less.
 - One 2048 px atlas holds the bodies (top half) and the hair and garment pieces (bottom half).
 - A scalp cap lies under every hair piece, so no bald skin shows between the locks; the cap alone is the short buzz cut, and a thicker cap with short tufts is the long one. The buzz cuts ride the head bone, so a Form's hair growth does not change them.
 - The cape is fitted with the arms down and cut open at the front (100 degrees from the back at the arms, 105 at the legs), so it hangs behind the arms; its hem flares out from the legs, so the kick does not cut through it. Every garment's weights are smoothed over the cloth; its inner wall has no ink hull; its two walls lie at two offsets from the skin (the outer wall `SHELL` farther), so they never cross; its paint is read on the outer side only, and a fold's patch under 0.5 % of that side is dropped; and it is pushed out of the body at four frames of the idle.
@@ -50,11 +52,11 @@ The name "Training Dummy" no longer fits: the opponent is a fighter who takes hi
 |---|---|
 | Faces per body | 30,000 |
 | Faces per garment piece | 8,000 |
-| Faces per hair piece or mane | 4,000 |
+| Faces per hair piece or mane | 4,000; Hair_mane_legend 4,500 |
 | Body texture | 1024 px |
 | Hero triangles drawn per frame (with the ink hull) | 84,000 |
-| `hero.glb` | about 3.3 MB planned; 5.97 MB with every part (1.18 MB before) |
-| Built file | about 15 MB planned; 18.68 MB with every part (13.1 MB before) |
+| `hero.glb` | about 3.3 MB planned; 6.00 MB with every part (1.18 MB before) |
+| Built file | about 15 MB planned; 18.73 MB with every part (13.1 MB before) |
 | Credits planned (with the reserve for diagnosis) | 950 (1,100): the first plan's 690, the second body prompt (200), and the gi top (60) |
 
 - If the iPad drops under 60 fps, decimate the Rival to 50,000 faces first, then the bodies to 20,000.
