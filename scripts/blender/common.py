@@ -765,6 +765,48 @@ def import_glb(path):
     return set(bpy.context.scene.objects) - before
 
 
+def bare_mesh(added):
+    """The one mesh of an imported model, bare: a Studio export comes with
+    a Mixamo armature whose binding Blender cannot read (the skin
+    explodes), and the mesh's own data lies on its back under the
+    armature's turn. The armature's transform goes into the mesh, and the
+    armature, the modifiers, the vertex groups, and the importer's bone
+    shape (an "Icosphere") go."""
+    meshes = [o for o in added if o.type == "MESH" and o.name != "Icosphere"]
+    if len(meshes) != 1:
+        raise ValueError(f"expected one mesh, found {[o.name for o in meshes]}")
+    mesh = meshes[0]
+    world = mesh.matrix_world.copy()
+    for mod in list(mesh.modifiers):
+        mesh.modifiers.remove(mod)
+    for group in list(mesh.vertex_groups):
+        mesh.vertex_groups.remove(group)
+    mesh.parent = None
+    mesh.matrix_world.identity()
+    mesh.data.transform(world)
+    for obj in added:
+        if obj != mesh:
+            data = obj.data
+            bpy.data.objects.remove(obj, do_unlink=True)
+            if data is not None and data.users == 0:
+                (bpy.data.meshes if isinstance(data, bpy.types.Mesh) else bpy.data.armatures).remove(data)
+    stand_up(mesh)
+    return mesh
+
+
+def stand_up(mesh):
+    """A model on its back (its height along Y, as a Studio export's mesh
+    data lies: glTF is Y up) stands up and turns to face +X, as Tripo's
+    API models do (a glTF model faces +Z, which the stand puts at -Y)."""
+    co = np.empty(len(mesh.data.vertices) * 3)
+    mesh.data.vertices.foreach_get("co", co)
+    co = co.reshape(-1, 3)
+    size = co.max(axis=0) - co.min(axis=0)
+    if size[1] > 1.5 * size[2]:
+        mesh.data.transform(Matrix.Rotation(math.radians(90.0), 4, "Z") @ Matrix.Rotation(math.radians(90.0), 4, "X"))
+        print(f"STAND {mesh.name}: stood up from size {tuple(round(float(v), 2) for v in size)}, facing +X")
+
+
 def mesh_height(meshes):
     zs = [(m.matrix_world @ v.co).z for m in meshes for v in m.data.vertices]
     return max(zs) - min(zs)
@@ -824,6 +866,8 @@ def set_weights(obj, saved, offset=(0.0, 0.0, 0.0)):
     far = 0
     for v in obj.data.vertices:
         _, index, distance = tree.find(v.co)
+        if index is None:
+            raise ValueError(f"{obj.name}: no saved vertex near {tuple(v.co)} (a NaN position?)")
         nearest[v.index] = index
         far += distance > 1e-3
     if far:

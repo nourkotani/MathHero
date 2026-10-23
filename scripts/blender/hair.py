@@ -53,15 +53,19 @@ def mane_name(mane):
     return f"Hair_mane_{mane}"
 
 
-def skull(body, prefix, on_bone):
+def skull(body, prefix, on_bone, floor=None):
     """The head, for the hair: the top centre and the width of its upper
     part, the crown's centre and half width, the ears' top, the brow, the
     hairline (front, side, back), and the core the roots are cast from.
-    on_bone(body, bone) -> bool array of the vertices a bone carries."""
+    on_bone(body, bone) -> bool array of the vertices a bone carries.
+    floor: a height below which the head's vertices do not count (long
+    hair on the head bone falls to the back)."""
     on_head = on_bone(body, prefix + "head")
     co = np.empty(len(body.data.vertices) * 3)
     body.data.vertices.foreach_get("co", co)
     co = co.reshape(-1, 3)
+    if floor is not None:
+        on_head = on_head & (co[:, 2] > floor)
     head = co[on_head]
     top = float(head[:, 2].max())
     height = top - float(head[:, 2].min())
@@ -106,25 +110,22 @@ def hairline(sk):
     return line
 
 
+FACE_CONE = 0.5  # cos 60 degrees: the face is the front of the head
+
+
 def mask_line(sk):
     """The hair boundary for the masks (masks.scalp_faces): the hairline at
-    the front, but down to the jaw at the sides and the nape at the back,
-    so a body whose painted hair falls past the ears (a bob) recolors
-    whole. A pixel below the real hairline that is not dark is sorted by
-    its color anyway; only the dark paint there counts as hair."""
+    the front of the head (within FACE_CONE of straight ahead), and no
+    boundary at all at the sides and the back, so a bob, a mane down the
+    back, or a buzz cut recolors whole. Skin anywhere stays skin (masks
+    sorts the scalp's pixels by skin first)."""
     front = sk["hairline"][0]
-    top, height = sk["centre"].z, sk["height"]
-    side = top - 0.85 * height
-    back = top - 0.95 * height
-    a = 0.5 * (side + 0.5 * (front + back))
-    b = 0.5 * (front - back)
-    cc = 0.5 * (front + back) - a
     cx, cy = sk["crown_x"], sk["crown_y"]
 
     def line(x, y, z):
         r = np.hypot(x - cx, y - cy) + 1e-9
         ahead = -(y - cy) / r
-        return a + b * ahead + cc * (2.0 * ahead * ahead - 1.0)
+        return np.where(ahead > FACE_CONE, front, -1e9)
 
     return line
 
@@ -152,6 +153,37 @@ class Scalp:
             hit = self.sk["core"] + d * self.sk["half_width"]
             normal = d
         return hit, normal.normalized()
+
+
+# A head face farther out than the first surface a ray from the core
+# meets, by this much (hero units), is hair over the skin.
+SHELL = 0.012
+
+
+def shell_faces(body, sk, head):
+    """The head's faces that are a shell over the skin: Tripo models hair
+    as a surface outside the head, so a ray from the skull's core meets the
+    skin first and the hair beyond it. A fringe over the forehead and the
+    strands framing the face are hair, not features, whatever their
+    paint. head: bool array over the faces (masks.head_faces)."""
+    scalp = Scalp(body, sk)
+    count = len(body.data.polygons)
+    centres = np.empty(count * 3, dtype=np.float32)
+    body.data.polygons.foreach_get("center", centres)
+    centres = centres.reshape(-1, 3)
+    shell = np.zeros(count, dtype=bool)
+    core = sk["core"]
+    for i in np.nonzero(head)[0]:
+        centre = Vector(centres[i])
+        away = centre - core
+        reach = away.length
+        if reach < 1e-6:
+            continue
+        hit, _, _, distance = scalp.tree.ray_cast(core, away / reach, reach + 1.0)
+        if hit is not None and reach > distance + SHELL:
+            shell[i] = True
+    print(f"SHELL {body.name}: {int(shell.sum())} of {int(head.sum())} head faces are hair over the skin")
+    return shell
 
 
 UP = Vector((0.0, 0.0, 1.0))

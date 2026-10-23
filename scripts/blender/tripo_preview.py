@@ -19,6 +19,8 @@ from mathutils import Vector
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+import common  # noqa: E402
+
 
 TILE_W, TILE_H = 320, 440
 VIEWS = (("front", 0.0), ("right", 90.0), ("back", 180.0), ("left", 270.0))
@@ -26,7 +28,9 @@ VIEWS = (("front", 0.0), ("right", 90.0), ("back", 180.0), ("left", 270.0))
 
 def load(path):
     bpy.ops.wm.read_factory_settings(use_empty=True)
+    before = set(bpy.context.scene.objects)
     bpy.ops.import_scene.gltf(filepath=path)
+    common.bare_mesh(set(bpy.context.scene.objects) - before)
     meshes = [o for o in bpy.context.scene.objects if o.type == "MESH"]
     lo = Vector((math.inf,) * 3)
     hi = Vector((-math.inf,) * 3)

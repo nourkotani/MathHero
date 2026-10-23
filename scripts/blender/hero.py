@@ -79,6 +79,8 @@ BODY_TEXTURE = 2048
 PIECES_TEXTURE = 2048
 # The body's faces: the candidate decimated here (ADR 0012's budget).
 BODY_FACES = 40000
+# Vertices closer than this (the rigged model's units) are one vertex.
+WELD = 1e-5
 # A sliver face: longer than SLIVER_EDGE (hero units) and narrower than
 # SLIVER_THIN of its length squared in area.
 SLIVER_EDGE = 0.1
@@ -93,6 +95,13 @@ WEIGHT_CLEAN = 0.03
 # bone, a vertex is the head's (the shoulders' tops stay below).
 HEAD_ABOVE = 0.02
 HEAD_REACH = 1.1
+# A suited body's skin: this far above the neck's base (hero units).
+SKIN_ABOVE_NECK = 0.02
+# The recolor's contrast (hero-rig.json "tint".gamma, _gamma): paint as
+# bright as GAMMA_BRIGHT (linear luminance) keeps all of its contrast.
+GAMMA_BRIGHT = 0.3
+GAMMA_MIN = 0.35
+GAMMA_MAX = 1.0
 # The arm bones (after the side prefix) a head vertex never carries.
 ARM_BONES = ("Upperarm", "Forearm", "Hand")
 
@@ -102,7 +111,7 @@ ARM_BONES = ("Upperarm", "Forearm", "Hand")
 # read it by the plain joint names. To put a Studio body in the game,
 # name its brief here (girl-studio, boy-studio) and bake.
 BODIES = {"BodyBoy": "", "BodyGirl": "girl_"}
-BRIEFS = {"BodyBoy": "boy-gi", "BodyGirl": "girl-gi"}
+BRIEFS = {"BodyBoy": "boy-studio", "BodyGirl": "girl-studio"}
 SHORT = {"BodyBoy": "boy", "BodyGirl": "girl"}
 GIRL = BODIES["BodyGirl"]
 # The brief whose preset clips every body plays (ADR 0012).
@@ -221,10 +230,8 @@ def _import_body(brief, name):
     for obj in added - {rig, rigged}:
         bpy.data.objects.remove(obj, do_unlink=True)
     chosen = brief["chosen"]["candidate"]
-    added = c.import_glb(os.path.join(SOURCES, brief["candidates"][chosen]["file"]))
-    mesh = next(o for o in added if o.type == "MESH")
-    for obj in added - {mesh}:
-        bpy.data.objects.remove(obj, do_unlink=True)
+    mesh = c.bare_mesh(c.import_glb(os.path.join(SOURCES, brief["candidates"][chosen]["file"])))
+    _weld(mesh)
     # Into the rigged model's space: Tripo sizes and centres the model it rigs.
     lo_c, hi_c = _bounds(mesh)
     lo_r, hi_r = _bounds(rigged)
@@ -270,6 +277,29 @@ def _drop_slivers(obj, unit):
     bm.to_mesh(obj.data)
     bm.free()
     print(f"SLIVERS {obj.name}: {len(slivers)} faces dropped")
+
+
+def _weld(obj):
+    """Join the vertices that lie together: a glTF stores a seam's vertex
+    once per side, and a Studio export has one vertex per face corner at
+    every island, so faces do not connect, normals break at every seam,
+    and a plate cut from the body comes out in chips. The UVs stay with
+    the face corners."""
+    before = len(obj.data.vertices)
+    bm = bmesh.new()
+    bm.from_mesh(obj.data)
+    bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=WELD)
+    bm.to_mesh(obj.data)
+    bm.free()
+    # The export's own normals, one per face corner, shade every island
+    # flat and show every seam as a bright line: the mesh's smooth normals
+    # take their place.
+    custom = obj.data.has_custom_normals
+    if custom:
+        bpy.context.view_layer.objects.active = obj
+        bpy.ops.mesh.customdata_custom_splitnormals_clear()
+    obj.data.shade_smooth()
+    print(f"WELD {obj.name}: {before} -> {len(obj.data.vertices)} vertices, custom normals {'cleared' if custom else 'none'}")
 
 
 def _bounds(obj):
@@ -463,13 +493,38 @@ def load_body(body_name):
 # ---------------------------------------------------------------- masks
 
 
-def _masks(body, prefix, sk, image, short):
+def _masks(body, prefix, sk, image, short, brief, marks):
     """The body's tint and mark masks, written next to the model; returns
-    each region's mean luminance for hero-rig.json."""
-    tints, marks, means = masks.build(body, image, prefix + "head", hair.mask_line(sk), size=BODY_TEXTURE)
+    each region's mean luminance for hero-rig.json. The brief's palette
+    (models.json) names the body's colors; else the hero palette. A
+    palette with "skin_above": "neck" keeps skin to the faces above the
+    neck's base (a suited body: the throat and the head; the suit's
+    collar and its pale leather stay the outfit and the trim)."""
+    palette = dict(masks.HERO_PALETTE, **brief.get("palette", {}))
+    skin_faces = None
+    if palette.get("skin_above") == "neck":
+        centres = np.empty(len(body.data.polygons) * 3, dtype=np.float32)
+        body.data.polygons.foreach_get("center", centres)
+        skin_faces = centres.reshape(-1, 3)[:, 2] > marks["neck"] + SKIN_ABOVE_NECK
+    tints, marks_px, means = masks.build(
+        body, image, prefix + "head", hair.mask_line(sk), palette=palette, size=BODY_TEXTURE,
+        shell_of=lambda head: hair.shell_faces(body, sk, head), skin_faces=skin_faces,
+    )
     masks.save_webp(masks.new_image(f"Mask{body.name}", tints), os.path.join(MODELS, f"hero-mask-{short}.webp"))
-    masks.save_webp(masks.new_image(f"Marks{body.name}", marks), os.path.join(MODELS, f"hero-marks-{short}.webp"))
-    return {name: round(value, 4) for name, value in means.items()}
+    masks.save_webp(masks.new_image(f"Marks{body.name}", marks_px), os.path.join(MODELS, f"hero-marks-{short}.webp"))
+    return {
+        "mean": {name: round(value, 4) for name, value in means.items()},
+        "gamma": {name: round(_gamma(value), 4) for name, value in means.items()},
+    }
+
+
+def _gamma(mean):
+    """How much of a region's contrast the recolor keeps: the ratio of a
+    pixel's light to the region's mean, raised to this. Bright paint (a
+    white gi) keeps all of it; dark paint (a navy suit) keeps less, or
+    its faint stitches, three times its mean, would come out three times
+    a bright tint, white."""
+    return min(GAMMA_MAX, max(GAMMA_MIN, math.sqrt(mean / GAMMA_BRIGHT)))
 
 
 # ---------------------------------------------------------------- clips
@@ -674,8 +729,19 @@ def _landmarks(body, prefix, rig):
         else:
             profile.append((np.percentile(np.abs(band[:, 0]), 99), np.percentile(band[:, 1], 1), np.percentile(band[:, 1], 99)))
             centre_x.append(0.5 * (band[:, 0].min() + band[:, 0].max()))
-    marks["heights"], marks["profile"] = heights, np.array(profile)
-    marks["centre_x"] = np.array(centre_x)
+    profile = np.array(profile)
+    centre_x = np.array(centre_x)
+    # A sparse mesh (a Studio export of 10k faces) leaves bands with too
+    # few vertices: those take the values interpolated from their
+    # neighbours, so no size downstream (the belt's) is NaN.
+    valid = ~np.isnan(profile[:, 0])
+    if not valid.any():
+        raise ValueError(f"{body.name}: no torso profile")
+    for column in range(profile.shape[1]):
+        profile[:, column] = np.interp(heights, heights[valid], profile[valid, column])
+    centre_x = np.interp(heights, heights[valid], centre_x[valid])
+    marks["heights"], marks["profile"] = heights, profile
+    marks["centre_x"] = centre_x
     return marks
 
 
@@ -858,8 +924,9 @@ def _write_rig_json(rigs, anchors, tints):
     """The renderer's copy of each body's rig (baked output): the prefix
     on its bone names, each joint's rest position and rotation in hero
     space with its nearest named parent, the strike offsets in each
-    joint's own frame, where the cosmetics sit (_cosmetic_anchors), and
-    the mean luminance of each tint region (masks.py).
+    joint's own frame, where the cosmetics sit (_cosmetic_anchors), the
+    mean luminance of each tint region (masks.py), and the contrast the
+    recolor keeps there (_gamma).
 
     The glTF exporter writes a bone's rest as its Blender rest with the
     axis change applied after it (matrix_local @ axis_basis_change), and
@@ -897,7 +964,8 @@ def _write_rig_json(rigs, anchors, tints):
             "joints": joints,
             "strikes": strikes,
             "cosmetics": anchors[body_name],
-            "tint": tints[body_name],
+            "tint": tints[body_name]["mean"],
+            "tintGamma": tints[body_name]["gamma"],
         }
     with open(RIG_JSON, "w", encoding="utf-8", newline="\n") as f:
         json.dump(data, f, indent=2)
@@ -918,9 +986,9 @@ def build():
         rig, body, body_scale, image = load_body(body_name)
         rigs[body_name], bodies[body_name], images[body_name] = rig, body, image
         scale = scale or body_scale
-        skulls[body_name] = hair.skull(body, prefix, _on_bone)
+        skulls[body_name] = hair.skull(body, prefix, _on_bone, floor=rig.data.bones[prefix + "head"].head_local.z)
         marks[body_name] = _landmarks(body, prefix, rig)
-        tints[body_name] = _masks(body, prefix, skulls[body_name], image, SHORT[body_name])
+        tints[body_name] = _masks(body, prefix, skulls[body_name], image, SHORT[body_name], briefs[BRIEFS[body_name]], marks[body_name])
         anchors[body_name] = _cosmetic_anchors(body, prefix, skulls[body_name], marks[body_name])
     rigs["BodyBoy"].name = "HeroRig"
     rigs["BodyGirl"].name = "GirlRig"

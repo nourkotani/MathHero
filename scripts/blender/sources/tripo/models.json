@@ -735,13 +735,45 @@
         "model": "v1.0-20240301",
         "spec": "tripo",
         "faces": 40000,
-        "note": "Decimated to `faces` first (tripo_prepare.py), then rigged with the native skeleton (ADR 0011). No preset clips are made for this body: the bake fits the hero-boy preset clips to its rig (hero.py)."
+        "note": "Decimated to `faces` first (tripo_prepare.py), then rigged with the native skeleton (ADR 0011). No preset clips are made for this body: the bake fits the hero-boy preset clips to its rig (hero.py).",
+        "import_task_id": "cea8dec5-de96-43e8-922c-f5d479b7d540",
+        "task_id": "094addf4-5b1a-4690-9d64-96b47f3d5a10",
+        "credits_consumed": 25
       },
       "note": "Never run `generate` on this brief: Studio makes the candidates. preview, pick, and rig work as for an API brief.",
       "rigged": {
         "file": "girl-studio/rigged.glb",
-        "note": "Made by `npm run tripo -- rig <name>` once the family exports the candidate; copy the rig task's model.glb here."
-      }
+        "task_id": "094addf4-5b1a-4690-9d64-96b47f3d5a10"
+      },
+      "chosen": {
+        "candidate": "p0s0",
+        "task_id": "884c54d8-e994-47ec-9033-44e50e5bd40e"
+      },
+      "palette": {
+        "skin_hue": [
+          0.0,
+          48.0
+        ],
+        "skin_sat": [
+          0.12,
+          0.8
+        ],
+        "skin_val": 0.18,
+        "outfit_sat": 0.3,
+        "outfit_val": 0.04,
+        "trim_hue": [
+          8.0,
+          48.0
+        ],
+        "trim_sat": 0.15,
+        "trim_val": 0.08,
+        "trim_val_max": 0.5,
+        "dark": 0.04,
+        "rest": "outfit",
+        "skin_above": "neck",
+        "crack": 0.015
+      },
+      "palette_note": "A dark, low-saturation suit (the outfit, gloves and boots included), brown leather panels (the trim), peach skin above the neck only (so the face's stubble and shadows recolor with it), auburn hair; the head's geometry sorts the hair (masks.py)."
     },
     "boy-studio": {
       "role": "the hero's boy body, made by the family in Tripo Studio (ADR 0013): one complete character; the bake keeps his paint and recolors it through masks (masks.py), and Blender builds every hair piece and garment on him (hero.py)",
@@ -771,13 +803,45 @@
         "model": "v1.0-20240301",
         "spec": "tripo",
         "faces": 40000,
-        "note": "Decimated to `faces` first (tripo_prepare.py), then rigged with the native skeleton (ADR 0011). No preset clips are made for this body: the bake fits the hero-boy preset clips to its rig (hero.py)."
+        "note": "Decimated to `faces` first (tripo_prepare.py), then rigged with the native skeleton (ADR 0011). No preset clips are made for this body: the bake fits the hero-boy preset clips to its rig (hero.py).",
+        "import_task_id": "1731b3bf-32d2-4720-bc99-b855c0172010",
+        "task_id": "0ebbde60-9baf-44a0-9dbb-853e29cb7637",
+        "credits_consumed": 25
       },
       "note": "Never run `generate` on this brief: Studio makes the candidates. preview, pick, and rig work as for an API brief.",
       "rigged": {
         "file": "boy-studio/rigged.glb",
-        "note": "Made by `npm run tripo -- rig <name>` once the family exports the candidate; copy the rig task's model.glb here."
-      }
+        "task_id": "0ebbde60-9baf-44a0-9dbb-853e29cb7637"
+      },
+      "chosen": {
+        "candidate": "p0s0",
+        "task_id": "3c0d6cc9-c445-46cf-b0f3-b018985c7b9e"
+      },
+      "palette": {
+        "skin_hue": [
+          0.0,
+          48.0
+        ],
+        "skin_sat": [
+          0.12,
+          0.8
+        ],
+        "skin_val": 0.18,
+        "outfit_sat": 0.3,
+        "outfit_val": 0.04,
+        "trim_hue": [
+          8.0,
+          48.0
+        ],
+        "trim_sat": 0.15,
+        "trim_val": 0.08,
+        "trim_val_max": 0.5,
+        "dark": 0.04,
+        "rest": "outfit",
+        "skin_above": "neck",
+        "crack": 0.015
+      },
+      "palette_note": "A dark, low-saturation suit (the outfit, gloves and boots included), brown leather panels (the trim), peach skin above the neck only (so the face's stubble and shadows recolor with it), auburn hair; the head's geometry sorts the hair (masks.py)."
     }
   }
 }

@@ -10,13 +10,15 @@ pixel and keeps its light and shade relative to the region's mean
 (hero-rig.json "tint"); the rest of the paint (the face, the undersuit,
 the dark seams) stays as painted.
 
-The body prompt fixes a flat palette, so the sort is by hue: peach skin,
-a pure white gi, bright cyan trim, a charcoal undersuit, black hair. The
+Each body's brief fixes a palette (models.json "palette", else
+HERO_PALETTE: peach skin, a pure white gi, bright cyan trim, a charcoal
+undersuit, black hair), so the sort is by hue, saturation, and value. The
 rules give each pixel a raw label. Geometry settles the head: a pixel on
-the scalp (the head's faces above the hairline) is hair when it is dark;
-a pixel on the face is skin when it is peach, and a feature (an eye, a
-brow, the mouth) otherwise. Dark paint off the scalp (the undersuit, a
-wrap, a deep seam) stays as painted. A majority vote over each pixel's
+the scalp (the head's faces, but for the face: the front below the
+hairline) is hair unless it is skin, so a buzz cut, a bob, or long auburn
+hair all recolor whole; a pixel on the face is skin when it is skin, and
+a feature (an eye, a brow, the mouth) otherwise. Dark paint off the head
+(the undersuit, a wrap, a deep seam) stays as painted. A majority vote over each pixel's
 neighbours takes the specks out, unknown pixels take the label around
 them, and a short blur softens the edges: a wrong pixel at a border shifts
 a little color, never a hard edge. The mask extends a few pixels past each
@@ -63,7 +65,8 @@ HERO_PALETTE = {
     "dark": 0.25,
 }
 
-# The repair: paint darker than CRACK off the head is a crack; an
+# The repair: paint darker than CRACK off the head is a crack (a palette
+# with a dark suit lowers it with "crack"); an
 # island's FRINGE outermost pixels are its dark padding; the islands'
 # colors extend PAD pixels past their borders.
 CRACK = 0.1
@@ -211,15 +214,18 @@ def face_flags(mesh, flags, size, keep=None):
         bm.free()
         flags = {name: value[keep] for name, value in flags.items()}
     names = list(flags)
-    assert len(names) <= 2, "two flags per bake; the blue channel is the coverage"
+    assert len(names) <= 3, "three flags per bake; the alpha is the coverage"
     colors = np.ones((len(copy.data.polygons), 4), dtype=np.float32)
-    colors[:, :2] = 0.0
+    colors[:, :3] = 0.0
     for channel, name in enumerate(names):
         colors[flags[name], channel] = 1.0
     attribute = copy.data.attributes.new("flags", "FLOAT_COLOR", "FACE")
     attribute.data.foreach_set("color", colors.ravel())
     image = bpy.data.images.new(f"{mesh.name}.flags", size, size, alpha=True, float_buffer=True)
     image.colorspace_settings.name = "Non-Color"
+    # Cleared to alpha 0 by hand and baked without a clear: the bake sets
+    # alpha 1 where a face is, and a cleared bake would set it everywhere.
+    image.pixels.foreach_set(np.zeros(size * size * 4, dtype=np.float32))
     mat = bpy.data.materials.new("Flags")
     mat.use_nodes = True
     nodes = mat.node_tree.nodes
@@ -244,13 +250,14 @@ def face_flags(mesh, flags, size, keep=None):
     bpy.ops.object.select_all(action="DESELECT")
     copy.select_set(True)
     bpy.context.view_layer.objects.active = copy
-    bpy.ops.object.bake(type="EMIT", margin=0, use_clear=True)
+    bpy.ops.object.bake(type="EMIT", margin=0, use_clear=False)
     scene.render.engine = engine
     px = pixels(image)
     bpy.data.objects.remove(copy, do_unlink=True)
     bpy.data.materials.remove(mat)
     bpy.data.images.remove(image)
-    coverage = px[:, :, 2] > 0.5
+    coverage = px[:, :, 3] > 0.5
+    print(f"FLAGS {mesh.name}: {int(coverage.sum())} px covered of {size * size}")
     return {name: px[:, :, i] > 0.5 for i, name in enumerate(names)}, coverage
 
 
@@ -265,18 +272,32 @@ def scalp_faces(mesh, head, hairline):
     return head & (centres[:, 2] > line)
 
 
-def labels_of(rgb, palette, head, scalp):
-    """The raw label of every pixel: the rules, then the head's geometry."""
+def labels_of(rgb, palette, head, scalp, skin_zone=None, shell=None):
+    """The raw label of every pixel: the rules, then the head's geometry.
+    skin_zone: where skin may be at all (a suit's pale leather reads as
+    skin by color; on a suited body skin is only above the shoulders).
+    shell: the hair over the skin (hair.shell_faces), hair whatever its
+    color (auburn reads as skin); on the skull itself skin stays skin
+    (the ears), and the rest is hair (a buzz cut)."""
     hue, sat, val = hsv(rgb)
     p = palette
     labels = np.full(rgb.shape[:2], UNKNOWN, dtype=np.int8)
     labels[(sat < p["outfit_sat"]) & (val > p["outfit_val"])] = OUTFIT
-    labels[in_hue(hue, p["trim_hue"]) & (sat >= p["trim_sat"]) & (val > p["trim_val"])] = TRIM
+    labels[in_hue(hue, p["trim_hue"]) & (sat >= p["trim_sat"]) & (val > p["trim_val"]) & (val <= p.get("trim_val_max", 1.0))] = TRIM
     skin = in_hue(hue, p["skin_hue"]) & (sat >= p["skin_sat"][0]) & (sat <= p["skin_sat"][1]) & (val > p["skin_val"])
+    if skin_zone is not None:
+        skin = skin & skin_zone
     labels[skin] = SKIN
+    # A palette may name the region of every pixel that fits no rule (a
+    # dark suit of many shades: "rest": "outfit"); else the vote fills it.
+    rest = p.get("rest")
+    if rest:
+        labels[labels == UNKNOWN] = {"skin": SKIN, "outfit": OUTFIT, "trim": TRIM, "other": OTHER}[rest]
     dark = val < p["dark"]
     labels[dark] = OTHER
-    labels[scalp & dark] = HAIR
+    labels[scalp & ~skin] = HAIR
+    if shell is not None:
+        labels[shell] = HAIR
     face = head & ~scalp
     labels[face & ~skin] = FEATURE
     return labels
@@ -291,37 +312,75 @@ def iris_of(rgb, face):
     return dilate(iris, 1) & face & ~white
 
 
-def repair(rgb, coverage, head):
+def repair(rgb, coverage, head, crack=CRACK):
     """The paint with no dark fringes, cracks, or gaps (see the module).
-    Returns the repaired rgb and the coverage of good paint, extended."""
+    Returns the repaired rgb and the coverage of good paint, extended.
+
+    The fringe and the gaps take the nearest good pixel's color, copied,
+    never averaged: a Studio export packs tiny islands a few pixels
+    apart, and an average across a gap mixes a dark suit with a skin
+    neighbour, which the recolor blows up into a bright line along every
+    seam. An island too small to keep an interior keeps its paint."""
     _, _, val = hsv(rgb)
-    good = erode(coverage, FRINGE) & ~(~head & (val < CRACK))
-    fixed = np.empty_like(rgb)
-    for channel in range(3):
-        fixed[:, :, channel] = fill_outside(rgb[:, :, channel], good, FRINGE + PAD)
-    print(f"REPAIR: {int((coverage & ~good).sum())} px of fringe and cracks repainted, {int((~coverage).sum())} px of gaps padded")
+    interior = erode(coverage, FRINGE)
+    lost = coverage & ~dilate(interior, FRINGE + 2)
+    good = (interior | lost) & ~(~head & (val < crack))
+    fixed = fill_nearest(rgb, good, FRINGE + PAD)
+    print(f"REPAIR: {int((coverage & ~good).sum())} px of fringe and cracks repainted, {int((~coverage).sum())} px of gaps padded, {int(lost.sum())} px of small islands kept")
     return fixed, dilate(good, FRINGE + PAD)
 
 
-def build(mesh, image, head_bone, hairline, palette=HERO_PALETTE, size=None, keep=None):
+def fill_nearest(rgb, known, radius):
+    """Every unknown pixel within radius of a known one takes the color of
+    its nearest known pixel, grown one pixel at a time (up, down, left,
+    right, in that order), so no two colors ever mix."""
+    out = rgb.copy()
+    have = known.copy()
+    for _ in range(radius):
+        before = have.copy()
+        for dy, dx in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            source = np.roll(before, (dy, dx), axis=(0, 1))
+            take = ~have & source
+            if not take.any():
+                continue
+            shifted = np.roll(out, (dy, dx), axis=(0, 1))
+            out[take] = shifted[take]
+            have |= take
+        if have.all():
+            break
+    return out
+
+
+def build(mesh, image, head_bone, hairline, palette=HERO_PALETTE, size=None, keep=None, shell_of=None, skin_faces=None):
     """The tints (R skin, G outfit, B trim), the marks (R hair, G iris), and
     each channel's mean linear luminance, for a mesh with its painted
     base-color image, which is repaired in place (repair). The two mask
     arrays are (size, size, 3). keep: the faces that are the painted body
-    (face_flags)."""
+    (face_flags). shell_of(head) -> the head's faces that are hair over
+    the skin (hair.shell_faces): scalp too, wherever they are. skin_faces:
+    the faces where skin may be (bool array), else everywhere."""
     size = size or image.size[0]
     if image.size[0] != size:
         image.scale(size, size)
     px = pixels(image)
     head = head_faces(mesh, head_bone)
     scalp = scalp_faces(mesh, head, hairline)
-    flags, coverage = face_flags(mesh, {"head": head, "scalp": scalp}, size, keep=keep)
-    rgb, coverage = repair(px[:, :, :3], coverage, flags["head"])
+    shell = None
+    if shell_of is not None:
+        shell = shell_of(head)
+        scalp = scalp | shell
+    wanted = {"head": head, "scalp": scalp}
+    if skin_faces is not None:
+        wanted["skin"] = skin_faces
+    flags, coverage = face_flags(mesh, wanted, size, keep=keep)
+    if shell is not None:
+        flags["shell"] = face_flags(mesh, {"shell": shell}, size, keep=keep)[0]["shell"]
+    rgb, coverage = repair(px[:, :, :3], coverage, flags["head"], crack=palette.get("crack", CRACK))
     px[:, :, :3] = rgb
     px[:, :, 3] = 1.0
     image.pixels.foreach_set(np.ascontiguousarray(px).ravel())
     image.pack()
-    labels = labels_of(rgb, palette, flags["head"], flags["scalp"])
+    labels = labels_of(rgb, palette, flags["head"], flags["scalp"], flags.get("skin"), flags.get("shell"))
     known = (labels >= 0) & coverage
     labels = np.where(known, labels, 0).astype(np.int8)
     # Each pixel takes the label most of its neighbours have, counting
