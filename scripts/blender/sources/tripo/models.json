@@ -590,6 +590,194 @@
           "file": "hero-garments/candidates/p2s0.glb"
         }
       }
+    },
+    "boy-gi": {
+      "role": "the hero's boy body (ADR 0013): one complete character in the Rival's style, with his painted face and buzz cut, in the fighter gi. The bake keeps his paint and recolors the skin, the gi, the trim, and the hair through masks (masks.py); Blender builds every other hair piece and garment on him (hero.py)",
+      "prompts": [
+        "Original anime martial-arts hero, teenage boy, athletic heroic build, very short buzz-cut black hair, friendly determined face with large bright eyes and thick eyebrows, light peach skin, plain pure white sleeveless martial-arts gi top with a V-neck over a fitted charcoal gray bodysuit, bright cyan waist sash, bright cyan cloth wrist wraps, bright cyan fingerless gloves, bright cyan knee-high boots, full body, standing A-pose with arms slightly away from the body, highly detailed stylized game character",
+        "Original anime martial-arts hero, teenage boy, athletic heroic build, very short buzz-cut black hair, friendly determined face with large bright eyes and thick eyebrows, light peach skin, plain pure white sleeveless martial-arts gi top with a V-neck and plain pure white loose martial-arts trousers, bright cyan belt, bright cyan cloth wrist wraps, bright cyan fingerless gloves, bright cyan boots, full body, standing A-pose with arms slightly away from the body, highly detailed stylized game character"
+      ],
+      "negative_prompt": "long hair, bald, beard, mustache, hat, helmet, mask, cape, armor, weapon, claws, jewelry, text, letters, logo, patterns, extra limbs, extra fingers, blurry, low detail, photorealistic real person, adult",
+      "seeds": [
+        11
+      ],
+      "options": {
+        "model": "tripo-v3.1",
+        "params": {
+          "geometry_quality": "detailed",
+          "texture_quality": "detailed",
+          "texture": true,
+          "pbr": true,
+          "face_limit": 800000
+        }
+      },
+      "candidates": {
+        "p0s0": {
+          "task_id": "8357e535-95d3-4aa2-a30a-f98343244955",
+          "status": "success",
+          "credits_consumed": 50,
+          "prompt": 0,
+          "seed": 11,
+          "file": "boy-gi/candidates/p0s0.glb"
+        },
+        "p1s0": {
+          "task_id": "3c63261c-a6cf-4f82-9dc4-3c8de26f8555",
+          "status": "success",
+          "credits_consumed": 50,
+          "prompt": 1,
+          "seed": 11,
+          "file": "boy-gi/candidates/p1s0.glb"
+        }
+      },
+      "rig": {
+        "model": "v1.0-20240301",
+        "spec": "tripo",
+        "faces": 40000,
+        "note": "Decimated to `faces` first (tripo_prepare.py), then rigged with the native skeleton (ADR 0011). No preset clips are made for this body: the bake fits the hero-boy preset clips to its rig, as it fits them to any Tripo rig (hero.py).",
+        "import_task_id": "7a33b3d5-0297-48b5-bb7d-2aadeea4eb37",
+        "task_id": "0e6d4c13-6b7b-4b05-b6ee-4aadfdddec82",
+        "credits_consumed": 25
+      },
+      "chosen": {
+        "candidate": "p0s0",
+        "task_id": "8357e535-95d3-4aa2-a30a-f98343244955"
+      },
+      "note": "Made on 2026-10-22 for ADR 0013. p0s0 is the development pick; the family picks from the sheet (build/tripo/<name>/sheet.png), and a Tripo Studio model goes through the same steps as a candidate.",
+      "rigged": {
+        "file": "boy-gi/rigged.glb",
+        "task_id": "0e6d4c13-6b7b-4b05-b6ee-4aadfdddec82",
+        "note": "The rig task's model: the decimated candidate with its paint, on the native skeleton. hero.py imports it."
+      }
+    },
+    "girl-gi": {
+      "role": "the hero's girl body (ADR 0013): one complete character in the Rival's style, with her painted face and cropped hair, in the fighter gi. The bake keeps her paint and recolors the skin, the gi, the trim, and the hair through masks (masks.py); Blender builds every other hair piece and garment on her (hero.py)",
+      "prompts": [
+        "Original anime martial-arts heroine, teenage girl, athletic strong build, very short cropped black hair, friendly determined face with large bright eyes, light peach skin, plain pure white sleeveless martial-arts gi top with a V-neck over a fitted charcoal gray bodysuit, bright cyan waist sash, bright cyan cloth wrist wraps, bright cyan fingerless gloves, bright cyan knee-high boots, full body, standing A-pose with arms slightly away from the body, highly detailed stylized game character",
+        "Original anime martial-arts heroine, teenage girl, athletic strong build, very short cropped black hair, friendly determined face with large bright eyes, light peach skin, plain pure white sleeveless martial-arts gi top with a V-neck and plain pure white loose martial-arts trousers, bright cyan belt, bright cyan cloth wrist wraps, bright cyan fingerless gloves, bright cyan boots, full body, standing A-pose with arms slightly away from the body, highly detailed stylized game character"
+      ],
+      "negative_prompt": "long hair, ponytail, bald, hat, helmet, mask, cape, armor, weapon, claws, jewelry, text, letters, logo, patterns, extra limbs, extra fingers, blurry, low detail, photorealistic real person, adult, revealing",
+      "seeds": [
+        11
+      ],
+      "options": {
+        "model": "tripo-v3.1",
+        "params": {
+          "geometry_quality": "detailed",
+          "texture_quality": "detailed",
+          "texture": true,
+          "pbr": true,
+          "face_limit": 800000
+        }
+      },
+      "candidates": {
+        "p0s0": {
+          "task_id": "20a7c34c-d214-43f6-bcb7-c394c5756f7e",
+          "status": "success",
+          "credits_consumed": 50,
+          "prompt": 0,
+          "seed": 11,
+          "file": "girl-gi/candidates/p0s0.glb"
+        },
+        "p1s0": {
+          "task_id": "62cbf5cd-55fe-410b-b69f-4f48a639071a",
+          "status": "success",
+          "credits_consumed": 50,
+          "prompt": 1,
+          "seed": 11,
+          "file": "girl-gi/candidates/p1s0.glb"
+        }
+      },
+      "rig": {
+        "model": "v1.0-20240301",
+        "spec": "tripo",
+        "faces": 40000,
+        "note": "Decimated to `faces` first (tripo_prepare.py), then rigged with the native skeleton (ADR 0011). No preset clips are made for this body: the bake fits the hero-boy preset clips to its rig, as it fits them to any Tripo rig (hero.py).",
+        "import_task_id": "de151b3d-496c-45e2-a140-b9b40e1ebb9f",
+        "task_id": "94a9536a-e092-40bb-98bd-3b0d0b7bf03f",
+        "credits_consumed": 25
+      },
+      "chosen": {
+        "candidate": "p0s0",
+        "task_id": "20a7c34c-d214-43f6-bcb7-c394c5756f7e"
+      },
+      "note": "Made on 2026-10-22 for ADR 0013. p0s0 is the development pick; the family picks from the sheet (build/tripo/<name>/sheet.png), and a Tripo Studio model goes through the same steps as a candidate.",
+      "rigged": {
+        "file": "girl-gi/rigged.glb",
+        "task_id": "94a9536a-e092-40bb-98bd-3b0d0b7bf03f",
+        "note": "The rig task's model: the decimated candidate with its paint, on the native skeleton. hero.py imports it."
+      }
+    },
+    "girl-studio": {
+      "role": "the hero's girl body, made by the family in Tripo Studio (ADR 0013): one complete character; the bake keeps her paint and recolors it through masks (masks.py), and Blender builds every hair piece and garment on her (hero.py)",
+      "prompts": [
+        "woman in dark armored bodysuit with gloves and boots, sci-fi character"
+      ],
+      "negative_prompt": "",
+      "seeds": [
+        0
+      ],
+      "options": {
+        "model": "studio",
+        "params": {}
+      },
+      "candidates": {
+        "p0s0": {
+          "task_id": "884c54d8-e994-47ec-9033-44e50e5bd40e",
+          "status": "awaiting export",
+          "credits_consumed": 0,
+          "prompt": 0,
+          "seed": 0,
+          "file": "girl-studio/candidates/p0s0.glb",
+          "note": "Made in Tripo Studio (web credits, not the API's). The API cannot read a Studio task: the family exports the GLB by hand to this file. Export the model itself at original quality with its textures embedded, not the rigged or animated download: the Mixamo-rigged export (about 10k faces) imports exploded in Blender and has too little detail. The prompt above is the Studio task's title."
+        }
+      },
+      "rig": {
+        "model": "v1.0-20240301",
+        "spec": "tripo",
+        "faces": 40000,
+        "note": "Decimated to `faces` first (tripo_prepare.py), then rigged with the native skeleton (ADR 0011). No preset clips are made for this body: the bake fits the hero-boy preset clips to its rig (hero.py)."
+      },
+      "note": "Never run `generate` on this brief: Studio makes the candidates. preview, pick, and rig work as for an API brief.",
+      "rigged": {
+        "file": "girl-studio/rigged.glb",
+        "note": "Made by `npm run tripo -- rig <name>` once the family exports the candidate; copy the rig task's model.glb here."
+      }
+    },
+    "boy-studio": {
+      "role": "the hero's boy body, made by the family in Tripo Studio (ADR 0013): one complete character; the bake keeps his paint and recolors it through masks (masks.py), and Blender builds every hair piece and garment on him (hero.py)",
+      "prompts": [
+        "male figure wearing a form-fitting sci-fi combat suit with dark gray panels"
+      ],
+      "negative_prompt": "",
+      "seeds": [
+        0
+      ],
+      "options": {
+        "model": "studio",
+        "params": {}
+      },
+      "candidates": {
+        "p0s0": {
+          "task_id": "3c0d6cc9-c445-46cf-b0f3-b018985c7b9e",
+          "status": "awaiting export",
+          "credits_consumed": 0,
+          "prompt": 0,
+          "seed": 0,
+          "file": "boy-studio/candidates/p0s0.glb",
+          "note": "Made in Tripo Studio (web credits, not the API's). The API cannot read a Studio task: the family exports the GLB by hand to this file. Export the model itself at original quality with its textures embedded, not the rigged or animated download: the Mixamo-rigged export (about 10k faces) imports exploded in Blender and has too little detail. The prompt above is the Studio task's title."
+        }
+      },
+      "rig": {
+        "model": "v1.0-20240301",
+        "spec": "tripo",
+        "faces": 40000,
+        "note": "Decimated to `faces` first (tripo_prepare.py), then rigged with the native skeleton (ADR 0011). No preset clips are made for this body: the bake fits the hero-boy preset clips to its rig (hero.py)."
+      },
+      "note": "Never run `generate` on this brief: Studio makes the candidates. preview, pick, and rig work as for an API brief.",
+      "rigged": {
+        "file": "boy-studio/rigged.glb",
+        "note": "Made by `npm run tripo -- rig <name>` once the family exports the candidate; copy the rig task's model.glb here."
+      }
     }
   }
 }

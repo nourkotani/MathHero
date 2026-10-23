@@ -17,6 +17,7 @@ import math
 
 import bmesh
 import bpy
+import numpy as np
 from mathutils import Matrix, Quaternion, Vector
 
 INK = "Ink"
@@ -767,6 +768,71 @@ def import_glb(path):
 def mesh_height(meshes):
     zs = [(m.matrix_world @ v.co).z for m in meshes for v in m.data.vertices]
     return max(zs) - min(zs)
+
+
+def drop_loose(obj):
+    """Remove the vertices and edges no face uses. A loose vertex of one
+    part would come out of every split_group (it deletes by face)."""
+    bm = bmesh.new()
+    bm.from_mesh(obj.data)
+    bmesh.ops.delete(bm, geom=[v for v in bm.verts if not v.link_faces], context="VERTS")
+    bmesh.ops.delete(bm, geom=[e for e in bm.edges if not e.link_faces], context="EDGES")
+    bm.to_mesh(obj.data)
+    bm.free()
+
+
+def weights_by_order(obj):
+    """An object's vertex weights, with each vertex's position: join keeps
+    no vertex group but the part's own, and a bake can leave a part with a
+    vertex more or fewer, so the weights go back by position (set_weights:
+    each vertex takes the weights of the nearest saved one). Returns
+    (positions, [(group, weights over the saved vertices)]). The groups
+    are removed from the object."""
+    count = len(obj.data.vertices)
+    co = np.empty(count * 3, dtype=np.float32)
+    obj.data.vertices.foreach_get("co", co)
+    saved = []
+    for group in obj.vertex_groups:
+        weights = np.zeros(count, dtype=np.float32)
+        for v in obj.data.vertices:
+            for g in v.groups:
+                if g.group == group.index:
+                    weights[v.index] = g.weight
+        if weights.any():
+            saved.append((group.name, weights))
+    for group in list(obj.vertex_groups):
+        obj.vertex_groups.remove(group)
+    return co.reshape(-1, 3), saved
+
+
+def set_weights(obj, saved, offset=(0.0, 0.0, 0.0)):
+    """Vertex weights back onto an object, by position (weights_by_order).
+    offset: what was added to the saved positions since."""
+    from mathutils.kdtree import KDTree
+
+    positions, groups = saved
+    for group in list(obj.vertex_groups):
+        obj.vertex_groups.remove(group)
+    if not groups:
+        return
+    tree = KDTree(len(positions))
+    shift = Vector(offset)
+    for i, p in enumerate(positions):
+        tree.insert(Vector(p) + shift, i)
+    tree.balance()
+    nearest = np.empty(len(obj.data.vertices), dtype=np.int64)
+    far = 0
+    for v in obj.data.vertices:
+        _, index, distance = tree.find(v.co)
+        nearest[v.index] = index
+        far += distance > 1e-3
+    if far:
+        print(f"WEIGHTS {obj.name}: {far} vertices farther than 1 mm from a saved one")
+    for name, weights in groups:
+        group = obj.vertex_groups.new(name=name)
+        mapped = weights[nearest]
+        for index in np.nonzero(mapped)[0]:
+            group.add([int(index)], float(mapped[index]), "REPLACE")
 
 
 def ink_hull_skinned(mesh, rig, width):

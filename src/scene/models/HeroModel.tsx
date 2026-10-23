@@ -5,9 +5,10 @@ src/renderer/models/hero.glb, which gltfjsx turns into a component. Do not
 edit this file by hand (ADR 0007, ADR 0009); change the script and run it
 again after every re-bake of the hero.
 The script's edits: the inlined model import (no network), meshopt
-without Draco (no web worker), the hero's tint materials and face layers
-(renderer/hero.ts) and the ink of materials.ts in place of Blender's, one
-`visible` per part from the director's parts, bloom on the painted hair,
+without Draco (no web worker), the hero's tint materials and masked body
+materials (renderer/hero.ts) and the ink of materials.ts in place of
+Blender's, one `visible` per part from the director's parts (a chosen
+name with no mesh shows nothing), bloom on the painted hair,
 no frustum culling (the attack clips carry the root 4 m), and the group
 ref from the parent (it drives useAnimations).
 */
@@ -20,6 +21,7 @@ import * as THREE from 'three';
 import { SkeletonUtils } from 'three-stdlib';
 import type { GLTF } from 'three-stdlib';
 import type { HeroMaterials } from '../../renderer/hero';
+import { partShows } from '../../renderer/heroDirector';
 import type { HeroParts } from '../../renderer/heroDirector';
 import { bakedInkSurface, BLOOM_LAYER } from '../../renderer/materials';
 import heroModelUrl from '../../renderer/models/hero.glb';
@@ -28,23 +30,14 @@ type GLTFResult = GLTF & {
   nodes: {
     BodyGirl_1: THREE.SkinnedMesh;
     BodyGirl_2: THREE.SkinnedMesh;
-    BodyGirl_3: THREE.SkinnedMesh;
-    BodyGirl_4: THREE.SkinnedMesh;
-    BodyGirl_5: THREE.SkinnedMesh;
-    BodyGirl_6: THREE.SkinnedMesh;
     ['GarmentArmor-BodyGirl_1']: THREE.SkinnedMesh;
     ['GarmentArmor-BodyGirl_2']: THREE.SkinnedMesh;
     ['GarmentArmor-BodyGirl_3']: THREE.SkinnedMesh;
     ['GarmentCape-BodyGirl_1']: THREE.SkinnedMesh;
     ['GarmentCape-BodyGirl_2']: THREE.SkinnedMesh;
     ['GarmentCape-BodyGirl_3']: THREE.SkinnedMesh;
-    ['GarmentGi-BodyGirl_1']: THREE.SkinnedMesh;
-    ['GarmentGi-BodyGirl_2']: THREE.SkinnedMesh;
-    ['GarmentGi-BodyGirl_3']: THREE.SkinnedMesh;
     ['Hair_buzz_long-BodyGirl_1']: THREE.SkinnedMesh;
     ['Hair_buzz_long-BodyGirl_2']: THREE.SkinnedMesh;
-    ['Hair_buzz_short-BodyGirl_1']: THREE.SkinnedMesh;
-    ['Hair_buzz_short-BodyGirl_2']: THREE.SkinnedMesh;
     ['Hair_flame_long-BodyGirl_1']: THREE.SkinnedMesh;
     ['Hair_flame_long-BodyGirl_2']: THREE.SkinnedMesh;
     ['Hair_flame_short-BodyGirl_1']: THREE.SkinnedMesh;
@@ -67,23 +60,14 @@ type GLTFResult = GLTF & {
     ['Hair_spiky_short-BodyGirl_2']: THREE.SkinnedMesh;
     BodyBoy_1: THREE.SkinnedMesh;
     BodyBoy_2: THREE.SkinnedMesh;
-    BodyBoy_3: THREE.SkinnedMesh;
-    BodyBoy_4: THREE.SkinnedMesh;
-    BodyBoy_5: THREE.SkinnedMesh;
-    BodyBoy_6: THREE.SkinnedMesh;
     ['GarmentArmor-BodyBoy_1']: THREE.SkinnedMesh;
     ['GarmentArmor-BodyBoy_2']: THREE.SkinnedMesh;
     ['GarmentArmor-BodyBoy_3']: THREE.SkinnedMesh;
     ['GarmentCape-BodyBoy_1']: THREE.SkinnedMesh;
     ['GarmentCape-BodyBoy_2']: THREE.SkinnedMesh;
     ['GarmentCape-BodyBoy_3']: THREE.SkinnedMesh;
-    ['GarmentGi-BodyBoy_1']: THREE.SkinnedMesh;
-    ['GarmentGi-BodyBoy_2']: THREE.SkinnedMesh;
-    ['GarmentGi-BodyBoy_3']: THREE.SkinnedMesh;
     ['Hair_buzz_long-BodyBoy_1']: THREE.SkinnedMesh;
     ['Hair_buzz_long-BodyBoy_2']: THREE.SkinnedMesh;
-    ['Hair_buzz_short-BodyBoy_1']: THREE.SkinnedMesh;
-    ['Hair_buzz_short-BodyBoy_2']: THREE.SkinnedMesh;
     ['Hair_flame_long-BodyBoy_1']: THREE.SkinnedMesh;
     ['Hair_flame_long-BodyBoy_2']: THREE.SkinnedMesh;
     ['Hair_flame_short-BodyBoy_1']: THREE.SkinnedMesh;
@@ -109,11 +93,10 @@ type GLTFResult = GLTF & {
   };
   materials: {
     PaintedOutfit: THREE.MeshStandardMaterial;
-    PaintedSkin: THREE.MeshStandardMaterial;
     PaintedTrim: THREE.MeshStandardMaterial;
     PaintedHair: THREE.MeshStandardMaterial;
-    Face: THREE.MeshStandardMaterial;
-    Iris: THREE.MeshStandardMaterial;
+    PaintedBodyBoy: THREE.MeshStandardMaterial;
+    PaintedBodyGirl: THREE.MeshStandardMaterial;
     Ink: THREE.MeshStandardMaterial;
   };
 };
@@ -145,9 +128,7 @@ export function HeroModel({
   const { nodes } = useGraph(clone) as unknown as GLTFResult;
   const ink = useMemo(() => bakedInkSurface(), []);
   // A piece fitted to one body (`<part>-<body>`) shows with that body.
-  const show = (part: string, of?: string) =>
-    (of === undefined || of === parts.body) &&
-    (part === parts.body || part === parts.garment || part === parts.hair);
+  const show = (part: string, of?: string) => partShows(parts, part, of);
   return (
     <group ref={groupRef} dispose={null}>
       <group name="Scene">
@@ -160,7 +141,7 @@ export function HeroModel({
                 name="BodyGirl_1"
                 geometry={nodes.BodyGirl_1.geometry}
                 skeleton={nodes.BodyGirl_1.skeleton}
-                material={materials.skin}
+                material={materials.bodies.BodyGirl}
                 castShadow
                 frustumCulled={false}
               />
@@ -168,40 +149,8 @@ export function HeroModel({
                 name="BodyGirl_2"
                 geometry={nodes.BodyGirl_2.geometry}
                 skeleton={nodes.BodyGirl_2.skeleton}
-                material={materials.body}
-                castShadow
-                frustumCulled={false}
-              />
-              <skinnedMesh
-                name="BodyGirl_3"
-                geometry={nodes.BodyGirl_3.geometry}
-                skeleton={nodes.BodyGirl_3.skeleton}
-                material={materials.trim}
-                castShadow
-                frustumCulled={false}
-              />
-              <skinnedMesh
-                name="BodyGirl_4"
-                geometry={nodes.BodyGirl_4.geometry}
-                skeleton={nodes.BodyGirl_4.skeleton}
                 material={ink}
                 userData={INK}
-                frustumCulled={false}
-              />
-              <skinnedMesh
-                name="BodyGirl_5"
-                geometry={nodes.BodyGirl_5.geometry}
-                skeleton={nodes.BodyGirl_5.skeleton}
-                material={materials.face}
-                renderOrder={1}
-                frustumCulled={false}
-              />
-              <skinnedMesh
-                name="BodyGirl_6"
-                geometry={nodes.BodyGirl_6.geometry}
-                skeleton={nodes.BodyGirl_6.skeleton}
-                material={materials.iris}
-                renderOrder={2}
                 frustumCulled={false}
               />
             </group>
@@ -257,32 +206,6 @@ export function HeroModel({
                 frustumCulled={false}
               />
             </group>
-            <group name="GarmentGi-BodyGirl" visible={show('GarmentGi', 'BodyGirl')}>
-              <skinnedMesh
-                name="GarmentGi-BodyGirl_1"
-                geometry={nodes['GarmentGi-BodyGirl_1'].geometry}
-                skeleton={nodes['GarmentGi-BodyGirl_1'].skeleton}
-                material={materials.body}
-                castShadow
-                frustumCulled={false}
-              />
-              <skinnedMesh
-                name="GarmentGi-BodyGirl_2"
-                geometry={nodes['GarmentGi-BodyGirl_2'].geometry}
-                skeleton={nodes['GarmentGi-BodyGirl_2'].skeleton}
-                material={materials.trim}
-                castShadow
-                frustumCulled={false}
-              />
-              <skinnedMesh
-                name="GarmentGi-BodyGirl_3"
-                geometry={nodes['GarmentGi-BodyGirl_3'].geometry}
-                skeleton={nodes['GarmentGi-BodyGirl_3'].skeleton}
-                material={ink}
-                userData={INK}
-                frustumCulled={false}
-              />
-            </group>
             <group name="Hair_buzz_long-BodyGirl" visible={show('Hair_buzz_long', 'BodyGirl')}>
               <skinnedMesh
                 name="Hair_buzz_long-BodyGirl_1"
@@ -297,25 +220,6 @@ export function HeroModel({
                 name="Hair_buzz_long-BodyGirl_2"
                 geometry={nodes['Hair_buzz_long-BodyGirl_2'].geometry}
                 skeleton={nodes['Hair_buzz_long-BodyGirl_2'].skeleton}
-                material={ink}
-                userData={INK}
-                frustumCulled={false}
-              />
-            </group>
-            <group name="Hair_buzz_short-BodyGirl" visible={show('Hair_buzz_short', 'BodyGirl')}>
-              <skinnedMesh
-                name="Hair_buzz_short-BodyGirl_1"
-                geometry={nodes['Hair_buzz_short-BodyGirl_1'].geometry}
-                skeleton={nodes['Hair_buzz_short-BodyGirl_1'].skeleton}
-                material={materials.hair}
-                castShadow
-                layers={BLOOM}
-                frustumCulled={false}
-              />
-              <skinnedMesh
-                name="Hair_buzz_short-BodyGirl_2"
-                geometry={nodes['Hair_buzz_short-BodyGirl_2'].geometry}
-                skeleton={nodes['Hair_buzz_short-BodyGirl_2'].skeleton}
                 material={ink}
                 userData={INK}
                 frustumCulled={false}
@@ -526,7 +430,7 @@ export function HeroModel({
               name="BodyBoy_1"
               geometry={nodes.BodyBoy_1.geometry}
               skeleton={nodes.BodyBoy_1.skeleton}
-              material={materials.skin}
+              material={materials.bodies.BodyBoy}
               castShadow
               frustumCulled={false}
             />
@@ -534,40 +438,8 @@ export function HeroModel({
               name="BodyBoy_2"
               geometry={nodes.BodyBoy_2.geometry}
               skeleton={nodes.BodyBoy_2.skeleton}
-              material={materials.body}
-              castShadow
-              frustumCulled={false}
-            />
-            <skinnedMesh
-              name="BodyBoy_3"
-              geometry={nodes.BodyBoy_3.geometry}
-              skeleton={nodes.BodyBoy_3.skeleton}
-              material={materials.trim}
-              castShadow
-              frustumCulled={false}
-            />
-            <skinnedMesh
-              name="BodyBoy_4"
-              geometry={nodes.BodyBoy_4.geometry}
-              skeleton={nodes.BodyBoy_4.skeleton}
               material={ink}
               userData={INK}
-              frustumCulled={false}
-            />
-            <skinnedMesh
-              name="BodyBoy_5"
-              geometry={nodes.BodyBoy_5.geometry}
-              skeleton={nodes.BodyBoy_5.skeleton}
-              material={materials.face}
-              renderOrder={1}
-              frustumCulled={false}
-            />
-            <skinnedMesh
-              name="BodyBoy_6"
-              geometry={nodes.BodyBoy_6.geometry}
-              skeleton={nodes.BodyBoy_6.skeleton}
-              material={materials.iris}
-              renderOrder={2}
               frustumCulled={false}
             />
           </group>
@@ -623,32 +495,6 @@ export function HeroModel({
               frustumCulled={false}
             />
           </group>
-          <group name="GarmentGi-BodyBoy" visible={show('GarmentGi', 'BodyBoy')}>
-            <skinnedMesh
-              name="GarmentGi-BodyBoy_1"
-              geometry={nodes['GarmentGi-BodyBoy_1'].geometry}
-              skeleton={nodes['GarmentGi-BodyBoy_1'].skeleton}
-              material={materials.body}
-              castShadow
-              frustumCulled={false}
-            />
-            <skinnedMesh
-              name="GarmentGi-BodyBoy_2"
-              geometry={nodes['GarmentGi-BodyBoy_2'].geometry}
-              skeleton={nodes['GarmentGi-BodyBoy_2'].skeleton}
-              material={materials.trim}
-              castShadow
-              frustumCulled={false}
-            />
-            <skinnedMesh
-              name="GarmentGi-BodyBoy_3"
-              geometry={nodes['GarmentGi-BodyBoy_3'].geometry}
-              skeleton={nodes['GarmentGi-BodyBoy_3'].skeleton}
-              material={ink}
-              userData={INK}
-              frustumCulled={false}
-            />
-          </group>
           <group name="Hair_buzz_long-BodyBoy" visible={show('Hair_buzz_long', 'BodyBoy')}>
             <skinnedMesh
               name="Hair_buzz_long-BodyBoy_1"
@@ -663,25 +509,6 @@ export function HeroModel({
               name="Hair_buzz_long-BodyBoy_2"
               geometry={nodes['Hair_buzz_long-BodyBoy_2'].geometry}
               skeleton={nodes['Hair_buzz_long-BodyBoy_2'].skeleton}
-              material={ink}
-              userData={INK}
-              frustumCulled={false}
-            />
-          </group>
-          <group name="Hair_buzz_short-BodyBoy" visible={show('Hair_buzz_short', 'BodyBoy')}>
-            <skinnedMesh
-              name="Hair_buzz_short-BodyBoy_1"
-              geometry={nodes['Hair_buzz_short-BodyBoy_1'].geometry}
-              skeleton={nodes['Hair_buzz_short-BodyBoy_1'].skeleton}
-              material={materials.hair}
-              castShadow
-              layers={BLOOM}
-              frustumCulled={false}
-            />
-            <skinnedMesh
-              name="Hair_buzz_short-BodyBoy_2"
-              geometry={nodes['Hair_buzz_short-BodyBoy_2'].geometry}
-              skeleton={nodes['Hair_buzz_short-BodyBoy_2'].skeleton}
               material={ink}
               userData={INK}
               frustumCulled={false}

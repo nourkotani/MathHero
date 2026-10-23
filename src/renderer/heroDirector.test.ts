@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createHeroDirector } from './heroDirector';
+import { createHeroDirector, partShows } from './heroDirector';
 
 const PARTS = { body: 'BodyBoy', garment: 'GarmentGi', hair: 'Hair_spiky_short' };
 const CLIPS = ['Idle', 'Attack0', 'Attack1', 'Charge', 'Stagger', 'Blast', 'Transform', 'Victory'].map(
@@ -95,5 +95,30 @@ describe('the hero director', () => {
     expect(hero.parts()).toEqual({ ...PARTS, hair: 'Hair_mane_wild' });
     hero.showParts({ ...PARTS, hair: 'Hair_mane_wild' });
     expect(changes).toBe(1);
+  });
+});
+
+describe('the parts that show', () => {
+  const HAIRS = ['Hair_spiky_short', 'Hair_buzz_long', 'Hair_mane_wild'];
+
+  it('shows the chosen body, and the chosen hair on that body only', () => {
+    expect(partShows(PARTS, 'BodyBoy')).toBe(true);
+    expect(partShows(PARTS, 'BodyGirl')).toBe(false);
+    expect(partShows(PARTS, 'Hair_spiky_short', 'BodyBoy')).toBe(true);
+    expect(partShows(PARTS, 'Hair_spiky_short', 'BodyGirl')).toBe(false);
+  });
+
+  it('shows no hair piece for a chosen hair that has no mesh', () => {
+    const parts = { ...PARTS, hair: 'Hair_buzz_short' };
+    expect(partShows(parts, 'BodyBoy')).toBe(true);
+    for (const hair of HAIRS) {
+      expect(partShows(parts, hair, 'BodyBoy')).toBe(false);
+    }
+  });
+
+  it('takes a hair swap to a name with no mesh with no error', () => {
+    const hero = createHeroDirector(PARTS);
+    expect(() => hero.showHair('Hair_buzz_short')).not.toThrow();
+    expect(HAIRS.some((hair) => partShows(hero.parts(), hair, 'BodyBoy'))).toBe(false);
   });
 });

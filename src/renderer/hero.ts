@@ -2,7 +2,7 @@
 // dressed from the chosen appearance, plus the streak-form looks that
 // transform it. The body and its clips are the Blender hero, mounted by the
 // React component src/scene/Hero.tsx (ADR 0009); this module dresses it
-// with light — face, aura, motes, cosmetics — which stays in code (ADR 0007).
+// with light — aura, motes, cosmetics — which stays in code (ADR 0007).
 
 import * as THREE from 'three';
 import { COSMETIC_MILESTONES, FORMS, presetHex, SKIN_PRESETS } from '../core';
@@ -10,15 +10,15 @@ import type { CosmeticSlot, Garment, HeroAppearance, StreakForm } from '../core'
 import {
   cosmeticPanel,
   cosmeticSprite,
-  faceLayer,
   glowSurface,
   markBloom,
+  maskedPainterlySurface,
   painterlySurface,
 } from './materials';
 import { hairMeshFor } from './hairLook';
 import type { HeroDirector, HeroParts } from './heroDirector';
 import { STYLE } from './style';
-import type { Surface } from './materials';
+import type { MaskedSurface, Surface } from './materials';
 import { applyCelTreatment } from './cel';
 import { freeMesh } from './fx';
 import heroRig from './models/hero-rig.json';
@@ -113,8 +113,15 @@ export const FORM_PALETTES: Record<string, FormPalette> = {
   },
 };
 
-/** The iris a hero wears before any Form: plain warm brown. */
-export const BASE_EYE = 0x3e2c22;
+/**
+ * The eye color a hero wears on the painted iris: the Form's, once a Form
+ * is earned. null before any Form: the painted eyes show as Tripo drew
+ * them.
+ */
+export function formEye(palette: FormPalette | null): number | null {
+  return palette === null ? null : palette.eye;
+}
+
 /** The aura's default lobe amplitude — the shape the game always had. */
 export const BASE_LOBES = 0.13;
 
@@ -280,7 +287,9 @@ function mountOn(
   return mount;
 }
 
-/** The garment mesh in the hero model for each garment choice. */
+/** The garment mesh in the hero model for each garment choice. The gi
+ *  has no mesh (ADR 0013): the painted body is the gi, so the name shows
+ *  no garment. */
 const GARMENT_MESHES: Record<Garment, string> = {
   gi: 'GarmentGi',
   cape: 'GarmentCape',
@@ -296,36 +305,50 @@ const SLOT_BONE: Partial<Record<CosmeticSlot, keyof HeroJoints>> = {
   trail: 'torso',
 };
 
+/** The two bodies of hero.glb. */
+export type HeroBody = 'BodyBoy' | 'BodyGirl';
+
 /**
- * The hero's tint materials, one per painted region of hero.glb, and its
- * face layers (ADR 0012). They live for the whole session: the React
- * model wears them, and the look code (applyLook, applyFormToRig, the
- * reactions) recolors them.
+ * The hero's materials (ADR 0013). They live for the whole session: the
+ * React model wears them, and the look code (applyLook, applyFormToRig,
+ * the reactions) recolors them.
+ *
+ * The four tint Surfaces are the Player's colors. The garments wear
+ * `body` and `trim`, and the hair pieces wear `hair`. Each body wears its
+ * own painted texture under one masked material: its tints ARE the
+ * colors of `skin`, `body`, `trim`, and `hair` (the same THREE.Color
+ * objects), and it glows region by region with them, so every recolor
+ * reaches the body with no other call.
  */
 export interface HeroMaterials {
-  /** PaintedOutfit */
+  /** PaintedOutfit, and the outfit tint of the bodies. */
   body: Surface;
-  /** PaintedTrim */
+  /** PaintedTrim, and the trim tint of the bodies. */
   trim: Surface;
-  /** PaintedSkin */
+  /** The skin tint of the bodies. No mesh wears it. */
   skin: Surface;
-  /** PaintedHair */
+  /** PaintedHair, and the tint of each body's own painted hair. */
   hair: Surface;
-  /** Face: the painted features, never tinted. */
-  face: THREE.MeshBasicMaterial;
-  /** Iris: the painted iris, worn in the Form's eye color once a Form is
-   *  earned; hidden before, when the painted eyes show as they are. */
-  iris: THREE.MeshBasicMaterial;
+  /** PaintedBodyBoy and PaintedBodyGirl. Hero.tsx gives each its painted
+   *  map, its masks, and its means; the build gives the Form's eye. */
+  bodies: Record<HeroBody, MaskedSurface>;
 }
 
 export function createHeroMaterials(): HeroMaterials {
+  const body = painterlySurface(null);
+  const trim = painterlySurface(null);
+  const skin = painterlySurface(null);
+  const hair = painterlySurface(null);
+  const regions = { skin, outfit: body, trim, hair };
   return {
-    body: painterlySurface(null),
-    trim: painterlySurface(null),
-    skin: painterlySurface(null),
-    hair: painterlySurface(null),
-    face: faceLayer(),
-    iris: faceLayer(),
+    body,
+    trim,
+    skin,
+    hair,
+    bodies: {
+      BodyBoy: maskedPainterlySurface(regions),
+      BodyGirl: maskedPainterlySurface(regions),
+    },
   };
 }
 
@@ -483,10 +506,10 @@ export interface HeroBuild {
 /**
  * Dress an original, DBZ-inspired (never copied) anime-style hero from the
  * chosen appearance: body style, hair style and length, garment, and skin
- * tone. The Blender model (scripts/blender/hero.py, ADR 0012) carries both
- * Tripo bodies with their painted faces and every hair on one rig; the
+ * tone. The Blender model (scripts/blender/hero.py, ADR 0012, ADR 0013)
+ * carries both painted Tripo bodies and every hair on one rig; the
  * director picks which parts show. This build adds the aura, the motes
- * and the cosmetics, and gives the iris the Form's eye color.
+ * and the cosmetics, and gives the painted iris the Form's eye color.
  *
  * Rig layout (group-local y, feet at 0; hero-rig.json): hips 1.34, torso
  * pivot 1.48, shoulders 2.03, head pivot 2.14, skull top 2.6.
@@ -505,10 +528,13 @@ export function buildHero({
   const dressing: THREE.Object3D[] = [];
 
   materials.skin.color.setHex(presetHex(SKIN_PRESETS, appearance.skinTone));
-  // The irises ride their own layer so a Form can change the hero's eyes;
-  // before any Form, the painted eyes show as Tripo drew them.
-  materials.iris.color.setHex(palette?.eye ?? BASE_EYE);
-  materials.iris.visible = palette !== null;
+  // The iris mask lets a Form change the hero's eyes; before any Form,
+  // the painted eyes show as Tripo drew them.
+  const eye = formEye(palette);
+  for (const surface of Object.values(materials.bodies)) {
+    surface.masks.eyeOn.value = eye === null ? 0 : 1;
+    if (eye !== null) surface.masks.eyeColor.value.setHex(eye);
+  }
   const parts = heroParts(appearance, form);
   director.showParts(parts);
   const formIndex = FORMS.findIndex((f) => f.id === form);

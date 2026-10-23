@@ -11,6 +11,20 @@ export interface HeroParts {
   hair: string;
 }
 
+/**
+ * Does this part of hero.glb show? A body shows when it is the chosen
+ * body. A piece fitted to a body (`<part>-<body>`, so `of` is its body)
+ * shows when it is the chosen garment or hair, on the chosen body. A
+ * chosen name that has no mesh in the model (the gi: the painted body is
+ * the gi) matches no part, so nothing shows for it.
+ */
+export function partShows(parts: HeroParts, part: string, of?: string): boolean {
+  return (
+    (of === undefined || of === parts.body) &&
+    (part === parts.body || part === parts.garment || part === parts.hair)
+  );
+}
+
 /** One clip request. The count makes a repeat of the same clip a new request. */
 export interface HeroCue {
   clip: string;

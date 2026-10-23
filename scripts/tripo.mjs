@@ -361,9 +361,17 @@ if (command === 'rig') {
   brief.rig.import_task_id = byType('import_model')?.task_id;
   brief.rig.task_id = byType('animate_rig')?.task_id ?? result.task_id;
   brief.rig.credits_consumed = result.credits_consumed;
+  // The rigged model is a bake input (hero.py imports it): it lives in the
+  // sources, through git LFS, like the candidates.
+  const rigged = findModel(join(work, 'rig'));
+  if (rigged) {
+    mkdirSync(join(SOURCES, name), { recursive: true });
+    copyFileSync(rigged, join(SOURCES, name, 'rigged.glb'));
+    brief.rigged = { file: `${name}/rigged.glb`, task_id: brief.rig.task_id };
+  }
   save();
   console.log(
-    `rigged: task ${brief.rig.task_id}, ${brief.rig.credits_consumed} credits; next: npm run tripo -- animate ${name}`,
+    `rigged: task ${brief.rig.task_id}, ${brief.rig.credits_consumed} credits, ${brief.rigged?.file ?? 'no model file'}; next: bake, or npm run tripo -- animate ${name} for preset clips`,
   );
 }
 

@@ -6,7 +6,7 @@ A self-contained, offline 3D multiplication game (times tables 1–12) for two k
 
 - **`CONTEXT.md`** — the domain glossary. Use its terms **verbatim** in code, tests, commits, and issues (Player, Round, Fact, Power Streak, Hero Level, Adaptive Selection, Save File, Rival, …). The Rival was the Training Dummy until ADR 0012; older ADRs and closed tickets keep the old term.
 - **`docs/ARCHITECTURE.md`** — stack, module map, unidirectional event flow, determinism rules, single-file constraints, perf budget.
-- **`docs/adr/`** — 0001 packaging (single HTML file, localStorage, manual export), 0002 stack (TypeScript strict, Preact, no CI), 0003 core contract (effects, never state-diffing), 0004–0005 bloom tiers and baked textures, 0006 hosted install alongside the single file, 0007 scripted Blender models, 0008 the Blender hero keeps every appearance choice, 0009 the React Three Fiber character pipeline (R3F owns the 3D scene; sourced characters and Mixamo clips are bake inputs), 0010 HY-Motion clips as bake inputs (`npm run motion`), published on GitHub Pages; the family accepts the risk of the license's territory clause, 0011 Tripo-generated models as bake inputs (`npm run tripo`; the fighter is the Rival's body), 0012 the Tripo hero keeps every appearance choice (parts under one armature, tint regions by hue, the clip owns its length; renames the Training Dummy to the Rival). Do not contradict an ADR; write a new one if a decision must change.
+- **`docs/adr/`** — 0001 packaging (single HTML file, localStorage, manual export), 0002 stack (TypeScript strict, Preact, no CI), 0003 core contract (effects, never state-diffing), 0004–0005 bloom tiers and baked textures, 0006 hosted install alongside the single file, 0007 scripted Blender models, 0008 the Blender hero keeps every appearance choice, 0009 the React Three Fiber character pipeline (R3F owns the 3D scene; sourced characters and Mixamo clips are bake inputs), 0010 HY-Motion clips as bake inputs (`npm run motion`), published on GitHub Pages; the family accepts the risk of the license's territory clause, 0011 Tripo-generated models as bake inputs (`npm run tripo`; the fighter is the Rival's body), 0012 the Tripo hero keeps every appearance choice (parts under one armature, the clip owns its length; renames the Training Dummy to the Rival), 0013 complete Tripo characters dressed by Blender (the paint stays; colors through masks in texture space; the hair and the garments are built on the body; the Studio briefs take the family's own models). Do not contradict an ADR; write a new one if a decision must change.
 
 ## Work model
 
@@ -27,17 +27,17 @@ A self-contained, offline 3D multiplication game (times tables 1–12) for two k
 
 ## Model and animation pipeline
 
-Blender is the bakery: every model and clip in the game is the output of a committed script. AI tools make the inputs. ADR 0007, 0009, 0010, 0011, and 0012 hold the decisions; this section is how to run it. The hero's bodies come from Tripo (ADR 0012); `hero.py` fits them to the game.
+Blender is the bakery: every model and clip in the game is the output of a committed script. AI tools make the inputs. ADR 0007, 0009, 0010, 0011, 0012, and 0013 hold the decisions; this section is how to run it. The hero's bodies come from Tripo (ADR 0013); `hero.py` dresses them.
 
 **Records**
 
 | Record | File |
 |---|---|
 | Tripo briefs, task ids, costs, candidates, the chosen one, rig, clip presets | `scripts/blender/sources/tripo/models.json` |
-| Tripo sources: every candidate at full detail, the rigged model, one file per clip | `scripts/blender/sources/tripo/<name>/**/*.glb` (git LFS) |
+| Tripo sources: every candidate at full detail, the rigged model (`rigged.glb`), one file per clip | `scripts/blender/sources/tripo/<name>/**/*.glb` (git LFS) |
 | HY-Motion briefs, scores, and chosen candidates | `scripts/blender/sources/hy-motion/clips.json`, `*.npz` |
-| Bake scripts | `scripts/blender/` (`bake.py` lists the models; `common.py`, `regions.py`, `mocap.py`, `tripo_prepare.py`, `tripo_preview.py`, `motion_score.py`, `contact_sheet.py`) |
-| Baked output: committed, never LFS, never edited by hand | `src/renderer/models/*.glb`, `src/renderer/models/hero-rig.json` (each body's joints, strike points, and cosmetic anchors), `src/scene/models/*.tsx` |
+| Bake scripts | `scripts/blender/` (`bake.py` lists the models; `common.py`, `masks.py`, `hair.py`, `garments.py`, `mocap.py`, `tripo_prepare.py`, `tripo_preview.py`, `motion_score.py`, `contact_sheet.py`) |
+| Baked output: committed, never LFS, never edited by hand | `src/renderer/models/*.glb`, `src/renderer/models/hero-rig.json` (each body's joints, strike points, cosmetic anchors, and tint means), `src/renderer/models/hero-mask-*.webp` and `hero-marks-*.webp` (the tint masks), `src/scene/models/*.tsx` |
 
 **Commands**
 
@@ -48,7 +48,7 @@ Blender is the bakery: every model and clip in the game is the output of a commi
 | Render every candidate from four sides | `npm run tripo -- preview <name>` → `build/tripo/<name>/sheet.png` |
 | Record the choice (the family picks from the sheet) | `npm run tripo -- pick <name> <id>` |
 | Paint the chosen candidate again from the brief's `retexture` text (the UV layout stays; the bake takes only what it needs, such as the face) | `npm run tripo -- retexture <name>` |
-| Decimate, then rig with the native skeleton | `npm run tripo -- rig <name>` |
+| Decimate, then rig with the native skeleton; the rigged model lands in `sources/tripo/<name>/rigged.glb` | `npm run tripo -- rig <name>` |
 | Make one clip per preset | `npm run tripo -- animate <name>` |
 | Make, score, and render HY-Motion candidates for a clip (the brief's `"target"` picks the rig, hero or fighter; `--for` overrides it) | `npm run motion -- <clip> [--for hero\|fighter]` |
 | Install a HY-Motion candidate | `npm run motion -- <clip> --pick <id>` |
@@ -69,7 +69,9 @@ Blender is the bakery: every model and clip in the game is the output of a commi
 - Put the Tripo sources in git LFS. Never put `src/renderer/models/` in LFS: the build would inline the pointer text, and the game would break with no error.
 - Never edit a `.blend`, a `.glb`, or a generated component by hand. Change the script and bake again. A bake from unchanged scripts must give the same files, byte for byte.
 - `bake-models.mjs` strips the normals and UVs from every ink hull (they draw one flat color).
-- Each hero body keeps its own Tripo rig and weights; never transfer weights between the bodies (ADR 0012). Garment and hair pieces are fitted per body and named `<part>-<body>`.
+- Each hero body keeps its own Tripo rig and weights; never transfer weights between the bodies (ADR 0012). The hair and the garments are built on each body by `hair.py` and `garments.py` and named `<part>-<body>` (ADR 0013); a part with no piece (`GarmentGi`, `Hair_buzz_short`) shows the body alone.
+- A hero body is one complete Tripo character (a face, short hair, the gi, in the flat palette of `masks.HERO_PALETTE`). `hero.py` `BRIEFS` names each body's brief; to put another body in the game, change that table and bake. A body made in Tripo Studio goes in by hand: export its GLB (full detail, textures embedded) to `sources/tripo/<name>-studio/candidates/p0s0.glb`, then `preview`, `pick`, and `rig` as for an API brief. Never run `generate` on a Studio brief.
+- Masks are data: the tint and mark images are opaque RGB, saved lossless, loaded with no color space and no vertical flip. Never pack a mask in an alpha channel (a browser drops the color under alpha 0).
 - The clip owns its length; the code reads it (ADR 0012). Do not copy a clip's duration into a constant.
 - A `"loop"` HY-Motion brief blends to its own first frame. The hero's Idle first frame is the stance of every hero clip: after `npm run motion -- idle --pick`, bake the hero and check the strikes and the start and end of every clip.
 - HY-Motion runs outside the repo on GPU 1 (memory note `hy-motion-local-setup`). It needs the target's `build/models/<target>.blend`: run `npm run bake:models hero` or `fighter` first. `mocap.py` retargets onto the scripted hero's joints, or onto a Tripo rig through a naming scheme (`mocap.TRIPO`). Its outputs are limited to the license Territory (ADR 0010).

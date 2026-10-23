@@ -3,15 +3,29 @@
 // HeroModel) mounts once, inside the renderer's hero group. The director
 // (renderer/heroDirector.ts) says which parts show and which clip plays;
 // this component plays the clip with drei's useAnimations. The renderer
-// then dresses the mounted bones with light: face, aura, motes, cosmetics.
+// then dresses the mounted bones with light: aura, motes, cosmetics.
 
 import { useAnimations } from '@react-three/drei';
 import { useFrame } from '@react-three/fiber';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import type { HeroMount } from '../renderer';
+import type { HeroBody } from '../renderer/hero';
+import { dataMap } from '../renderer/materials';
+import heroRig from '../renderer/models/hero-rig.json';
+import marksBoyUrl from '../renderer/models/hero-marks-boy.webp';
+import marksGirlUrl from '../renderer/models/hero-marks-girl.webp';
+import maskBoyUrl from '../renderer/models/hero-mask-boy.webp';
+import maskGirlUrl from '../renderer/models/hero-mask-girl.webp';
 import { STYLE } from '../renderer/style';
 import { HeroModel, useHeroGltf } from './models/HeroModel';
+
+/** Each body's masks, baked beside hero.glb (ADR 0013): R skin, G outfit,
+ *  B trim; the marks R hair, G iris. */
+const BODY_MASKS: Record<HeroBody, { mask: string; marks: string }> = {
+  BodyBoy: { mask: maskBoyUrl, marks: marksBoyUrl },
+  BodyGirl: { mask: maskGirlUrl, marks: marksGirlUrl },
+};
 
 export function Hero({ mount, timeScale }: { mount: HeroMount; timeScale: () => number }) {
   const { director, materials, group } = mount;
@@ -21,21 +35,36 @@ export function Hero({ mount, timeScale }: { mount: HeroMount; timeScale: () => 
   const [cue, setCue] = useState(director.cue());
   const [parts, setParts] = useState(director.parts());
 
-  // The model exists: it wears the baked atlas under each tint and the
-  // baked face on its face layers, the director learns its clips, and
-  // the renderer dresses its bones.
+  // The model exists: the garments and the hair wear the baked atlas
+  // under their tints, each body wears its painted texture through its
+  // masks, the director learns its clips, and the renderer dresses its
+  // bones.
   useLayoutEffect(() => {
-    const atlas: Array<[THREE.Material & { map: THREE.Texture | null }, THREE.MeshStandardMaterial]> = [
+    const atlas: Array<[THREE.MeshToonMaterial, THREE.MeshStandardMaterial]> = [
       [materials.body as THREE.MeshToonMaterial, baked.PaintedOutfit],
       [materials.trim as THREE.MeshToonMaterial, baked.PaintedTrim],
-      [materials.skin as THREE.MeshToonMaterial, baked.PaintedSkin],
       [materials.hair as THREE.MeshToonMaterial, baked.PaintedHair],
-      [materials.face, baked.Face],
-      [materials.iris, baked.Iris],
     ];
     for (const [tint, painted] of atlas) {
       tint.map = painted.map;
       tint.needsUpdate = true;
+    }
+    const bodies: Array<[HeroBody, THREE.MeshStandardMaterial]> = [
+      ['BodyBoy', baked.PaintedBodyBoy],
+      ['BodyGirl', baked.PaintedBodyGirl],
+    ];
+    for (const [body, painted] of bodies) {
+      const surface = materials.bodies[body];
+      const { masks } = surface;
+      const mean = heroRig.bodies[body].tint;
+      surface.map = painted.map;
+      masks.maskMap.value = dataMap(BODY_MASKS[body].mask);
+      masks.marksMap.value = dataMap(BODY_MASKS[body].marks);
+      masks.meanSkin.value = mean.skin;
+      masks.meanOutfit.value = mean.outfit;
+      masks.meanTrim.value = mean.trim;
+      masks.meanHair.value = mean.hair;
+      surface.needsUpdate = true;
     }
     director.ready(clips.map((clip) => ({ name: clip.name, duration: clip.duration })));
     mount.modelReady(model.current);
