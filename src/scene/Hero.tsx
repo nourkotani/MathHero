@@ -49,6 +49,18 @@ export function Hero({ mount, timeScale }: { mount: HeroMount; timeScale: () => 
       tint.map = painted.map;
       tint.needsUpdate = true;
     }
+    // The drawn face, when the bake made one (ADR 0013): a bake without
+    // one has no Face or Iris material.
+    const drawn = baked as Partial<Record<'Face' | 'Iris', THREE.MeshStandardMaterial>>;
+    const layers: Array<[THREE.MeshBasicMaterial, THREE.MeshStandardMaterial | undefined]> = [
+      [materials.face, drawn.Face],
+      [materials.iris, drawn.Iris],
+    ];
+    for (const [layer, painted] of layers) {
+      if (painted === undefined) continue;
+      layer.map = painted.map;
+      layer.needsUpdate = true;
+    }
     const bodies: Array<[HeroBody, THREE.MeshStandardMaterial]> = [
       ['BodyBoy', baked.PaintedBodyBoy],
       ['BodyGirl', baked.PaintedBodyGirl],

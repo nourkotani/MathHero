@@ -30,6 +30,8 @@ type GLTFResult = GLTF & {
   nodes: {
     BodyGirl_1: THREE.SkinnedMesh;
     BodyGirl_2: THREE.SkinnedMesh;
+    BodyGirl_3: THREE.SkinnedMesh;
+    BodyGirl_4: THREE.SkinnedMesh;
     ['GarmentArmor-BodyGirl_1']: THREE.SkinnedMesh;
     ['GarmentArmor-BodyGirl_2']: THREE.SkinnedMesh;
     ['GarmentArmor-BodyGirl_3']: THREE.SkinnedMesh;
@@ -60,6 +62,8 @@ type GLTFResult = GLTF & {
     ['Hair_spiky_short-BodyGirl_2']: THREE.SkinnedMesh;
     BodyBoy_1: THREE.SkinnedMesh;
     BodyBoy_2: THREE.SkinnedMesh;
+    BodyBoy_3: THREE.SkinnedMesh;
+    BodyBoy_4: THREE.SkinnedMesh;
     ['GarmentArmor-BodyBoy_1']: THREE.SkinnedMesh;
     ['GarmentArmor-BodyBoy_2']: THREE.SkinnedMesh;
     ['GarmentArmor-BodyBoy_3']: THREE.SkinnedMesh;
@@ -97,6 +101,8 @@ type GLTFResult = GLTF & {
     PaintedHair: THREE.MeshStandardMaterial;
     PaintedBodyBoy: THREE.MeshStandardMaterial;
     PaintedBodyGirl: THREE.MeshStandardMaterial;
+    Face: THREE.MeshStandardMaterial;
+    Iris: THREE.MeshStandardMaterial;
     Ink: THREE.MeshStandardMaterial;
   };
 };
@@ -151,6 +157,22 @@ export function HeroModel({
                 skeleton={nodes.BodyGirl_2.skeleton}
                 material={ink}
                 userData={INK}
+                frustumCulled={false}
+              />
+              <skinnedMesh
+                name="BodyGirl_3"
+                geometry={nodes.BodyGirl_3.geometry}
+                skeleton={nodes.BodyGirl_3.skeleton}
+                material={materials.iris}
+                renderOrder={1}
+                frustumCulled={false}
+              />
+              <skinnedMesh
+                name="BodyGirl_4"
+                geometry={nodes.BodyGirl_4.geometry}
+                skeleton={nodes.BodyGirl_4.skeleton}
+                material={materials.face}
+                renderOrder={2}
                 frustumCulled={false}
               />
             </group>
@@ -440,6 +462,22 @@ export function HeroModel({
               skeleton={nodes.BodyBoy_2.skeleton}
               material={ink}
               userData={INK}
+              frustumCulled={false}
+            />
+            <skinnedMesh
+              name="BodyBoy_3"
+              geometry={nodes.BodyBoy_3.geometry}
+              skeleton={nodes.BodyBoy_3.skeleton}
+              material={materials.iris}
+              renderOrder={1}
+              frustumCulled={false}
+            />
+            <skinnedMesh
+              name="BodyBoy_4"
+              geometry={nodes.BodyBoy_4.geometry}
+              skeleton={nodes.BodyBoy_4.skeleton}
+              material={materials.face}
+              renderOrder={2}
               frustumCulled={false}
             />
           </group>

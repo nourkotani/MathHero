@@ -31,6 +31,8 @@ const REGIONS = {
   PaintedHair: 'materials.hair',
   PaintedBodyBoy: 'materials.bodies.BodyBoy',
   PaintedBodyGirl: 'materials.bodies.BodyGirl',
+  Face: 'materials.face',
+  Iris: 'materials.iris',
 };
 
 mkdirSync(dirname(RAW), { recursive: true });
@@ -97,7 +99,12 @@ for (const line of lines.slice(start, end + 1)) {
   } else {
     const region = REGIONS[material];
     if (!region) throw new Error(`hero.glb has an unknown material: ${material}`);
-    props.push(`material={${region}}`, 'castShadow');
+    props.push(`material={${region}}`);
+    // The drawn face layers draw after the body, the iris under the face
+    // (ADR 0013); they are light on the skin: no shadow, no ink.
+    if (material === 'Face') props.push('renderOrder={2}');
+    else if (material === 'Iris') props.push('renderOrder={1}');
+    else props.push('castShadow');
     if (material === 'PaintedHair') props.push('layers={BLOOM}');
   }
   props.push('frustumCulled={false}');
