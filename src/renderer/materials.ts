@@ -53,6 +53,17 @@ export function characterSurface(color: number, mapUrl?: string): Surface {
 
 let softRamp: THREE.DataTexture | null = null;
 
+/** The soft light steps every painterly material shares. */
+function softRampTexture(): THREE.DataTexture {
+  if (softRamp === null) {
+    softRamp = createToonRamp(STYLE.painterly.ramp);
+    // Linear filtering blends neighbouring steps: painted, not cut.
+    softRamp.minFilter = THREE.LinearFilter;
+    softRamp.magFilter = THREE.LinearFilter;
+  }
+  return softRamp;
+}
+
 /** The rim values every painterly material shares: one tune, every model. */
 const rimUniforms = {
   rimColor: { value: new THREE.Color(STYLE.painterly.rim.color) },
@@ -60,6 +71,33 @@ const rimUniforms = {
   rimFrom: { value: STYLE.painterly.rim.from },
   rimTo: { value: STYLE.painterly.rim.to },
 };
+
+/** The part of a shader that onBeforeCompile changes. */
+interface ShaderEdit {
+  uniforms: Record<string, THREE.IUniform>;
+  fragmentShader: string;
+}
+
+/** Add the colored rim light on the silhouette edge to a toon shader. */
+function addRim(shader: ShaderEdit, rimScale: number): void {
+  Object.assign(shader.uniforms, rimUniforms, { rimScale: { value: rimScale } });
+  shader.fragmentShader = shader.fragmentShader
+    .replace(
+      'void main() {',
+      `uniform vec3 rimColor;
+uniform float rimStrength;
+uniform float rimFrom;
+uniform float rimTo;
+uniform float rimScale;
+void main() {`,
+    )
+    .replace(
+      '#include <opaque_fragment>',
+      `float rimFacing = 1.0 - clamp(dot(normal, normalize(vViewPosition)), 0.0, 1.0);
+outgoingLight += rimColor * rimStrength * rimScale * smoothstep(rimFrom, rimTo, rimFacing);
+#include <opaque_fragment>`,
+    );
+}
 
 /**
  * The shared look of every Blender-baked model (ADR 0007): the baked
@@ -70,33 +108,146 @@ const rimUniforms = {
  * camera, so the rim would ice the whole arena: the arena passes 0.
  */
 export function painterlySurface(map: THREE.Texture | null, rimScale = 1): Surface {
-  if (softRamp === null) {
-    softRamp = createToonRamp(STYLE.painterly.ramp);
-    // Linear filtering blends neighbouring steps: painted, not cut.
-    softRamp.minFilter = THREE.LinearFilter;
-    softRamp.magFilter = THREE.LinearFilter;
-  }
-  const material = new THREE.MeshToonMaterial({ color: 0xffffff, map, gradientMap: softRamp });
+  const material = new THREE.MeshToonMaterial({ color: 0xffffff, map, gradientMap: softRampTexture() });
+  material.onBeforeCompile = (shader) => addRim(shader, rimScale);
+  material.customProgramCacheKey = () => 'painterly';
+  material.userData.role = 'painted';
+  return material;
+}
+
+/**
+ * The four painted regions that a hero body wears through its masks. The
+ * look code recolors these Surfaces; the body reads their colors as its
+ * tints and their glow as its own, region by region.
+ */
+export interface BodyRegions {
+  skin: Surface;
+  outfit: Surface;
+  trim: Surface;
+  hair: Surface;
+}
+
+/**
+ * The uniforms of a masked body. The tints are the colors of its
+ * BodyRegions (the same THREE.Color objects). Hero.tsx gives the masks
+ * and the means; the hero build gives the eye.
+ */
+export interface MaskUniforms {
+  /** R skin, G outfit, B trim: 0..1 each, in the body texture's UV space. */
+  maskMap: { value: THREE.Texture | null };
+  /** R the body's own painted hair, G the iris: 0..1 each, same space. */
+  marksMap: { value: THREE.Texture | null };
+  tintSkin: { value: THREE.Color };
+  tintOutfit: { value: THREE.Color };
+  tintTrim: { value: THREE.Color };
+  tintHair: { value: THREE.Color };
+  /** The mean linear luminance of the painted texture inside each mask. */
+  meanSkin: { value: number };
+  meanOutfit: { value: number };
+  meanTrim: { value: number };
+  meanHair: { value: number };
+  /** The Form's eye color, on the iris only while eyeOn is 1. */
+  eyeColor: { value: THREE.Color };
+  eyeOn: { value: number };
+  /** Each region's glow (emissive × intensity), read before each draw. */
+  glowOutfit: { value: THREE.Color };
+  glowTrim: { value: THREE.Color };
+  glowHair: { value: THREE.Color };
+}
+
+/** A hero body: one painted texture, recolored through its masks. */
+export type MaskedSurface = THREE.MeshToonMaterial & { masks: MaskUniforms };
+
+/**
+ * A hero body (ADR 0013): Tripo's full painted texture under one
+ * material, with the painterly look of painterlySurface. The masks put
+ * the Player's colors on the skin, outfit, trim, and hair. Each tint
+ * keeps the painted light and shade: the texel's luminance over the
+ * region's mean luminance scales the tint. The iris takes the Form's eye
+ * color. The texture outside every mask stays as Tripo painted it.
+ *
+ * The glow follows the regions too: the outfit glows with `outfit`, the
+ * trim with `trim`, and the painted hair with `hair`. The skin and the
+ * face never glow. The material's own emissive stays black.
+ */
+export function maskedPainterlySurface(regions: BodyRegions): MaskedSurface {
+  const masks: MaskUniforms = {
+    maskMap: { value: null },
+    marksMap: { value: null },
+    tintSkin: { value: regions.skin.color },
+    tintOutfit: { value: regions.outfit.color },
+    tintTrim: { value: regions.trim.color },
+    tintHair: { value: regions.hair.color },
+    meanSkin: { value: 1 },
+    meanOutfit: { value: 1 },
+    meanTrim: { value: 1 },
+    meanHair: { value: 1 },
+    eyeColor: { value: new THREE.Color() },
+    eyeOn: { value: 0 },
+    glowOutfit: { value: new THREE.Color(0x000000) },
+    glowTrim: { value: new THREE.Color(0x000000) },
+    glowHair: { value: new THREE.Color(0x000000) },
+  };
+  const material = Object.assign(
+    new THREE.MeshToonMaterial({ color: 0xffffff, map: null, gradientMap: softRampTexture() }),
+    { masks },
+  );
+  // The same uniform objects go into every compile, so a recompile (a new
+  // map) keeps every value that the code set.
   material.onBeforeCompile = (shader) => {
-    Object.assign(shader.uniforms, rimUniforms, { rimScale: { value: rimScale } });
+    addRim(shader, 1);
+    Object.assign(shader.uniforms, masks);
     shader.fragmentShader = shader.fragmentShader
       .replace(
         'void main() {',
-        `uniform vec3 rimColor;
-uniform float rimStrength;
-uniform float rimFrom;
-uniform float rimTo;
-uniform float rimScale;
+        `uniform sampler2D maskMap;
+uniform sampler2D marksMap;
+uniform vec3 tintSkin;
+uniform vec3 tintOutfit;
+uniform vec3 tintTrim;
+uniform vec3 tintHair;
+uniform float meanSkin;
+uniform float meanOutfit;
+uniform float meanTrim;
+uniform float meanHair;
+uniform vec3 eyeColor;
+uniform float eyeOn;
+uniform vec3 glowOutfit;
+uniform vec3 glowTrim;
+uniform vec3 glowHair;
 void main() {`,
       )
+      // vMapUv exists only with a map: without one, the masks read zero.
       .replace(
-        '#include <opaque_fragment>',
-        `float rimFacing = 1.0 - clamp(dot(normal, normalize(vViewPosition)), 0.0, 1.0);
-outgoingLight += rimColor * rimStrength * rimScale * smoothstep(rimFrom, rimTo, rimFacing);
-#include <opaque_fragment>`,
+        '#include <map_fragment>',
+        `#include <map_fragment>
+vec3 bodyMask = vec3(0.0);
+vec2 bodyMarks = vec2(0.0);
+#ifdef USE_MAP
+bodyMask = texture2D(maskMap, vMapUv).rgb;
+bodyMarks = texture2D(marksMap, vMapUv).rg;
+float paintedLum = dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722));
+diffuseColor.rgb = mix(diffuseColor.rgb, tintSkin * (paintedLum / meanSkin), bodyMask.r);
+diffuseColor.rgb = mix(diffuseColor.rgb, tintOutfit * (paintedLum / meanOutfit), bodyMask.g);
+diffuseColor.rgb = mix(diffuseColor.rgb, tintTrim * (paintedLum / meanTrim), bodyMask.b);
+diffuseColor.rgb = mix(diffuseColor.rgb, tintHair * (paintedLum / meanHair), bodyMarks.r);
+diffuseColor.rgb = mix(diffuseColor.rgb, eyeColor, bodyMarks.g * eyeOn);
+#endif`,
+      )
+      .replace(
+        '#include <emissivemap_fragment>',
+        `#include <emissivemap_fragment>
+totalEmissiveRadiance += glowOutfit * bodyMask.g + glowTrim * bodyMask.b + glowHair * bodyMarks.r;`,
       );
   };
-  material.customProgramCacheKey = () => 'painterly';
+  // Read each region's glow before each draw, so every site that sets an
+  // emissive on the regions reaches the body with no new call.
+  material.onBeforeRender = () => {
+    masks.glowOutfit.value.copy(regions.outfit.emissive).multiplyScalar(regions.outfit.emissiveIntensity);
+    masks.glowTrim.value.copy(regions.trim.emissive).multiplyScalar(regions.trim.emissiveIntensity);
+    masks.glowHair.value.copy(regions.hair.emissive).multiplyScalar(regions.hair.emissiveIntensity);
+  };
+  material.customProgramCacheKey = () => 'painterly-masked';
   material.userData.role = 'painted';
   return material;
 }
@@ -108,18 +259,6 @@ outgoingLight += rimColor * rimStrength * rimScale * smoothstep(rimFrom, rimTo, 
  */
 export function bakedInkSurface(): THREE.MeshBasicMaterial {
   return new THREE.MeshBasicMaterial({ color: STYLE.outline.color });
-}
-
-/**
- * A face layer of the hero (ADR 0012): the painted features (eyes, brows,
- * lashes) on a thin layer just off the skin, opaque only where a feature
- * is, so the tinted skin shows around them. The baked model gives it its
- * map (src/scene/Hero.tsx). Deliberately NOT a character-role surface: it
- * must never grow an ink hull or cast a shadow, and depth writes stay off
- * so it cannot z-fight the skin beneath it.
- */
-export function faceLayer(): THREE.MeshBasicMaterial {
-  return new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false });
 }
 
 const paintedMaps = new Map<string, THREE.Texture>();
@@ -137,6 +276,29 @@ export function paintedMap(url: string): THREE.Texture {
     texture.colorSpace = THREE.SRGBColorSpace;
     texture.anisotropy = 4;
     paintedMaps.set(url, texture);
+  }
+  return texture;
+}
+
+const dataMaps = new Map<string, THREE.Texture>();
+
+/**
+ * A baked data texture (a mask), inlined into the single file by the
+ * build. Its values are data, not color: no color space, so the GPU
+ * never decodes them. flipY stays off, as for the glTF's own textures,
+ * so the mask lies in the same UV space as the painted map. Cached per
+ * url, as paintedMap.
+ */
+export function dataMap(url: string): THREE.Texture {
+  let texture = dataMaps.get(url);
+  if (texture === undefined) {
+    texture = new THREE.TextureLoader().load(url);
+    texture.colorSpace = THREE.NoColorSpace;
+    texture.flipY = false;
+    texture.minFilter = THREE.LinearFilter;
+    texture.magFilter = THREE.LinearFilter;
+    texture.generateMipmaps = false;
+    dataMaps.set(url, texture);
   }
   return texture;
 }
