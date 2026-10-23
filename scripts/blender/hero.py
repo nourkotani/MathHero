@@ -809,6 +809,17 @@ def _landmarks(body, prefix, rig):
     return marks
 
 
+def _rgba_image(name, rgba):
+    """A packed sRGB image with alpha from an (H, W, 4) float array."""
+    height, width = rgba.shape[:2]
+    image = bpy.data.images.new(name, width, height, alpha=True)
+    image.colorspace_settings.name = "sRGB"
+    image.alpha_mode = "STRAIGHT"
+    image.pixels.foreach_set(np.ascontiguousarray(rgba, dtype=np.float32).ravel())
+    image.pack()
+    return image
+
+
 def _rounded(v):
     return [round(float(x), 4) + 0.0 for x in v]
 
@@ -973,6 +984,169 @@ def _pieces(rigs, bodies, skulls, marks):
     return pieces
 
 
+# ---------------------------------------------------------------- the drawn face
+#
+# A Studio body's face is a photograph at ten thousand faces: smoothed,
+# it is a blur with a dark mouth. The game draws its own anime face on
+# it, as it did on the scripted hero: two layers of the head's front
+# faces, a little off the skin and inside the ink hull, with a planar UV
+# from the front, wearing images the bake draws. The Iris layer (below)
+# carries the irises, which the runtime tints with the Form's eye color;
+# the Face layer (above) carries the whites, the lids, the brows, the
+# mouth, and the eyes' highlights, opaque only where a feature is, with a
+# hole over each iris. Every size is a share of the skull's width, and the
+# eye line is the ears' top, so the same face fits each head. A brief
+# asks for it with "face": "drawn" in its palette.
+
+FACE_TEXTURE = 512
+FACE_LIFT = 0.011
+IRIS_LIFT = 0.008
+# The decal's window on the face: this many skull widths wide and high,
+# centred on the eye line.
+FACE_WINDOW = 1.25
+# The eye line, in skull heights below the skull's top.
+EYE_LINE = 0.5
+# The features, in skull widths from the skull's axis and the eye line.
+FACE = {
+    "eye_dx": 0.19,
+    "eye_dz": 0.0,
+    "eye_rx": 0.105,
+    "eye_ry": 0.072,
+    "iris_r": 0.066,
+    "iris_dz": -0.006,
+    "pupil_r": 0.034,
+    "shine_r": 0.02,
+    "shine_dx": 0.024,
+    "shine_dz": 0.03,
+    "lid": 0.02,
+    "lash": 0.03,
+    "brow_dz": 0.115,
+    "brow_half": 0.12,
+    "brow_t": 0.02,
+    "brow_tilt": 0.04,
+    "mouth_dz": -0.23,
+    "mouth_half": 0.06,
+    "mouth_t": 0.011,
+}
+FACE_INK = (0.08, 0.06, 0.07)
+FACE_WHITE = (0.98, 0.98, 1.0)
+
+
+def _draw_face(sk):
+    """The Face and Iris images (RGBA, FACE_TEXTURE square), drawn at twice
+    the size and averaged down. Coordinates are skull widths from the
+    window's centre (the eye line, the skull's axis)."""
+    n = FACE_TEXTURE * 2
+    v, u = np.mgrid[0:n, 0:n].astype(np.float32)
+    x = (u / (n - 1) - 0.5) * FACE_WINDOW
+    z = (v / (n - 1) - 0.5) * FACE_WINDOW
+    f = FACE
+    face = np.zeros((n, n, 4), dtype=np.float32)
+    iris = np.zeros((n, n, 4), dtype=np.float32)
+
+    def paint(target, mask, rgb, alpha=1.0):
+        target[mask, :3] = rgb
+        target[mask, 3] = alpha
+
+    for side in (-1.0, 1.0):
+        ex, ez = side * f["eye_dx"], f["eye_dz"]
+        dx, dz = x - ex, z - ez
+        inside = (dx / f["eye_rx"]) ** 2 + (dz / f["eye_ry"]) ** 2
+        paint(face, inside <= 1.0, FACE_WHITE)
+        # The lid: a line around the eye, thick above, thin below, with a
+        # lash flick at the outer corner.
+        outer = ((dx / (f["eye_rx"] + f["lid"])) ** 2 + (dz / (f["eye_ry"] + f["lid"])) ** 2 <= 1.0) & (inside > 1.0)
+        thin = ((dx / (f["eye_rx"] + f["lid"] * 0.4)) ** 2 + (dz / (f["eye_ry"] + f["lid"] * 0.4)) ** 2 <= 1.0) & (inside > 1.0)
+        paint(face, (outer & (dz > 0.0)) | (thin & (dz <= 0.0)), FACE_INK)
+        lash = (np.abs((dz - 0.3 * f["eye_ry"]) - 0.9 * (side * dx - f["eye_rx"])) < f["lid"] * 0.6) & (side * dx > f["eye_rx"] * 0.8) & (side * dx < f["eye_rx"] + f["lash"]) & (dz > 0.0)
+        paint(face, lash, FACE_INK)
+        # The iris, on its own layer, and a hole for it in the white.
+        ix, iz = ex, ez + f["iris_dz"]
+        disk = (x - ix) ** 2 + (z - iz) ** 2 <= f["iris_r"] ** 2
+        paint(iris, disk, (1.0, 1.0, 1.0))
+        pupil = (x - ix) ** 2 + (z - iz) ** 2 <= f["pupil_r"] ** 2
+        paint(iris, pupil, FACE_INK)
+        face[disk & (inside <= 1.0), 3] = 0.0
+        shine = (x - (ix + side * f["shine_dx"])) ** 2 + (z - (iz + f["shine_dz"])) ** 2 <= f["shine_r"] ** 2
+        paint(face, shine, FACE_WHITE)
+        # The brow: a thick arc above the eye, higher at the outer end.
+        bz = ez + f["brow_dz"] + f["brow_tilt"] * (side * dx / f["brow_half"]) - 0.25 * (dx / f["brow_half"]) ** 2 * f["brow_dz"] * 0.3
+        brow = (np.abs(z - bz) < f["brow_t"] * (0.6 + 0.4 * np.clip(side * dx / f["brow_half"] + 0.5, 0.0, 1.0))) & (np.abs(dx) < f["brow_half"])
+        paint(face, brow, FACE_INK)
+    # The mouth: a short, faintly smiling line.
+    mz = f["mouth_dz"] + 0.3 * (x / f["mouth_half"]) ** 2 * f["mouth_t"] * 2.0
+    mouth = (np.abs(z - mz) < f["mouth_t"]) & (np.abs(x) < f["mouth_half"])
+    paint(face, mouth, FACE_INK)
+    # Down to size: the average of each 2 x 2 block (premultiplied, so a
+    # feature's edge never fades to black).
+    def down(img):
+        pre = img.copy()
+        pre[:, :, :3] *= pre[:, :, 3:4]
+        small = pre.reshape(FACE_TEXTURE, 2, FACE_TEXTURE, 2, 4).mean(axis=(1, 3))
+        alpha = small[:, :, 3:4]
+        small[:, :, :3] = np.where(alpha > 1e-4, small[:, :, :3] / np.maximum(alpha, 1e-4), 0.0)
+        return small
+
+    return down(face), down(iris)
+
+
+def _face_layers(body, prefix, sk, face_material, iris_material):
+    """Two copies of the head's front faces, lifted off the skin, with a
+    planar UV from the front over the face window, merged into the body
+    under the Face and Iris materials. Built after the ink hull, so the
+    layers are not inked."""
+    bm = bmesh.new()
+    bm.from_mesh(body.data)
+    uv_layer = bm.loops.layers.uv.active
+    index = body.vertex_groups[prefix + "head"].index
+    deform = bm.verts.layers.deform.verify()
+    ink = {i for i, slot in enumerate(body.material_slots) if slot.material and slot.material.name == c.INK}
+    # The eye line: a share of the skull's height below its top (the ears
+    # are hidden under hair on some heads, so they do not place it).
+    eye_z = sk["centre"].z - EYE_LINE * sk["height"]
+    half = 0.5 * FACE_WINDOW * sk["width"]
+    chin = eye_z - 0.3 * sk["height"]
+    top = sk["hairline"][0] + 0.02
+    front = []
+    for f in bm.faces:
+        if f.material_index in ink:
+            continue
+        if not all(v[deform].get(index, 0.0) > 0.5 for v in f.verts):
+            continue
+        centre = f.calc_center_median()
+        if centre.z < chin or centre.z > top or abs(centre.x - sk["crown_x"]) > half:
+            continue
+        if f.normal.y > -0.15:
+            continue
+        front.append(f)
+    if not front:
+        raise ValueError(f"{body.name}: no front faces for the drawn face")
+    slots = {mat.name: i for i, mat in enumerate(body.data.materials)}
+    for material, lift in ((iris_material, IRIS_LIFT), (face_material, FACE_LIFT)):
+        if material.name not in slots:
+            body.data.materials.append(material)
+            slots[material.name] = len(body.data.materials) - 1
+        made = bmesh.ops.duplicate(bm, geom=front)
+        verts = [g for g in made["geom"] if isinstance(g, bmesh.types.BMVert)]
+        faces = [g for g in made["geom"] if isinstance(g, bmesh.types.BMFace)]
+        normals = {v: Vector((0.0, 0.0, 0.0)) for v in verts}
+        for f in faces:
+            for v in f.verts:
+                normals[v] += f.normal
+        for v in verts:
+            n = normals[v]
+            if n.length > 1e-9:
+                v.co += n.normalized() * lift
+        for f in faces:
+            f.material_index = slots[material.name]
+            for loop in f.loops:
+                p = loop.vert.co
+                loop[uv_layer].uv = ((p.x - sk["crown_x"]) / (2.0 * half) + 0.5, (p.z - eye_z) / (2.0 * half) + 0.5)
+    bm.to_mesh(body.data)
+    bm.free()
+    print(f"FACE {body.name}: {len(front)} front faces, the eye line at {eye_z:.3f}, the window {2 * half:.3f} wide")
+
+
 # ---------------------------------------------------------------- the rig for the renderer
 
 
@@ -1065,8 +1239,18 @@ def build():
     rigs["BodyGirl"].matrix_parent_inverse.identity()
 
     pieces = _pieces(rigs, bodies, skulls, marks)
+    face_image = iris_image = None
     for body_name, body in bodies.items():
         c.ink_hull_skinned(body, rigs[body_name], INK_WIDTH)
+        palette = briefs[BRIEFS[body_name]].get("palette", {})
+        if palette.get("face") == "drawn":
+            if face_image is None:
+                face_px, iris_px = _draw_face(skulls[body_name])
+                face_image = _rgba_image("HeroFace", face_px)
+                iris_image = _rgba_image("HeroIris", iris_px)
+                face_material = c.painted_material("Face", face_image, alpha=True)
+                iris_material = c.painted_material("Iris", iris_image, alpha=True)
+            _face_layers(body, BODIES[body_name], skulls[body_name], face_material, iris_material)
     _finish_pieces(pieces, rigs)
 
     _clips(rigs, briefs[CLIP_SOURCE], scale)

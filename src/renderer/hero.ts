@@ -10,6 +10,7 @@ import type { CosmeticSlot, Garment, HeroAppearance, StreakForm } from '../core'
 import {
   cosmeticPanel,
   cosmeticSprite,
+  faceLayer,
   glowSurface,
   markBloom,
   maskedPainterlySurface,
@@ -332,7 +333,16 @@ export interface HeroMaterials {
   /** PaintedBodyBoy and PaintedBodyGirl. Hero.tsx gives each its painted
    *  map, its masks, and its means; the build gives the Form's eye. */
   bodies: Record<HeroBody, MaskedSurface>;
+  /** Face: the drawn features, never tinted. Worn by a body whose brief
+   *  asks for a drawn face; otherwise no mesh wears it. */
+  face: THREE.MeshBasicMaterial;
+  /** Iris: the drawn irises, in the Form's eye color, or warm brown
+   *  before any Form. */
+  iris: THREE.MeshBasicMaterial;
 }
+
+/** The iris a hero wears before any Form: plain warm brown. */
+export const BASE_EYE = 0x3e2c22;
 
 export function createHeroMaterials(): HeroMaterials {
   const body = painterlySurface(null);
@@ -345,6 +355,8 @@ export function createHeroMaterials(): HeroMaterials {
     trim,
     skin,
     hair,
+    face: faceLayer(),
+    iris: faceLayer(),
     bodies: {
       BodyBoy: maskedPainterlySurface(regions),
       BodyGirl: maskedPainterlySurface(regions),
@@ -535,6 +547,8 @@ export function buildHero({
     surface.masks.eyeOn.value = eye === null ? 0 : 1;
     if (eye !== null) surface.masks.eyeColor.value.setHex(eye);
   }
+  // The drawn irises wear the Form's eye color, or brown before any Form.
+  materials.iris.color.setHex(eye ?? BASE_EYE);
   const parts = heroParts(appearance, form);
   director.showParts(parts);
   const formIndex = FORMS.findIndex((f) => f.id === form);

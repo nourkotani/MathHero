@@ -272,6 +272,18 @@ totalEmissiveRadiance += glowOutfit * bodyMask.g + glowTrim * bodyMask.b + glowH
  * shell with flipped normals, so it draws front faces only (unlike the
  * code-built hulls in cel.ts, which draw back faces of a scaled copy).
  */
+/**
+ * A drawn face layer of the hero (ADR 0013): the drawn features (the
+ * whites, the lids, the brows, the mouth) or the irises, on a thin layer
+ * just off the skin, opaque only where a feature is, so the tinted skin
+ * shows around them. The baked model gives it its map (src/scene/Hero.tsx).
+ * Not a character-role surface: it never grows an ink hull or casts a
+ * shadow, and depth writes stay off so it cannot z-fight the skin.
+ */
+export function faceLayer(): THREE.MeshBasicMaterial {
+  return new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false });
+}
+
 export function bakedInkSurface(): THREE.MeshBasicMaterial {
   return new THREE.MeshBasicMaterial({ color: STYLE.outline.color });
 }
