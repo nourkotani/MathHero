@@ -775,8 +775,8 @@
         "feature_val": 0.12,
         "smooth": {
           "skin": [
-            6,
-            0.85
+            10,
+            0.9
           ],
           "outfit": [
             3,
@@ -859,8 +859,8 @@
         "feature_val": 0.12,
         "smooth": {
           "skin": [
-            6,
-            0.85
+            10,
+            0.9
           ],
           "outfit": [
             3,
