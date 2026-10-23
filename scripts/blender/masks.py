@@ -78,6 +78,9 @@ VOTE_MAJORITY = 0.55
 FEATURE_GROW = 1
 SOFTEN = 1
 EXTEND = 8
+# On the face, paint darker than this is a feature (a palette may set
+# "feature_val").
+FEATURE_VAL = 0.14
 IRIS_REACH = 5
 IRIS_VAL = 0.45
 WHITE_VAL = 0.7
@@ -295,12 +298,35 @@ def labels_of(rgb, palette, head, scalp, skin_zone=None, shell=None):
         labels[labels == UNKNOWN] = {"skin": SKIN, "outfit": OUTFIT, "trim": TRIM, "other": OTHER}[rest]
     dark = val < p["dark"]
     labels[dark] = OTHER
-    labels[scalp & ~skin] = HAIR
+    # On the scalp, only bright skin is skin (the ears): auburn hair reads
+    # as skin by hue, and a palette raises "scalp_skin_val" above it.
+    scalp_skin = skin & (val > p.get("scalp_skin_val", p["skin_val"]))
+    labels[scalp & ~scalp_skin] = HAIR
     if shell is not None:
         labels[shell] = HAIR
+    # The face: skin, but for the features: the darkest paint (the eyes,
+    # the brows, the mouth's line) and the whites of the eyes. Stubble and
+    # shadow are skin, and recolor with it.
     face = head & ~scalp
-    labels[face & ~skin] = FEATURE
+    white = (sat < WHITE_SAT) & (val > WHITE_VAL)
+    labels[face & ~skin] = SKIN
+    labels[face & ((val < p.get("feature_val", FEATURE_VAL)) | white)] = FEATURE
     return labels
+
+
+def flatten(rgb, labels, smooth):
+    """Flatten the paint of a region toward one shade, an anime look: each
+    region's pixels blend toward their own blurred mean (the blur never
+    crosses into another region). smooth: {region: [radius, share]}."""
+    out = rgb.copy()
+    for name, (radius, share) in smooth.items():
+        label = {"skin": SKIN, "outfit": OUTFIT, "trim": TRIM, "hair": HAIR}[name]
+        inside = (labels == label).astype(np.float32)
+        weight = box(inside, radius)
+        for channel in range(3):
+            blurred = box(rgb[:, :, channel] * inside, radius) / np.maximum(weight, 1e-6)
+            out[:, :, channel] = np.where(inside > 0.5, rgb[:, :, channel] * (1.0 - share) + blurred * share, out[:, :, channel])
+    return out
 
 
 def iris_of(rgb, face):
@@ -395,6 +421,11 @@ def build(mesh, image, head_bone, hairline, palette=HERO_PALETTE, size=None, kee
         labels = np.where(flip, voted, labels)
         known = known | flip
     labels = fill_unknown(labels, LABELS, known)
+    if palette.get("smooth"):
+        rgb = flatten(rgb, labels, palette["smooth"])
+        px[:, :, :3] = rgb
+        image.pixels.foreach_set(np.ascontiguousarray(px).ravel())
+        image.pack()
     # A feature keeps a margin of unrecolored paint around it.
     feature = dilate(labels == FEATURE, FEATURE_GROW)
     tints = np.zeros((size, size, 3), dtype=np.float32)

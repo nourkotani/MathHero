@@ -240,16 +240,16 @@
         }
       },
       "tint": {
-        "skin": 0.1238,
-        "outfit": 0.0557,
+        "skin": 0.1335,
+        "outfit": 0.0551,
         "trim": 0.0505,
-        "hair": 0.0432
+        "hair": 0.0303
       },
       "tintGamma": {
-        "skin": 0.6423,
-        "outfit": 0.4311,
+        "skin": 0.6672,
+        "outfit": 0.4287,
         "trim": 0.4101,
-        "hair": 0.3793
+        "hair": 0.35
       }
     },
     "BodyGirl": {
@@ -490,16 +490,16 @@
         }
       },
       "tint": {
-        "skin": 0.1289,
-        "outfit": 0.0325,
-        "trim": 0.0539,
-        "hair": 0.0439
+        "skin": 0.1622,
+        "outfit": 0.0315,
+        "trim": 0.0545,
+        "hair": 0.0452
       },
       "tintGamma": {
-        "skin": 0.6556,
+        "skin": 0.7353,
         "outfit": 0.35,
-        "trim": 0.4238,
-        "hair": 0.3825
+        "trim": 0.4263,
+        "hair": 0.3879
       }
     }
   }

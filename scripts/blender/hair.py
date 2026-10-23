@@ -160,29 +160,49 @@ class Scalp:
 SHELL = 0.012
 
 
+# Hair hangs this far below the skull's core (in skull heights) and this
+# far out from its axis (in skull half widths); farther is the body.
+HANG_DOWN = 1.3
+HANG_OUT = 1.6
+
+
 def shell_faces(body, sk, head):
-    """The head's faces that are a shell over the skin: Tripo models hair
-    as a surface outside the head, so a ray from the skull's core meets the
-    skin first and the hair beyond it. A fringe over the forehead and the
-    strands framing the face are hair, not features, whatever their
-    paint. head: bool array over the faces (masks.head_faces)."""
-    scalp = Scalp(body, sk)
+    """The faces near the head that are a shell over the skin: Tripo
+    models hair as a surface outside the body, so a ray from the skull's
+    core meets the skin first and the hair beyond it. A fringe over the
+    forehead, the strands framing the face, and the hair down the back
+    are hair whatever their paint. head: bool array over the faces
+    (masks.head_faces); the test runs on every face near the head."""
+    bm = bmesh.new()
+    bm.from_mesh(body.data)
+    tree = BVHTree.FromBMesh(bm)
+    bm.free()
     count = len(body.data.polygons)
     centres = np.empty(count * 3, dtype=np.float32)
     body.data.polygons.foreach_get("center", centres)
     centres = centres.reshape(-1, 3)
-    shell = np.zeros(count, dtype=bool)
     core = sk["core"]
-    for i in np.nonzero(head)[0]:
+    floor = core.z - 0.6 * (sk["centre"].z - core.z)
+    near = head | (
+        (centres[:, 2] > core.z - HANG_DOWN * sk["height"])
+        & (np.abs(centres[:, 0] - sk["crown_x"]) < HANG_OUT * sk["half_width"])
+    )
+    shell = np.zeros(count, dtype=bool)
+    for i in np.nonzero(near)[0]:
         centre = Vector(centres[i])
+        # The neck and the chin: below the skull and not behind it. A ray
+        # from the core leaves the skull through the jaw before it reaches
+        # them, which would count them as a shell.
+        if centre.z < floor and centre.y < sk["crown_y"] + 0.02:
+            continue
         away = centre - core
         reach = away.length
         if reach < 1e-6:
             continue
-        hit, _, _, distance = scalp.tree.ray_cast(core, away / reach, reach + 1.0)
+        hit, _, _, distance = tree.ray_cast(core, away / reach, reach + 1.0)
         if hit is not None and reach > distance + SHELL:
             shell[i] = True
-    print(f"SHELL {body.name}: {int(shell.sum())} of {int(head.sum())} head faces are hair over the skin")
+    print(f"SHELL {body.name}: {int(shell.sum())} of {int(near.sum())} faces near the head are hair over the skin")
     return shell
 
 
@@ -451,6 +471,70 @@ def build_buzz_long(name, scalp, sk):
                 spike(bm, root, normal, direction, BACK * 0.3, 0.22 * w, 0.055 * w, flow=0.6, rings=4, segments=5)
 
     return _build(name, tufts)
+
+
+def split_native(body, sk, head, name, least=300):
+    """The body's own hair (the shell over the skin, hair.shell_faces) as
+    a piece of its own, so the Hair Styles sit on the scalp and not on
+    top of it; the body keeps the skull under it. None when the body has
+    no such shell (a buzz cut). The piece keeps the body's weights, UVs,
+    and material: the masks recolor it with the hair color."""
+    shell = shell_faces(body, sk, head)
+    if int(shell.sum()) < least:
+        return None
+    piece = body.copy()
+    piece.data = body.data.copy()
+    piece.name = piece.data.name = name
+    bpy.context.scene.collection.objects.link(piece)
+    for mod in list(piece.modifiers):
+        piece.modifiers.remove(mod)
+    for obj, keep in ((piece, shell), (body, ~shell)):
+        bm = bmesh.new()
+        bm.from_mesh(obj.data)
+        bm.faces.ensure_lookup_table()
+        bmesh.ops.delete(bm, geom=[f for f in bm.faces if not keep[f.index]], context="FACES")
+        bmesh.ops.delete(bm, geom=[v for v in bm.verts if not v.link_faces], context="VERTS")
+        bm.to_mesh(obj.data)
+        bm.free()
+    print(f"NATIVE {name}: {len(piece.data.polygons)} faces of hair off the skull")
+    return piece
+
+
+CAP_LIFT = 0.01
+
+
+def build_cap(body, sk, head, name):
+    """The scalp: the head's faces above the hairline, lifted off the
+    skin, as the base under every spike style, so no bare skull shows
+    between the spikes. Made from the body with its own hair taken off
+    (split_native)."""
+    line = hairline(sk)
+    count = len(body.data.polygons)
+    centres = np.empty(count * 3, dtype=np.float32)
+    body.data.polygons.foreach_get("center", centres)
+    centres = centres.reshape(-1, 3)
+    scalp = head & (centres[:, 2] > line(centres[:, 0], centres[:, 1], centres[:, 2]))
+    cap = body.copy()
+    cap.data = body.data.copy()
+    cap.name = cap.data.name = name
+    bpy.context.scene.collection.objects.link(cap)
+    for mod in list(cap.modifiers):
+        cap.modifiers.remove(mod)
+    for group in list(cap.vertex_groups):
+        cap.vertex_groups.remove(group)
+    bm = bmesh.new()
+    bm.from_mesh(cap.data)
+    bm.faces.ensure_lookup_table()
+    bmesh.ops.delete(bm, geom=[f for f in bm.faces if not scalp[f.index]], context="FACES")
+    bmesh.ops.delete(bm, geom=[v for v in bm.verts if not v.link_faces], context="VERTS")
+    bm.normal_update()
+    for v in bm.verts:
+        v.co += v.normal * CAP_LIFT
+    bm.to_mesh(cap.data)
+    bm.free()
+    cap.data.materials.clear()
+    cap.data.shade_smooth()
+    return cap
 
 
 def build_all(body, prefix, sk, suffix):
