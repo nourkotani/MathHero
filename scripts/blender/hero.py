@@ -477,12 +477,74 @@ def _on_bone(mesh, name):
     return on
 
 
+# Arcade proportions (ADR 0008: a big head, big fists, and big boots), as
+# the bake reshapes a body around its own joints by the rig's weights: a
+# uniform scale about a joint ("about"), or a thicker limb, a scale away
+# from the bone's axis ("around"). The bones are Tripo's; a side prefix
+# (L_, R_) is added for each side. The clips play as before: no joint
+# moves, only the skin around it.
+PROPORTIONS = (
+    {"about": "Head", "bones": ("Head",), "scale": 1.26},
+    {"about": "Hand", "bones": ("Hand",), "scale": 1.42, "sides": True},
+    {"about": "Foot", "bones": ("Foot", "ToeBase"), "scale": 1.3, "sides": True},
+    {"around": "Upperarm", "bones": ("Upperarm", "UpperarmTwist01"), "scale": 1.26, "sides": True},
+    {"around": "Forearm", "bones": ("Forearm", "ForearmTwist01", "ForearmTwist02"), "scale": 1.26, "sides": True},
+    {"around": "Thigh", "bones": ("Thigh", "ThighTwist01", "ThighTwist02"), "scale": 1.12, "sides": True},
+    {"around": "Calf", "bones": ("Calf", "CalfTwist01", "CalfTwist02"), "scale": 1.15, "sides": True},
+)
+
+
+def _proportions(mesh, rig):
+    """Reshape the body by PROPORTIONS: every vertex moves by the sum over
+    the rules of its weight on the rule's bones times the rule's move."""
+    co = np.empty(len(mesh.data.vertices) * 3)
+    mesh.data.vertices.foreach_get("co", co)
+    co = co.reshape(-1, 3)
+    move = np.zeros_like(co)
+    names = {group.name: group.index for group in mesh.vertex_groups}
+    weights = {}
+
+    def weight(name):
+        if name not in weights:
+            w = np.zeros(len(co))
+            index = names.get(name)
+            if index is not None:
+                for v in mesh.data.vertices:
+                    for g in v.groups:
+                        if g.group == index:
+                            w[v.index] = g.weight
+            weights[name] = w
+        return weights[name]
+
+    for rule in PROPORTIONS:
+        for side in (("L_", "R_") if rule.get("sides") else ("",)):
+            share = np.zeros(len(co))
+            for bone in rule["bones"]:
+                share += weight(side + bone)
+            k = rule["scale"] - 1.0
+            if "about" in rule:
+                pivot = np.array(rig.data.bones[side + rule["about"]].head_local)
+                move += (co - pivot) * (k * share)[:, None]
+            else:
+                bone = rig.data.bones[side + rule["around"]]
+                head, tail = np.array(bone.head_local), np.array(bone.tail_local)
+                axis = tail - head
+                t = ((co - head) @ axis) / max(float(axis @ axis), 1e-9)
+                nearest = head + t[:, None] * axis
+                move += (co - nearest) * (k * share)[:, None]
+    co += move
+    mesh.data.vertices.foreach_set("co", co.ravel())
+    mesh.data.update()
+    print(f"PROPORTIONS {mesh.name}: {int((np.linalg.norm(move, axis=1) > 1e-4).sum())} vertices moved")
+
+
 def load_body(body_name):
     """A body in hero space with its joints renamed and its paint kept:
     (rig, mesh, scale, image). The tools (a hair preview) start here."""
     with open(os.path.join(SOURCES, "models.json"), encoding="utf-8") as f:
         brief = json.load(f)["models"][BRIEFS[body_name]]
     rig, mesh = _import_body(brief, body_name)
+    _proportions(mesh, rig)
     image = _painted_only(mesh, c.PAINTED + body_name)
     matrix, scale = _hero_space(rig, mesh)
     _transform(rig, mesh, matrix)
