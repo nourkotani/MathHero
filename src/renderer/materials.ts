@@ -146,6 +146,13 @@ export interface MaskUniforms {
   meanOutfit: { value: number };
   meanTrim: { value: number };
   meanHair: { value: number };
+  /** How much of each region's contrast the recolor keeps: the ratio of
+   *  a pixel's light to the mean, raised to this (1 keeps it all; dark
+   *  paint keeps less, or its faint stitches come out white). */
+  gammaSkin: { value: number };
+  gammaOutfit: { value: number };
+  gammaTrim: { value: number };
+  gammaHair: { value: number };
   /** The Form's eye color, on the iris only while eyeOn is 1. */
   eyeColor: { value: THREE.Color };
   eyeOn: { value: number };
@@ -182,6 +189,10 @@ export function maskedPainterlySurface(regions: BodyRegions): MaskedSurface {
     meanOutfit: { value: 1 },
     meanTrim: { value: 1 },
     meanHair: { value: 1 },
+    gammaSkin: { value: 1 },
+    gammaOutfit: { value: 1 },
+    gammaTrim: { value: 1 },
+    gammaHair: { value: 1 },
     eyeColor: { value: new THREE.Color() },
     eyeOn: { value: 0 },
     glowOutfit: { value: new THREE.Color(0x000000) },
@@ -210,6 +221,10 @@ uniform float meanSkin;
 uniform float meanOutfit;
 uniform float meanTrim;
 uniform float meanHair;
+uniform float gammaSkin;
+uniform float gammaOutfit;
+uniform float gammaTrim;
+uniform float gammaHair;
 uniform vec3 eyeColor;
 uniform float eyeOn;
 uniform vec3 glowOutfit;
@@ -227,10 +242,10 @@ vec2 bodyMarks = vec2(0.0);
 bodyMask = texture2D(maskMap, vMapUv).rgb;
 bodyMarks = texture2D(marksMap, vMapUv).rg;
 float paintedLum = dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722));
-diffuseColor.rgb = mix(diffuseColor.rgb, tintSkin * (paintedLum / meanSkin), bodyMask.r);
-diffuseColor.rgb = mix(diffuseColor.rgb, tintOutfit * (paintedLum / meanOutfit), bodyMask.g);
-diffuseColor.rgb = mix(diffuseColor.rgb, tintTrim * (paintedLum / meanTrim), bodyMask.b);
-diffuseColor.rgb = mix(diffuseColor.rgb, tintHair * (paintedLum / meanHair), bodyMarks.r);
+diffuseColor.rgb = mix(diffuseColor.rgb, tintSkin * pow(paintedLum / meanSkin, gammaSkin), bodyMask.r);
+diffuseColor.rgb = mix(diffuseColor.rgb, tintOutfit * pow(paintedLum / meanOutfit, gammaOutfit), bodyMask.g);
+diffuseColor.rgb = mix(diffuseColor.rgb, tintTrim * pow(paintedLum / meanTrim, gammaTrim), bodyMask.b);
+diffuseColor.rgb = mix(diffuseColor.rgb, tintHair * pow(paintedLum / meanHair, gammaHair), bodyMarks.r);
 diffuseColor.rgb = mix(diffuseColor.rgb, eyeColor, bodyMarks.g * eyeOn);
 #endif`,
       )

@@ -9,16 +9,24 @@ is the record of that step; the rig and animation task ids are in
 sources/tripo/models.json.
 """
 
+import os
 import sys
 
-import bpy
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+import bpy  # noqa: E402
+
+import common  # noqa: E402
 
 
 def main():
     argv = sys.argv[sys.argv.index("--") + 1 :]
     source, out, faces = argv[0], argv[1], int(argv[2])
     bpy.ops.wm.read_factory_settings(use_empty=True)
+    before = set(bpy.context.scene.objects)
     bpy.ops.import_scene.gltf(filepath=source)
+    # A Studio export carries a Mixamo armature: Tripo rigs the mesh alone.
+    common.bare_mesh(set(bpy.context.scene.objects) - before)
     meshes = [o for o in bpy.context.scene.objects if o.type == "MESH"]
     total = sum(len(m.data.polygons) for m in meshes)
     ratio = min(1.0, faces / total)

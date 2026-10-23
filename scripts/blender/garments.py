@@ -44,6 +44,13 @@ PLATES = {
     "ShinL": (300, "Outfit"),
 }
 SHOULDER_REACH = 0.24
+# The arms' clearance from the chest and back plates; the bracers' and the
+# shins' reach around their bones (hero units).
+ARM_CLEAR = 0.11
+BRACER_RADIUS = 0.13
+SHIN_RADIUS = 0.15
+# A plate keeps every patch of at least this many faces.
+MIN_PATCH = 8
 # The cape's grid, its clearance from the back, its flare at the hem, and
 # its thickness.
 CAPE_COLUMNS = 13
@@ -111,8 +118,9 @@ def _shell(body, keep, name, faces, lift, thickness, paint, rim_paint):
     if not patches:
         raise ValueError(f"{name}: the rule keeps no face")
     patches.sort(key=len, reverse=True)
-    print(f"PLATE {name}: {len(patches[0])} faces kept of {sum(len(p) for p in patches)} in {len(patches)} patches")
-    bmesh.ops.delete(bm, geom=[f for patch in patches[1:] for f in patch], context="FACES")
+    small = [patch for patch in patches if len(patch) < MIN_PATCH]
+    print(f"PLATE {name}: {sum(len(p) for p in patches) - sum(len(p) for p in small)} faces kept in {len(patches) - len(small)} patches ({len(small)} chips dropped)")
+    bmesh.ops.delete(bm, geom=[f for patch in small for f in patch], context="FACES")
     bmesh.ops.delete(bm, geom=[v for v in bm.verts if not v.link_faces], context="VERTS")
     bm.to_mesh(plate.data)
     bm.free()
@@ -145,30 +153,42 @@ def _shell(body, keep, name, faces, lift, thickness, paint, rim_paint):
     return plate
 
 
+def _near_bone(co, rig, name, radius):
+    """The vertices within radius of a bone's segment."""
+    bone = rig.data.bones[name]
+    head, tail = np.array(bone.head_local), np.array(bone.tail_local)
+    axis = tail - head
+    length = float(axis @ axis)
+    t = np.clip(((co - head) @ axis) / max(length, 1e-9), 0.0, 1.0)
+    nearest = head + t[:, None] * axis
+    return np.linalg.norm(co - nearest, axis=1) < radius
+
+
 def _plate_rules(body, prefix, rig, marks):
-    """Which vertices each plate is cut from."""
+    """Which vertices each plate is cut from: by place and by distance to
+    a bone, never by weight (a sparse mesh's weights cut a plate into
+    chips)."""
     co = _coords(body)
-    w = lambda name: _weights(body, prefix + name)  # noqa: E731
-    joint = lambda name: rig.data.bones[prefix + name].head_local  # noqa: E731
-    torso = w("torso") + w("Spine02") + w("Waist") + w("Hip") + w("Pelvis") + w("NeckTwist01") * 0.0
-    arms = w("armR") + w("armL") + w("L_Clavicle") + w("R_Clavicle")
+    joint = lambda name: np.array(rig.data.bones[prefix + name].head_local)  # noqa: E731
     hip_z, neck_z = marks["hip"], marks["neck"]
     mid_y = np.interp(co[:, 2], marks["heights"], 0.5 * (marks["profile"][:, 1] + marks["profile"][:, 2]))
     half = marks["shoulder_x"]
-    body_z = (co[:, 2] > hip_z + 0.04) & (co[:, 2] < neck_z - 0.03) & (torso > 0.55) & (arms < 0.4) & (np.abs(co[:, 0]) < half * 0.82)
+    arms = np.zeros(len(co), dtype=bool)
+    for arm in ("armR", "armL", "elbowR", "elbowL"):
+        arms |= _near_bone(co, rig, prefix + arm, ARM_CLEAR)
+    torso = (co[:, 2] > hip_z + 0.06) & (co[:, 2] < neck_z - 0.03) & (np.abs(co[:, 0]) < half * 0.78) & ~arms
     rules = {
-        "Chest": body_z & (co[:, 1] < mid_y - 0.01),
-        "Back": body_z & (co[:, 1] > mid_y + 0.01),
+        "Chest": torso & (co[:, 1] < mid_y - 0.01),
+        "Back": torso & (co[:, 1] > mid_y + 0.01),
     }
-    for side, arm, fore, hand, thigh, calf, foot in (("R", "armR", "elbowR", "L_Hand", "legR", "kneeR", "L_Foot"), ("L", "armL", "elbowL", "R_Hand", "legL", "kneeL", "R_Foot")):
+    for side, arm, fore, hand, calf, foot in (("R", "armR", "elbowR", "L_Hand", "kneeR", "L_Foot"), ("L", "armL", "elbowL", "R_Hand", "kneeL", "R_Foot")):
         shoulder = joint(arm)
-        near = np.linalg.norm(co - np.array(shoulder), axis=1) < SHOULDER_REACH
-        rules["Shoulder" + side] = near & (co[:, 2] > shoulder.z - 0.1) & (np.abs(co[:, 0]) > 0.16)
-        twist = "L_" if side == "R" else "R_"
-        forearm = w(fore) + w(f"{twist}ForearmTwist01") + w(f"{twist}ForearmTwist02")
-        rules["Bracer" + side] = (forearm > 0.6) & (w(hand) < 0.25)
-        shin = w(calf) + w(f"{twist}CalfTwist01") + w(f"{twist}CalfTwist02")
-        rules["Shin" + side] = (shin > 0.6) & (w(foot) < 0.2) & (co[:, 2] < marks["knee"] - 0.02)
+        near = np.linalg.norm(co - shoulder, axis=1) < SHOULDER_REACH
+        rules["Shoulder" + side] = near & (co[:, 2] > shoulder[2] - 0.1) & (np.abs(co[:, 0]) > 0.12)
+        wrist = joint(hand)
+        rules["Bracer" + side] = _near_bone(co, rig, prefix + fore, BRACER_RADIUS) & (np.linalg.norm(co - wrist, axis=1) > 0.07)
+        ankle = joint(foot)
+        rules["Shin" + side] = _near_bone(co, rig, prefix + calf, SHIN_RADIUS) & (co[:, 2] < marks["knee"] - 0.03) & (np.linalg.norm(co - ankle, axis=1) > 0.1)
     return rules
 
 
