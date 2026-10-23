@@ -781,7 +781,7 @@ def _cosmetic_anchors(body, prefix, sk, marks):
 def _paints(*names):
     """The bake-only paint of the pieces, as on the scripted hero."""
     made = {
-        "Hair": lambda: c.paint_material("Hair", HAIR, grain=0.2, edge=0.35, crevice=0.4, top=0.3, stroke_scale=14.0),
+        "Hair": lambda: c.paint_material("Hair", HAIR, grain=0.12, edge=0.6, crevice=0.35, top=0.45, stroke_scale=14.0),
         "Outfit": lambda: c.paint_material("Outfit", OUTFIT, grain=0.14, edge=0.15, crevice=0.5, top=0.16, stroke_scale=7.0),
         "Trim": lambda: c.paint_material("Trim", TRIM, grain=0.1, edge=0.2, crevice=0.45, top=0.16),
     }
@@ -856,7 +856,7 @@ def _finish_pieces(pieces, rigs):
     for piece, body_name in pieces:
         for i, mat in enumerate(piece.data.materials):
             if mat is None or not mat.name.startswith(c.PAINTED):
-                raise ValueError(f"{piece.name}: slot {i} wears {mat and mat.name}, not an atlas paint")
+                raise ValueError(f"{piece.name}: slot {i} wears {mat and mat.name}, not a painted material")
         c.ink_hull_skinned(piece, rigs[body_name], INK_WIDTH)
         piece.parent = rigs[body_name]
         faces = sum(1 for p in piece.data.polygons if piece.data.materials[p.material_index].name != c.INK)
@@ -874,6 +874,11 @@ def _pieces(rigs, bodies, skulls, marks):
     owners = {}
     for body_name, prefix in BODIES.items():
         body, rig, sk = bodies[body_name], rigs[body_name], skulls[body_name]
+        # The body's own hair comes off the skull first, so the styles root
+        # on the scalp; it is the buzz cut's look, short and long.
+        # The body's own hair is the base of every style: on these models
+        # it is the skin's own surface (only loose strands are a shell over
+        # it), so the spikes root on it and grow out of it.
         made = hair.build_all(body, prefix, sk, body_name)
         for part, piece in made.items():
             piece.data.materials.append(paints["Hair"])

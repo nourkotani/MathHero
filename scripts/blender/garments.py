@@ -83,9 +83,9 @@ def _coords(body):
     return co.reshape(-1, 3)
 
 
-def _shell(body, keep, name, faces, lift, thickness, paint, rim_paint):
-    """The body's faces whose every vertex is kept, as a plate: decimated,
-    pushed out, and made solid. The vertex groups come along."""
+def _shell(body, keep, name, faces, lift, thickness, paint, rim_paint, most=2):
+    """The body's faces with at least `most` vertices kept, as a plate:
+    decimated, pushed out, and made solid. The vertex groups come along."""
     plate = body.copy()
     plate.data = body.data.copy()
     plate.name = plate.data.name = name
@@ -94,7 +94,7 @@ def _shell(body, keep, name, faces, lift, thickness, paint, rim_paint):
         plate.modifiers.remove(mod)
     bm = bmesh.new()
     bm.from_mesh(plate.data)
-    bmesh.ops.delete(bm, geom=[f for f in bm.faces if not all(keep[v.index] for v in f.verts)], context="FACES")
+    bmesh.ops.delete(bm, geom=[f for f in bm.faces if sum(keep[v.index] for v in f.verts) < most], context="FACES")
     bmesh.ops.delete(bm, geom=[v for v in bm.verts if not v.link_faces], context="VERTS")
     # Only the largest patch: a stray face elsewhere would be a floating chip.
     bm.verts.ensure_lookup_table()
@@ -313,7 +313,8 @@ def build_cape(body, prefix, rig, marks, name, paints):
 
 
 def build_all(body, prefix, rig, marks, sk, body_name, paints):
-    """Both built garments of one body: {part: object}."""
+    """Both built garments of one body: {part: object}. The fighter gi is
+    the body itself: a loft over a sparse body came out as a box."""
     return {
         "GarmentArmor": build_armor(body, prefix, rig, marks, f"GarmentArmor-{body_name}", paints),
         "GarmentCape": build_cape(body, prefix, rig, marks, f"GarmentCape-{body_name}", paints),

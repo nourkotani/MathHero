@@ -771,7 +771,23 @@
         "dark": 0.04,
         "rest": "outfit",
         "skin_above": "neck",
-        "crack": 0.015
+        "crack": 0.015,
+        "feature_val": 0.12,
+        "smooth": {
+          "skin": [
+            6,
+            0.85
+          ],
+          "outfit": [
+            3,
+            0.6
+          ],
+          "trim": [
+            3,
+            0.6
+          ]
+        },
+        "scalp_skin_val": 0.5
       },
       "palette_note": "A dark, low-saturation suit (the outfit, gloves and boots included), brown leather panels (the trim), peach skin above the neck only (so the face's stubble and shadows recolor with it), auburn hair; the head's geometry sorts the hair (masks.py)."
     },
@@ -839,7 +855,23 @@
         "dark": 0.04,
         "rest": "outfit",
         "skin_above": "neck",
-        "crack": 0.015
+        "crack": 0.015,
+        "feature_val": 0.12,
+        "smooth": {
+          "skin": [
+            6,
+            0.85
+          ],
+          "outfit": [
+            3,
+            0.6
+          ],
+          "trim": [
+            3,
+            0.6
+          ]
+        },
+        "scalp_skin_val": 0.5
       },
       "palette_note": "A dark, low-saturation suit (the outfit, gloves and boots included), brown leather panels (the trim), peach skin above the neck only (so the face's stubble and shadows recolor with it), auburn hair; the head's geometry sorts the hair (masks.py)."
     }
