@@ -491,6 +491,8 @@ PROPORTIONS = (
     {"around": "Forearm", "bones": ("Forearm", "ForearmTwist01", "ForearmTwist02"), "scale": 1.26, "sides": True},
     {"around": "Thigh", "bones": ("Thigh", "ThighTwist01", "ThighTwist02"), "scale": 1.12, "sides": True},
     {"around": "Calf", "bones": ("Calf", "CalfTwist01", "CalfTwist02"), "scale": 1.15, "sides": True},
+    {"around": "Spine02", "bones": ("Spine02", "L_Clavicle", "R_Clavicle"), "scale": 1.12},
+    {"around": "Spine01", "bones": ("Spine01",), "scale": 1.06},
 )
 
 
